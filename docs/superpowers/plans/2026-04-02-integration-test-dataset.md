@@ -800,10 +800,10 @@ from pathlib import Path
 PROMPT_TEMPLATE = """Given the following C test file and the Rust interface it should use, \
 generate ONLY a Rust file with a main() function that:
 1. Calls the equivalent Rust API functions defined in the interface
-2. Produces identical stdout output to the C version
-3. Preserves any assert! checks for correctness (use assert! or assert_eq! macros)
-4. Uses println!/print! to match printf output exactly
-5. Does NOT implement the library — only the main() function and any helper functions local to the test
+2. Produces identical stdout output to the C version using println!/print!
+3. Does NOT include assert! or assert_eq! — this is a coarse-grained integration \
+test, not a unit test. Correctness is verified by comparing stdout/exit-code.
+4. Does NOT implement the library — only the main() function and any helper functions local to the test
 
 C test file ({c_test_name}):
 ```c
@@ -822,8 +822,8 @@ The crate name is `{crate_name}`.
 
 Generate only the Rust file with necessary `use` statements and a `fn main()`.
 Do not generate the library implementation.
-Do not wrap the output in markdown code fences.
-Do not include #[test] annotations — this is a standalone binary."""
+Do not include #[test] annotations or assert macros.
+Do not wrap the output in markdown code fences."""
 
 
 def build_prompt(entry: dict) -> str:

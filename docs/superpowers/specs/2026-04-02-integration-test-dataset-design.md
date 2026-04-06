@@ -62,8 +62,8 @@ The pipeline has three sequential steps.
 
 For each project in CBench:
 
-1. **Copy** the project into `CBench_int/<project>/` (src, tests, CMakeLists.txt, any data files)
-2. **Compile** using CMake: `cmake -B build && cmake --build build`
+1. **Copy** the project into `CBench_int/<project>/` (src, tests, CMakeLists.txt, MAKEFILE, any data files)
+2. **Compile** using CMake: `cmake -B build && cmake --build build` or `make`
 3. **For each test binary** (identified from CMakeLists.txt or by globbing compiled executables):
    a. **Skip detection** — static analysis of the `.c` source for:
       - `scanf`, `fgets`, `getline`, `read(STDIN` — stdin dependency
@@ -112,10 +112,10 @@ For each project that survived Step 1:
 Given the following C test file and the Rust interface it should use,
 generate ONLY a Rust file with a main() function that:
 1. Calls the equivalent Rust API functions defined in the interface
-2. Produces identical stdout output to the C version
-3. Preserves any assert! checks for correctness
-4. Uses `println!`/`print!` to match printf output exactly
-5. Does NOT implement the library — only the main() function and any
+2. Produces identical stdout output to the C version using println!/print!
+3. Does NOT include assert! or assert_eq! — this is a coarse-grained integration
+   test, not a unit test. Correctness is verified by comparing stdout/exit-code.
+4. Does NOT implement the library — only the main() function and any
    helper functions local to the test
 
 C test file:
@@ -129,6 +129,7 @@ Existing Rust lib.rs:
 
 Generate only the Rust file with necessary `use` statements and a `fn main()`.
 Do not generate the library implementation.
+Do not include #[test] annotations or assert macros.
 Do not wrap the output in markdown code fences.
 ```
 
