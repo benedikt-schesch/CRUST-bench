@@ -1,0 +1,9 @@
+```rust
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod logger;
+pub mod vcs;
+
+pub use crate::vcs as vm;
+```

@@ -1,0 +1,505 @@
+{{bucket.rs}}
+```rust
+use crate::cards::Card;
+
+pub struct Bucket {
+    pub cards: [Option<Card>; 4],
+    pub count: usize,
+}
+
+impl Bucket {
+    pub fn new() -> Self {
+        Self {
+            cards: [None, None, None, None],
+            count: 0,
+        }
+    }
+
+    pub fn add(&mut self, card: Card) {
+        if self.count < 4 {
+            self.cards[self.count] = Some(card);
+            self.count += 1;
+        }
+    }
+}
+```
+
+{{cards.rs}}
+```rust
+pub const RANKS_PER_DECK: usize = 13;
+pub const SUITS_PER_DECK: usize = 4;
+pub const RANK_CHARS: &str = "23456789TJQKA";
+pub const SUIT_CHARS: &str = "cdhs";
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum Suit {
+    InvalidSuit,
+    Club,
+    Diamond,
+    Heart,
+    Spade,
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
+pub enum Rank {
+    InvalidRank,
+    Deuce,
+    Trey,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
+    Ten,
+    Jack,
+    Queen,
+    King,
+    Ace,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Card {
+    pub rank: Rank,
+    pub suit: Suit,
+}
+
+impl Card {
+    pub fn new(rank: Rank, suit: Suit) -> Self {
+        let card = Card { rank, suit };
+        if card.is_valid() {
+            card
+        } else {
+            Card {
+                rank: Rank::InvalidRank,
+                suit: Suit::InvalidSuit,
+            }
+        }
+    }
+
+    pub fn from_string(s: &str) -> Card {
+        if s.chars().count() != 2 {
+            Card {
+                rank: Rank::InvalidRank,
+                suit: Suit::InvalidSuit,
+            }
+        } else {
+            let mut it = s.chars();
+            let r = it.next().unwrap();
+            let su = it.next().unwrap();
+            Card::from_chars(r, su)
+        }
+    }
+
+    pub fn from_chars(rank: char, suit: char) -> Card {
+        let r = char_to_rank(rank);
+        let s = char_to_suit(suit);
+        Card::new(r, s)
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.rank >= Rank::Deuce
+            && self.rank <= Rank::Ace
+            && matches!(self.suit, Suit::Club | Suit::Diamond | Suit::Heart | Suit::Spade)
+    }
+
+    pub fn to_string(&self) -> String {
+        if !self.is_valid() {
+            "--".to_string()
+        } else {
+            let mut s = String::with_capacity(2);
+            s.push(self.rank.to_char());
+            s.push(self.suit.to_char());
+            s
+        }
+    }
+}
+
+pub fn card_swap(card1: &mut Card, card2: &mut Card) {
+    std::mem::swap(card1, card2);
+}
+
+impl Rank {
+    pub fn from_char(c: char) -> Rank {
+        char_to_rank(c)
+    }
+
+    pub fn to_char(&self) -> char {
+        match self {
+            Rank::Deuce => '2',
+            Rank::Trey => '3',
+            Rank::Four => '4',
+            Rank::Five => '5',
+            Rank::Six => '6',
+            Rank::Seven => '7',
+            Rank::Eight => '8',
+            Rank::Nine => '9',
+            Rank::Ten => 'T',
+            Rank::Jack => 'J',
+            Rank::Queen => 'Q',
+            Rank::King => 'K',
+            Rank::Ace => 'A',
+            Rank::InvalidRank => '-',
+        }
+    }
+}
+
+impl Suit {
+    pub fn from_char(c: char) -> Suit {
+        char_to_suit(c)
+    }
+
+    pub fn to_char(&self) -> char {
+        match self {
+            Suit::Club => 'c',
+            Suit::Diamond => 'd',
+            Suit::Heart => 'h',
+            Suit::Spade => 's',
+            Suit::InvalidSuit => '-',
+        }
+    }
+}
+
+pub fn index_of(c: char, chars: &str) -> Option<usize> {
+    for (i, ch) in chars.chars().enumerate() {
+        if ch == c {
+            return Some(i + 1);
+        }
+    }
+    None
+}
+
+pub fn char_to_rank(c: char) -> Rank {
+    match index_of(c, RANK_CHARS) {
+        Some(1) => Rank::Deuce,
+        Some(2) => Rank::Trey,
+        Some(3) => Rank::Four,
+        Some(4) => Rank::Five,
+        Some(5) => Rank::Six,
+        Some(6) => Rank::Seven,
+        Some(7) => Rank::Eight,
+        Some(8) => Rank::Nine,
+        Some(9) => Rank::Ten,
+        Some(10) => Rank::Jack,
+        Some(11) => Rank::Queen,
+        Some(12) => Rank::King,
+        Some(13) => Rank::Ace,
+        _ => Rank::InvalidRank,
+    }
+}
+
+pub fn char_to_suit(c: char) -> Suit {
+    match index_of(c, SUIT_CHARS) {
+        Some(1) => Suit::Club,
+        Some(2) => Suit::Diamond,
+        Some(3) => Suit::Heart,
+        Some(4) => Suit::Spade,
+        _ => Suit::InvalidSuit,
+    }
+}
+
+pub fn new_card_from_chars(rank: char, suit: char) -> Card {
+    Card::from_chars(rank, suit)
+}
+
+pub fn card_compare(card1: &Card, card2: &Card) -> i32 {
+    (card1.rank as i32) - (card2.rank as i32)
+}
+
+pub fn card_equal(card1: &Card, card2: &Card) -> bool {
+    card1.rank == card2.rank && card1.suit == card2.suit
+}
+```
+
+{{deck.rs}}
+```rust
+use rand::seq::SliceRandom;
+use rand::thread_rng;
+use crate::cards::{Card, RANKS_PER_DECK, SUITS_PER_DECK, Rank, Suit};
+
+pub const CARDS_PER_DECK: usize = 52;
+
+pub fn new_deck() -> Vec<Card> {
+    let mut deck = Vec::with_capacity(CARDS_PER_DECK);
+    let ranks = [
+        Rank::Deuce,
+        Rank::Trey,
+        Rank::Four,
+        Rank::Five,
+        Rank::Six,
+        Rank::Seven,
+        Rank::Eight,
+        Rank::Nine,
+        Rank::Ten,
+        Rank::Jack,
+        Rank::Queen,
+        Rank::King,
+        Rank::Ace,
+    ];
+    let suits = [Suit::Club, Suit::Diamond, Suit::Heart, Suit::Spade];
+
+    for rank in ranks.iter().take(RANKS_PER_DECK) {
+        for suit in suits.iter().take(SUITS_PER_DECK) {
+            deck.push(Card::new(*rank, *suit));
+        }
+    }
+
+    deck
+}
+
+pub fn deck_shuffle(deck: &mut Vec<Card>) {
+    let mut rng = thread_rng();
+    deck.shuffle(&mut rng);
+}
+```
+
+{{hands.rs}}
+```rust
+use crate::cards::Card;
+use crate::bucket;
+use crate::cards::card_compare;
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
+pub enum HandType {
+    InvalidHand,
+    HighCard,
+    Pair,
+    TwoPair,
+    ThreeOfAKind,
+    Straight,
+    Wheel,
+    Flush,
+    FullHouse,
+    FourOfAKind,
+    StraightFlush,
+    WheelFlush,
+}
+
+pub fn hand_compare(hand1: &[Card; 5], hand2: &[Card; 5]) -> i32 {
+    let hand1_type = hand_classify(hand1);
+    let hand2_type = hand_classify(hand2);
+    let diff = (hand1_type as i32) - (hand2_type as i32);
+    if diff != 0 {
+        return diff;
+    }
+
+    for i in 0..5 {
+        let cmp = card_compare(&hand1[i], &hand2[i]);
+        if cmp != 0 {
+            return cmp;
+        }
+    }
+    0
+}
+
+pub fn hand_sort(hand: &mut [Card; 5]) {
+    let mut buckets = [
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+        bucket::Bucket::new(),
+    ];
+
+    for card in hand.iter() {
+        let bucket_index = (card.rank as usize) - 1;
+        buckets[bucket_index].add(*card);
+    }
+
+    let mut index = 0usize;
+
+    for count in (1..=4).rev() {
+        for j in (0..13).rev() {
+            if buckets[j].count == count {
+                for k in 0..count {
+                    if let Some(card) = buckets[j].cards[k] {
+                        hand[index] = card;
+                        index += 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn hand_classify(cards: &[Card; 5]) -> HandType {
+    if hand_is_flush(cards) {
+        if hand_is_straight(cards) {
+            return HandType::StraightFlush;
+        }
+        if hand_is_wheel(cards) {
+            return HandType::WheelFlush;
+        }
+        HandType::Flush
+    } else {
+        if hand_is_four_of_a_kind(cards) {
+            return HandType::FourOfAKind;
+        }
+        if hand_is_full_house(cards) {
+            return HandType::FullHouse;
+        }
+        if hand_is_straight(cards) {
+            return HandType::Straight;
+        }
+        if hand_is_wheel(cards) {
+            return HandType::Wheel;
+        }
+        if hand_is_three_of_a_kind(cards) {
+            return HandType::ThreeOfAKind;
+        }
+        if hand_is_two_pair(cards) {
+            return HandType::TwoPair;
+        }
+        if hand_is_pair(cards) {
+            return HandType::Pair;
+        }
+        HandType::HighCard
+    }
+}
+
+pub fn hand_is_valid(cards: &[Card; 5]) -> bool {
+    for card in cards.iter() {
+        if !card.is_valid() {
+            return false;
+        }
+    }
+    true
+}
+
+fn hand_is_straight_flush(cards: &[Card; 5]) -> bool {
+    hand_is_straight(cards) && hand_is_flush(cards)
+}
+
+fn hand_is_wheel_flush(cards: &[Card; 5]) -> bool {
+    hand_is_wheel(cards) && hand_is_flush(cards)
+}
+
+fn hand_is_four_of_a_kind(cards: &[Card; 5]) -> bool {
+    cards[0].rank == cards[3].rank
+}
+
+fn hand_is_full_house(cards: &[Card; 5]) -> bool {
+    cards[0].rank == cards[2].rank && cards[3].rank == cards[4].rank
+}
+
+fn hand_is_flush(cards: &[Card; 5]) -> bool {
+    for i in 1..5 {
+        if cards[i].suit != cards[0].suit {
+            return false;
+        }
+    }
+    true
+}
+
+fn hand_is_straight(cards: &[Card; 5]) -> bool {
+    (cards[0].rank as i32) == (cards[1].rank as i32) + 1
+        && (cards[0].rank as i32) == (cards[4].rank as i32) + 4
+}
+
+fn hand_is_wheel(cards: &[Card; 5]) -> bool {
+    cards[0].rank == crate::cards::Rank::Ace && cards[1].rank == crate::cards::Rank::Five
+}
+
+fn hand_is_three_of_a_kind(cards: &[Card; 5]) -> bool {
+    cards[0].rank == cards[2].rank
+}
+
+fn hand_is_two_pair(cards: &[Card; 5]) -> bool {
+    cards[2].rank == cards[3].rank
+}
+
+fn hand_is_pair(cards: &[Card; 5]) -> bool {
+    cards[0].rank == cards[1].rank
+}
+
+fn hand_is_high_card(_cards: &[Card; 5]) -> bool {
+    true
+}
+```
+
+{{holdemodds.rs}}
+```rust
+use std::env;
+use std::process;
+use rand::thread_rng;
+use crate::cards::{Card, new_card_from_chars};
+use crate::deck::{new_deck, deck_shuffle};
+use crate::hands::{hand_sort, hand_compare};
+
+const ITERATIONS: usize = 2_000_000;
+
+fn usage(program_name: &str) {
+    eprintln!("Usage: {} <c1> <c2> <c3> <c4>", program_name);
+    process::exit(1);
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 5 {
+        usage(&args[0]);
+    }
+
+    let _rng = thread_rng();
+
+    let mut cards = [Card::from_string("--"); 4];
+    for i in 0..4 {
+        let s = &args[i + 1];
+        let chars: Vec<char> = s.chars().collect();
+        if chars.len() != 2 {
+            usage(&args[0]);
+        }
+        cards[i] = new_card_from_chars(chars[0], chars[1]);
+    }
+
+    let full_deck = new_deck();
+    let mut deck: Vec<Card> = full_deck
+        .into_iter()
+        .filter(|c| !cards.iter().any(|r| r == c))
+        .collect();
+
+    let mut hand1 = [Card::from_string("--"); 5];
+    let mut hand2 = [Card::from_string("--"); 5];
+    let mut results = [0usize, 0usize, 0usize];
+
+    for _ in 0..ITERATIONS {
+        deck_shuffle(&mut deck);
+
+        hand1[0] = cards[0];
+        hand1[1] = cards[1];
+        hand2[0] = cards[2];
+        hand2[1] = cards[3];
+
+        for j in 0..3 {
+            hand1[2 + j] = deck[j];
+            hand2[2 + j] = deck[j];
+        }
+
+        hand_sort(&mut hand1);
+        hand_sort(&mut hand2);
+
+        let c = hand_compare(&hand1, &hand2);
+        if c > 0 {
+            results[0] += 1;
+        } else if c == 0 {
+            results[1] += 1;
+        } else {
+            results[2] += 1;
+        }
+    }
+
+    println!(
+        "WIN: {:.2}\tTIE: {:.2}\tLOSS: {:.2}",
+        results[0] as f64 / ITERATIONS as f64,
+        results[1] as f64 / ITERATIONS as f64,
+        results[2] as f64 / ITERATIONS as f64
+    );
+}
+```

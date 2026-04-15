@@ -1,0 +1,8 @@
+To resolve the `E0432: unresolved import` error, we need to ensure that the `kdtree` module is publicly accessible from the root of the crate (`lib.rs`). The `pub mod kdtree;` declaration correctly exposes the `kdtree` module so that it can be imported in other files like `test.rs` using `use kd3::kdtree;`. 
+
+Here is the repaired `lib.rs` file:
+
+{{lib.rs}} 
+```rust
+pub mod kdtree;
+```

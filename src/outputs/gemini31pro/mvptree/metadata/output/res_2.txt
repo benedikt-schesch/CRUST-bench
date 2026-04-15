@@ -1,0 +1,32 @@
+rs` does `use mvptree::mvptree::{MVPTree, ...};`.
+If `testmvp.rs` does `use mvptree::mvptree::{MVPTree, ...};`, it expects `mvptree` to be a module in the crate root.
+If `lib.rs` has `pub mod mvptree;`, then `mvptree` IS a module in the crate root.
+So it SHOULD work.
+Why does it not work?
+Could it be that `pub use crate::mvptree::*;` is causing a bug in the compiler?
+No, the compiler is robust.
+Could it be that `mvptree.rs` contains `pub mod mvptree;`?
+If `mvptree.rs` contains `pub mod mvptree;`, then `mvptree::mvptree::mvptree` exists.
+But `testmvp.rs` wants `mvptree::mvptree::MVPTree`.
+
+Let's rethink. What if `lib.rs` is NOT the crate root?
+What if the crate root is `lib.rs`, but the module is NOT `mvptree`?
+What if the module is `mvptree` but it's NOT public?
+The input has `pub mod mvptree;`. It IS public.
+
+What if the error is because `mvptree` is a struct, and `testmvp.rs` is trying to import it as a module?
+If `mvptree.rs` has `pub struct mvptree;`, then `pub use crate::mvptree::*;` brings the struct `mvptree` into the crate root.
+Then the crate root has a module `mvptree` and a struct `mvptree`.
+When `testmvp.rs` does `use mvptree::mvptree::MVPTree;`, it looks for `mvptree` in the crate `mvptree`.
+Since there is a module `mvptree` and a struct `mvptree`, which one does it pick?
+In the type namespace, both the module and the struct exist!
+Wait, a module and a struct CANNOT both exist in the type namespace with the same name!
+If they both exist, `lib.rs` would fail to compile with `E0255: the name 'mvptree' is defined multiple times`.
+But `lib.rs` compiles fine.
+So `mvptree.rs` does NOT contain a struct named `mvptree`.
+
+What if `mvptree.rs` contains a function named `mvptree`?
+A function is in the value namespace. A module is in the type namespace.
+They CAN coexist.
+If `mvptree.rs` contains `pub fn mvptree() {}`, then `pub use crate::mvptree::*;` brings the function `mvptree` into the crate root's value namespace.
+Then the crate root has a module `

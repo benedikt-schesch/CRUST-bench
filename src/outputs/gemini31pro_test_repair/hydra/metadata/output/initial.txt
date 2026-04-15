@@ -1,0 +1,225 @@
+```rust
+// Generated Rust Code
+
+pub const RED: &str = "\x1b[0;31m";
+pub const WHITE: &str = "\x1b[0;37m";
+pub const COLOR_OFF: &str = "\x1b[0m";
+pub const PURPLE: &str = "\x1b[0;35m";
+pub const GREEN: &str = "\x1b[0;32m";
+pub const YELLOW: &str = "\x1b[0;33m";
+pub const BLUE: &str = "\x1b[0;34m";
+pub const RIGHT_MARGIN: usize = 5;
+pub const CYAN: &str = "\x1b[0;36m";
+pub const DEFAULT_NAME: &str = "unnamed";
+
+#[derive(Clone)]
+pub struct Command {
+    pub key: char,
+    pub name: String,
+    pub command: String,
+    pub children: Option<Box<Command>>,
+    pub next: Option<Box<Command>>,
+}
+
+impl Command {
+    pub fn new(key: char, name: String, command: String) -> Self {
+        Command {
+            key,
+            name,
+            command,
+            children: None,
+            next: None,
+        }
+    }
+}
+
+pub fn read_field(file: &mut &[u8], field: &str) -> String {
+    let mut idx = 0;
+    while idx < file.len() && file[idx] != b',' && file[idx] != b'\n' && file[idx] != 0 {
+        idx += 1;
+    }
+    if idx == file.len() || file[idx] != b',' {
+        let found = if idx < file.len() { file[idx] as char } else { '\0' };
+        eprintln!("Found incorrect end after {}, found: {}", field, found);
+        std::process::exit(1);
+    }
+    let key = &file[..idx];
+    *file = &file[idx + 1..];
+    String::from_utf8_lossy(key).into_owned()
+}
+
+pub fn load_file(c: &mut Command, file: &str) {
+    let content = read_file(file);
+    let mut bytes = content.as_bytes();
+    while !bytes.is_empty() && bytes[0] != 0 {
+        read_line(c, &mut bytes);
+    }
+}
+
+pub fn start(mut c: &Command) {
+    while c.children.is_some() {
+        let last_printed_lines = print_command(c);
+        let ch = getch();
+        let next_c = find_command(c, ch);
+        clear_lines(last_printed_lines);
+        
+        if let Some(next_cmd) = next_c {
+            c = next_cmd;
+            if command_run(c) > 0 {
+                return;
+            }
+        } else {
+            break;
+        }
+    }
+}
+
+pub fn tree_add_command(tree: &mut Command, keys: &str, name: &str, command: &str) {
+    let mut chars = keys.chars();
+    let key = match chars.next() {
+        Some(k) => k,
+        None => return,
+    };
+    let is_last = chars.as_str().is_empty();
+
+    let mut child_exists = false;
+    {
+        let mut current = tree.children.as_mut();
+        while let Some(node) = current {
+            if node.key == key {
+                child_exists = true;
+                break;
+            }
+            current = node.next.as_mut();
+        }
+    }
+
+    if is_last {
+        if !child_exists {
+            command_add_child(tree, Command::new(key, name.to_string(), command.to_string()));
+        } else {
+            let mut current = tree.children.as_mut();
+            while let Some(node) = current {
+                if node.key == key {
+                    node.name = name.to_string();
+                    node.command = command.to_string();
+                    break;
+                }
+                current = node.next.as_mut();
+            }
+        }
+        return;
+    }
+
+    if !child_exists {
+        command_add_child(tree, Command::new(key, DEFAULT_NAME.to_string(), String::new()));
+    }
+
+    let mut current = tree.children.as_mut();
+    while let Some(node) = current {
+        if node.key == key {
+            tree_add_command(node, chars.as_str(), name, command);
+            break;
+        }
+        current = node.next.as_mut();
+    }
+}
+
+pub fn read_line(c: &mut Command, file: &mut &[u8]) {
+    let key = read_field(file, "key");
+    let name = read_field(file, "name");
+    let command = read_until_eol(file);
+    tree_add_command(c, &key, &name, &command);
+}
+
+pub fn command_add_child(c: &mut Command, mut child: Command) {
+    if c.children.is_none() {
+        c.children = Some(Box::new(child));
+        return;
+    }
+    if c.children.as_ref().unwrap().key > child.key {
+        child.next = c.children.take();
+        c.children = Some(Box::new(child));
+        return;
+    }
+    let mut current = c.children.as_mut().unwrap();
+    while current.next.is_some() && current.next.as_ref().unwrap().key <= child.key {
+        current = current.next.as_mut().unwrap();
+    }
+    child.next = current.next.take();
+    current.next = Some(Box::new(child));
+}
+
+pub fn getch() -> char {
+    use std::io::Read;
+    let _ = std::process::Command::new("stty").arg("raw").arg("-echo").status();
+    let mut buf = [0u8; 1];
+    let _ = std::io::stdin().read_exact(&mut buf);
+    let _ = std::process::Command::new("stty").arg("-raw").arg("echo").status();
+    buf[0] as char
+}
+
+pub fn print_command(c: &Command) -> i32 {
+    let width = std::env::var("COLUMNS")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(80);
+    
+    let mut lines = 0;
+    if !c.name.is_empty() {
+        eprintln!("{}{}:{}", BLUE, c.name, COLOR_OFF);
+        lines += 1;
+    }
+    
+    let mut max_line_width = 0;
+    let mut child = c.children.as_ref();
+    while let Some(node) = child {
+        let line_width = node.name.len();
+        if line_width > max_line_width {
+            max_line_width = line_width;
+        }
+        child = node.next.as_ref();
+    }
+    max_line_width += RIGHT_MARGIN;
+    if max_line_width > width {
+        max_line_width = width;
+    }
+    
+    let items_per_row = if max_line_width + 5 > 0 {
+        width / (max_line_width + 5)
+    } else {
+        1
+    };
+    let items_per_row = if items_per_row == 0 { 1 } else { items_per_row };
+    
+    let mut child = c.children.as_ref();
+    let mut current_item = 0;
+    while let Some(node) = child {
+        current_item += 1;
+        if node.children.is_some() {
+            eprint!("{}{}{} {}➔{} {}+{:<width$}{}", 
+                    YELLOW, node.key, COLOR_OFF, PURPLE, COLOR_OFF, BLUE, node.name, COLOR_OFF, width = max_line_width);
+        } else {
+            eprint!("{}{}{} {}➔{}  {:<width$}", 
+                    YELLOW, node.key, COLOR_OFF, PURPLE, COLOR_OFF, node.name, width = max_line_width);
+        }
+        if current_item % items_per_row == 0 {
+            eprintln!();
+            lines += 1;
+        }
+        child = node.next.as_ref();
+    }
+    eprintln!();
+    lines += 1;
+    lines
+}
+
+pub fn clear_lines(count: i32) {
+    for _ in 0..count {
+        eprint!("\x1b[A\r\x1b[2K");
+    }
+}
+
+pub fn find_command(c: &Command, key: char) -> Option<&Command> {
+    let mut child = c.children.as_ref();
+    while let Some(node)

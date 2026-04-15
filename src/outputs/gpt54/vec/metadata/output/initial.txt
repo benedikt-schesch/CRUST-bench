@@ -1,0 +1,94 @@
+{{vec.rs}}
+```rust
+// Generated Rust Code
+
+// Constants
+pub const VEC_VERSION: &str = "0.2.1";
+
+// Equivalent to C's vec_insert_ macro behavior on a Rust Vec.
+// Returns 0 on success.
+pub fn vec_insert<T>(data: &mut Vec<T>, idx: usize, value: T) -> i32 {
+    data.insert(idx, value);
+    0
+}
+
+// Equivalent to vec_splice_ + length adjustment.
+pub fn vec_splice<T>(data: &mut Vec<T>, start: usize, count: usize) {
+    if count == 0 {
+        return;
+    }
+    let end = start + count;
+    data.drain(start..end);
+}
+
+// Equivalent to vec_swapsplice_ + length adjustment.
+// Moves the last `count` elements into position `start`, then truncates.
+pub fn vec_swapsplice<T>(data: &mut Vec<T>, start: usize, count: usize) {
+    if count == 0 {
+        return;
+    }
+    let len = data.len();
+    let tail_start = len - count;
+    if start >= tail_start {
+        data.truncate(len - count);
+        return;
+    }
+
+    let mut tail = data.split_off(tail_start);
+    data.truncate(start);
+    data.append(&mut tail);
+}
+
+// Reserve capacity to next power-of-two >= n, like vec_reserve_po2_.
+pub fn vec_reserve_po2<T>(data: &mut Vec<T>, n: usize) -> i32 {
+    if n == 0 {
+        return 0;
+    }
+    let mut n2 = 1usize;
+    while n2 < n {
+        n2 <<= 1;
+    }
+    vec_reserve(data, n2)
+}
+
+// Equivalent to vec_expand_: ensure room for one more element.
+pub fn vec_expand<T>(data: &mut Vec<T>) -> i32 {
+    if data.len() + 1 > data.capacity() {
+        let new_capacity = if data.capacity() == 0 {
+            1
+        } else {
+            data.capacity() << 1
+        };
+        let additional = new_capacity.saturating_sub(data.capacity());
+        data.reserve_exact(additional);
+    }
+    0
+}
+
+// Equivalent to vec_reserve_: ensure capacity is at least n.
+pub fn vec_reserve<T>(data: &mut Vec<T>, n: usize) -> i32 {
+    if n > data.capacity() {
+        let additional = n - data.capacity();
+        data.reserve_exact(additional);
+    }
+    0
+}
+
+// Equivalent to vec_compact_: shrink capacity to length, or free when empty.
+pub fn vec_compact<T>(data: &mut Vec<T>) -> i32 {
+    if data.is_empty() {
+        *data = Vec::new();
+    } else {
+        data.shrink_to_fit();
+    }
+    0
+}
+
+// Equivalent to vec_swap_.
+pub fn vec_swap<T>(data: &mut Vec<T>, idx1: usize, idx2: usize) {
+    if idx1 == idx2 {
+        return;
+    }
+    data.swap(idx1, idx2);
+}
+```

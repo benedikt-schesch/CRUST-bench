@@ -1,0 +1,105 @@
+```rust
+// Generated Rust Code
+use std::io::Write;
+
+pub const OBJECT_NUMBER: usize = 50;
+pub const BLOCK_SIZE: usize = std::mem::size_of::<Object>();
+pub const MEMORY_SIZE: usize = BLOCK_SIZE * OBJECT_NUMBER;
+pub const FREE_BITMAP_SIZE: usize = MEMORY_SIZE / BLOCK_SIZE;
+pub const MAX_BINDINGS: usize = 10;
+pub const MAX_SYMBOL_NAME_LENGTH: usize = 20;
+
+#[derive(Debug, Clone, Copy)]
+pub enum ConsCellType {
+    Cell,
+    Nil,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenKind {
+    Digit,
+    LParen,
+    RParen,
+    Symbol,
+    String,
+    True,
+    False,
+    Eof,
+    Quote,
+}
+
+#[derive(Debug, Clone)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub next: Option<Box<Token>>,
+    pub val: i32,
+    pub str: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ParseState {
+    pub token: Option<Box<Token>>,
+    pub pos: i32,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProgramNode {
+    pub expressions: Option<Box<ExpressionList>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExpressionType {
+    Literal,
+    Symbol,
+    List,
+    SymbolicExp,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExpressionList {
+    pub expression: Option<Box<ExpressionNode>>,
+    pub next: Option<Box<ExpressionList>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExpressionNode {
+    pub type_: ExpressionType,
+    pub data: ExpressionData,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExpressionData {
+    SymbolicExp(Option<Box<SymbolicExpNode>>),
+    List(Option<Box<ListNode>>),
+    Literal(Option<Box<LiteralNode>>),
+    Symbol(Option<Box<SymbolNode>>),
+}
+
+#[derive(Debug, Clone)]
+pub struct SymbolicExpNode {
+    pub expressions: Option<Box<ExpressionList>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ListNode {
+    pub expressions: Option<Box<ExpressionList>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LiteralType {
+    Integer,
+    String,
+    Boolean,
+}
+
+#[derive(Debug, Clone)]
+pub struct LiteralNode {
+    pub type_: LiteralType,
+    pub value: LiteralValue,
+}
+
+#[derive(Debug, Clone)]
+pub enum LiteralValue {
+    IntValue(i32),
+    BooleanValue(bool),
+    StringValue(String

@@ -1,0 +1,49 @@
+ {{circular_buffer.rs}}
+```rust
+use std::vec::Vec;
+
+pub struct CircularBuffer {
+    size: usize,
+    data_size: usize,
+    tail_offset: usize,
+    head_offset: usize,
+    buffer: Vec<u8>,
+}
+
+impl CircularBuffer {
+    pub fn new(size: usize) -> Self {
+        CircularBuffer {
+            size,
+            data_size: 0,
+            tail_offset: 0,
+            head_offset: 0,
+            buffer: vec![0; size],
+        }
+    }
+    
+    pub fn pop(&mut self, length: usize, data_out: &mut [u8]) -> usize {
+        self.inter_read(length, data_out, true)
+    }
+    
+    pub fn read(&self, length: usize, data_out: &mut [u8]) -> usize {
+        if self.data_size == 0 || length == 0 {
+            return 0;
+        }
+        
+        let rd_len = if self.data_size < length { self.data_size } else { length };
+        let actual_len = if data_out.len() < rd_len { data_out.len() } else { rd_len };
+        
+        if self.head_offset <= self.tail_offset {
+            data_out[0..actual_len].copy_from_slice(&self.buffer[self.head_offset..self.head_offset + actual_len]);
+        } else {
+            let frg1_len = self.size - self.head_offset;
+            if actual_len <= frg1_len {
+                data_out[0..actual_len].copy_from_slice(&self.buffer[self.head_offset..self.head_offset + actual_len]);
+            } else {
+                data_out[0..frg1_len].copy_from_slice(&self.buffer[self.head_offset..self.size]);
+                let frg2_len = actual_len - frg1_len;
+                data_out[frg1_len..frg1_len + frg2_len].copy_from_slice(&self.buffer[0..frg2_len]);
+            }
+        }
+        
+       

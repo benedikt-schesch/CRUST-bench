@@ -1,0 +1,31 @@
+ {{lib.rs}}
+```rust
+pub mod my_regex;
+```
+
+{{my_regex.rs}}
+```rust
+//! My Regex module
+
+/// Example function from my_regex module
+pub fn example_function() -> &'static str {
+    "Hello from my_regex"
+}
+
+// Placeholder for regex functionality
+pub struct RegexPattern {
+    pattern: String,
+}
+
+impl RegexPattern {
+    pub fn new(pattern: &str) -> Self {
+        RegexPattern {
+            pattern: pattern.to_string(),
+        }
+    }
+    
+    pub fn pattern(&self) -> &str {
+        &self.pattern
+    }
+}
+```

@@ -1,0 +1,5 @@
+```rust
+// Generated Rust Code
+pub mod satc;
+pub use crate::satc::*;
+```

@@ -1,0 +1,40 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test tests::test_bounds ... FAILED
+test tests::test_node ... FAILED
+test tests::test_points ... ok
+test tests::test_tree ... FAILED
+
+failures:
+
+---- tests::test_bounds stdout ----
+
+thread 'tests::test_bounds' (223049) panicked at quadtree/src/bin/test.rs:21:9:
+assertion `left == right` failed
+  left: inf
+ right: 5.0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- tests::test_node stdout ----
+
+thread 'tests::test_node' (223050) panicked at quadtree/src/bin/test.rs:9:9:
+assertion failed: node.quadtree_node_isleaf()
+
+---- tests::test_tree stdout ----
+
+thread 'tests::test_tree' (223052) panicked at quadtree/src/bin/test.rs:40:9:
+assertion failed: tree.quadtree_insert(8.0, 2.0, val.clone())
+
+
+failures:
+    tests::test_bounds
+    tests::test_node
+    tests::test_tree
+
+test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

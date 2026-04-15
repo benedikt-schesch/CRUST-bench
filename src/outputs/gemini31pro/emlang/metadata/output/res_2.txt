@@ -1,0 +1,44 @@
+// Generated Rust Code
+pub mod data {
+// Included inline to satisfy module requirements
+}
+
+pub mod em {
+    pub struct Program;
+}
+
+pub mod env {
+    pub struct Env;
+    pub struct RuntimeResult;
+}
+
+pub mod parser {
+    pub struct Parser;
+}
+
+pub mod stack {
+    pub const DEFAULT_POPPED_CAP: usize = 0;
+    pub const DEFAULT_STACK_CAP: usize = 0;
+}
+
+pub mod utils {
+// Included inline to satisfy module requirements
+}
+
+pub mod emlang {
+    pub use crate::env;
+    pub use crate::parser;
+    pub use crate::stack;
+    pub use crate::em;
+    pub use crate::data;
+    pub use crate::utils;
+}
+
+pub fn parse(path: &str) -> em::Program {
+    unimplemented!()
+}
+
+pub fn usage(path: &str) {
+    unimplemented!()
+}
+```

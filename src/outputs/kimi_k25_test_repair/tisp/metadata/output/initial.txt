@@ -1,0 +1,585 @@
+ {{core.rs}}
+```rust
+use crate::tisp::{Rec, Tsp, Val, TspType, tsp_lstlen, mk_pair, mk_str, mk_sym, mk_func, mk_val, rec_add, rec_get, entry_get, tsp_type_str, mk_rec, mk_list, mk_prim, tisp_env_add, tisp_eval, tisp_eval_body, vals_eq};
+
+fn car(v: &Val) -> Option<&Val> {
+    match &v.v {
+        crate::tisp::ValUnion::P { car, .. } => Some(car),
+        _ => None,
+    }
+}
+
+fn cdr(v: &Val) -> Option<&Val> {
+    match &v.v {
+        crate::tisp::ValUnion::P { cdr, .. } => Some(cdr),
+        _ => None,
+    }
+}
+
+fn caar(v: &Val) -> Option<&Val> {
+    car(v).and_then(car)
+}
+
+fn cdar(v: &Val) -> Option<&Val> {
+    car(v).and_then(cdr)
+}
+
+fn cadr(v: &Val) -> Option<&Val> {
+    cdr(v).and_then(car)
+}
+
+fn cddr(v: &Val) -> Option<&Val> {
+    cdr(v).and_then(cdr)
+}
+
+fn nilp(v: &Val) -> bool {
+    matches!(v.t, TspType::TspNil)
+}
+
+pub fn prim_car(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) != 1 {
+        eprintln!("car: expected 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let first = car(&args).unwrap_or(&st.nil);
+    if !matches!(first.t, TspType::TspPair) {
+        eprintln!("car: expected Pair, received {}", tsp_type_str(first.t));
+        return st.none.clone();
+    }
+    
+    car(first).unwrap_or(&st.nil).clone()
+}
+
+pub fn prim_cdr(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) != 1 {
+        eprintln!("cdr: expected 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let first = car(&args).unwrap_or(&st.nil);
+    if !matches!(first.t, TspType::TspPair) {
+        eprintln!("cdr: expected Pair, received {}", tsp_type_str(first.t));
+        return st.none.clone();
+    }
+    
+    cdr(first).unwrap_or(&st.nil).clone()
+}
+
+pub fn prim_cons(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) != 2 {
+        eprintln!("cons: expected 2 arguments, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let a = car(&args).unwrap_or(&st.nil).clone();
+    let b = cadr(&args).unwrap_or(&st.nil).clone();
+    mk_pair(a, b).unwrap_or(st.none.clone())
+}
+
+pub fn form_quote(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) != 1 {
+        eprintln!("quote: expected 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    car(&args).unwrap_or(&st.nil).clone()
+}
+
+pub fn prim_eval(st: &mut Tsp, env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) != 1 {
+        eprintln!("eval: expected 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let v = car(&args).unwrap_or(&st.nil);
+    match tisp_eval(st, env, v.clone()) {
+        Some(val) => val,
+        None => st.none.clone(),
+    }
+}
+
+pub fn prim_eq(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    if nilp(&args) {
+        return st.t.clone();
+    }
+    
+    let mut current = &args;
+    while !nilp(cdr(current).unwrap_or(&st.nil)) {
+        let a = car(current).unwrap_or(&st.nil);
+        let b = cadr(current).unwrap_or(&st.nil);
+        if !vals_eq(a, b) {
+            return st.nil.clone();
+        }
+        current = cdr(current).unwrap_or(&st.nil);
+    }
+    
+    st.t.clone()
+}
+
+pub fn form_cond(st: &mut Tsp, env: &mut Rec, args: Val) -> Val {
+    let mut v = &args;
+    while !nilp(v) {
+        let clause = car(v).unwrap_or(&st.nil);
+        let cond_val = match tisp_eval(st, env, car(&clause).unwrap_or(&st.nil).clone()) {
+            Some(val) => val,
+            None => return st.none.clone(),
+        };
+        
+        if !nilp(&cond_val) {
+            return match tisp_eval_body(st, env, cdr(&clause).unwrap_or(&st.nil).clone()) {
+                Some(val) => val,
+                None => st.none.clone(),
+            };
+        }
+        
+        v = cdr(v).unwrap_or(&st.nil);
+    }
+    
+    st.none.clone()
+}
+
+pub fn prim_typeof(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) != 1 {
+        eprintln!("typeof: expected 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let first = car(&args).unwrap_or(&st.nil);
+    let type_str = tsp_type_str(first.t);
+    mk_str(st, type_str).unwrap_or(st.none.clone())
+}
+
+pub fn prim_procprops(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) != 1 {
+        eprintln!("procprops: expected 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let proc = car(&args).unwrap_or(&st.nil);
+    let mut ret = crate::tisp::rec_new(6, None);
+    
+    match proc.t {
+        TspType::TspForm | TspType::TspPrim => {
+            if let crate::tisp::ValUnion::Pr { name, .. } = &proc.v {
+                rec_add(&mut ret, "name", mk_sym(st, name).unwrap_or(st.none.clone()));
+            }
+        }
+        TspType::TspFunc | TspType::TspMacro => {
+            if let crate::tisp::ValUnion::F { name, args: f_args, body, .. } = &proc.v {
+                let name_val = if let Some(n) = name {
+                    mk_sym(st, n).unwrap_or(st.none.clone())
+                } else {
+                    mk_sym(st, "anon").unwrap_or(st.none.clone())
+                };
+                rec_add(&mut ret, "name", name_val);
+                rec_add(&mut ret, "args", f_args.as_ref().clone());
+                rec_add(&mut ret, "body", body.as_ref().clone());
+            }
+        }
+        _ => {
+            eprintln!("procprops: expected Proc, received '{}'", tsp_type_str(proc.t));
+            return st.none.clone();
+        }
+    }
+    
+    mk_rec(st, ret, None).unwrap_or(st.none.clone())
+}
+
+pub fn form_Func(st: &mut Tsp, env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) < 1 {
+        eprintln!("Func: expected at least 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let (params, body) = if nilp(cdr(&args).unwrap_or(&st.nil)) {
+        let params = mk_pair(mk_sym(st, "it").unwrap_or(st.none.clone()), st.nil.clone()).unwrap_or(st.none.clone());
+        (params, args.clone())
+    } else {
+        (car(&args).unwrap_or(&st.nil).clone(), cdr(&args).unwrap_or(&st.nil).clone())
+    };
+    
+    mk_func(TspType::TspFunc, None, params, body, env.clone()).unwrap_or(st.none.clone())
+}
+
+pub fn form_Macro(st: &mut Tsp, env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) < 1 {
+        eprintln!("Macro: expected at least 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let mut ret = form_Func(st, env, args);
+    ret.t = TspType::TspMacro;
+    ret
+}
+
+pub fn prim_error(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    use std::io::Write;
+    
+    if tsp_lstlen(&args) < 2 {
+        eprintln!("error: expected at least 2 arguments, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let first = car(&args).unwrap_or(&st.nil);
+    if !matches!(first.t, TspType::TspSym) {
+        eprintln!("error: expected Sym, received {}", tsp_type_str(first.t));
+        return st.none.clone();
+    }
+    
+    if let crate::tisp::ValUnion::S(s) = &first.v {
+        eprint!("; tisp: error: {}: ", s);
+    }
+    
+    let mut rest = cdr(&args).unwrap_or(&st.nil);
+    while !nilp(rest) {
+        let val = car(rest).unwrap_or(&st.nil);
+        eprint!("{:?}", val);
+        rest = cdr(rest).unwrap_or(&st.nil);
+    }
+    eprintln!();
+    
+    st.none.clone()
+}
+
+pub fn prim_recmerge(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    use crate::tisp::TSP_REC_FACTOR;
+    
+    if tsp_lstlen(&args) != 2 {
+        eprintln!("recmerge: expected 2 arguments, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let first = car(&args).unwrap_or(&st.nil);
+    let second = cadr(&args).unwrap_or(&st.nil);
+    
+    if !matches!(first.t, TspType::TspRec) {
+        eprintln!("recmerge: expected Rec, received {}", tsp_type_str(first.t));
+        return st.none.clone();
+    }
+    if !matches!(second.t, TspType::TspRec) {
+        eprintln!("recmerge: expected Rec, received {}", tsp_type_str(second.t));
+        return st.none.clone();
+    }
+    
+    let mut ret = mk_val(TspType::TspRec);
+    
+    if let crate::tisp::ValUnion::R(r2) = &second.v {
+        if let crate::tisp::ValUnion::R(r1) = &first.v {
+            let new_size = r2.size * TSP_REC_FACTOR as i32;
+            let mut new_rec = crate::tisp::rec_new(new_size as usize, Some(Box::new(r1.clone())));
+            
+            let mut current = Some(r2);
+            while let Some(r) = current {
+                for i in 0..r.size {
+                    if let Some(entry) = r.items.get(i as usize) {
+                        if !entry.key.is_empty() {
+                            rec_add(&mut new_rec, &entry.key, entry.val.clone());
+                        }
+                    }
+                }
+                current = r.next.as_ref().map(|b| b.as_ref());
+            }
+            
+            if let crate::tisp::ValUnion::R(ref mut r) = ret.v {
+                *r = new_rec;
+            }
+        }
+    }
+    
+    ret
+}
+
+pub fn prim_records(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) != 1 {
+        eprintln!("records: expected 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let first = car(&args).unwrap_or(&st.nil);
+    if !matches!(first.t, TspType::TspRec) {
+        eprintln!("records: expected Rec, received {}", tsp_type_str(first.t));
+        return st.none.clone();
+    }
+    
+    let mut ret = st.nil.clone();
+    
+    if let crate::tisp::ValUnion::R(r) = &first.v {
+        let mut current = Some(r);
+        while let Some(rec) = current {
+            for i in 0..rec.size {
+                if let Some(entry) = rec.items.get(i as usize) {
+                    if !entry.key.is_empty() {
+                        let key_sym = mk_sym(st, &entry.key).unwrap_or(st.none.clone());
+                        let entry_pair = mk_pair(key_sym, entry.val.clone()).unwrap_or(st.none.clone());
+                        ret = mk_pair(entry_pair, ret).unwrap_or(st.none.clone());
+                    }
+                }
+            }
+            current = rec.next.as_ref().map(|b| b.as_ref());
+        }
+    }
+    
+    ret
+}
+
+pub fn form_def(st: &mut Tsp, env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) < 1 {
+        eprintln!("def: expected at least 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let first = car(&args).unwrap_or(&st.nil);
+    let (sym, val) = if matches!(first.t, TspType::TspPair) {
+        let sym = car(&first).unwrap_or(&st.nil);
+        if !matches!(sym.t, TspType::TspSym) {
+            eprintln!("def: expected symbol for function name, received '{}'", tsp_type_str(sym.t));
+            return st.none.clone();
+        }
+        let params = cdr(&first).unwrap_or(&st.nil).clone();
+        let body = cdr(&args).unwrap_or(&st.nil).clone();
+        let func_val = mk_func(TspType::TspFunc, None, params, body, env.clone()).unwrap_or(st.none.clone());
+        (sym.clone(), func_val)
+    } else if matches!(first.t, TspType::TspSym) {
+        let sym = first.clone();
+        let val = if nilp(cdr(&args).unwrap_or(&st.nil)) {
+            sym.clone()
+        } else {
+            match tisp_eval(st, env, cadr(&args).unwrap_or(&st.nil).clone()) {
+                Some(v) => v,
+                None => return st.none.clone(),
+            }
+        };
+        (sym, val)
+    } else {
+        eprintln!("def: incorrect format, no variable name found");
+        return st.none.clone();
+    };
+    
+    if matches!(val.t, TspType::TspNone) {
+        return st.none.clone();
+    }
+    
+    if matches!(val.t, TspType::TspFunc | TspType::TspMacro) {
+        if let crate::tisp::ValUnion::F { ref mut name, .. } = val.v {
+            if name.is_none() {
+                if let crate::tisp::ValUnion::S(s) = &sym.v {
+                    *name = Some(s.clone());
+                }
+            }
+        }
+    }
+    
+    if let crate::tisp::ValUnion::S(s) = &sym.v {
+        rec_add(env, s, val);
+    }
+    
+    st.none.clone()
+}
+
+pub fn form_undefine(st: &mut Tsp, env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) < 1 {
+        eprintln!("undefine!: expected at least 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let first = car(&args).unwrap_or(&st.nil);
+    if !matches!(first.t, TspType::TspSym) {
+        eprintln!("undefine!: expected Sym, received {}", tsp_type_str(first.t));
+        return st.none.clone();
+    }
+    
+    if let crate::tisp::ValUnion::S(s) = &first.v {
+        let mut current = Some(env);
+        while let Some(r) = current {
+            if let Some(e) = entry_get(r, s) {
+                if !e.key.is_empty() {
+                    e.key.clear();
+                    return st.none.clone();
+                }
+            }
+            current = r.next.as_ref().map(|b| b.as_ref());
+        }
+        eprintln!("undefine!: could not find symbol {} to undefine", s);
+    }
+    
+    st.none.clone()
+}
+
+pub fn form_definedp(st: &mut Tsp, env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) < 1 {
+        eprintln!("defined?: expected at least 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let first = car(&args).unwrap_or(&st.nil);
+    if !matches!(first.t, TspType::TspSym) {
+        eprintln!("defined?: expected Sym, received {}", tsp_type_str(first.t));
+        return st.none.clone();
+    }
+    
+    if let crate::tisp::ValUnion::S(s) = &first.v {
+        let mut current = Some(env);
+        while let Some(r) = current {
+            if let Some(e) = entry_get(r, s) {
+                if !e.key.is_empty() {
+                    return st.t.clone();
+                }
+            }
+            current = r.next.as_ref().map(|b| b.as_ref());
+        }
+    }
+    
+    st.nil.clone()
+}
+
+pub fn tib_env_core(st: &mut Tsp) {
+    tisp_env_add(st, "car", mk_prim(TspType::TspPrim, prim_car, "car").unwrap());
+    tisp_env_add(st, "cdr", mk_prim(TspType::TspPrim, prim_cdr, "cdr").unwrap());
+    tisp_env_add(st, "cons", mk_prim(TspType::TspPrim, prim_cons, "cons").unwrap());
+    tisp_env_add(st, "quote", mk_prim(TspType::TspForm, form_quote, "quote").unwrap());
+    tisp_env_add(st, "eval", mk_prim(TspType::TspPrim, prim_eval, "eval").unwrap());
+    tisp_env_add(st, "=", mk_prim(TspType::TspPrim, prim_eq, "=").unwrap());
+    tisp_env_add(st, "cond", mk_prim(TspType::TspForm, form_cond, "cond").unwrap());
+    tisp_env_add(st, "typeof", mk_prim(TspType::TspPrim, prim_typeof, "typeof").unwrap());
+    tisp_env_add(st, "procprops", mk_prim(TspType::TspPrim, prim_procprops, "procprops").unwrap());
+    tisp_env_add(st, "Func", mk_prim(TspType::TspForm, form_Func, "Func").unwrap());
+    tisp_env_add(st, "Macro", mk_prim(TspType::TspForm, form_Macro, "Macro").unwrap());
+    tisp_env_add(st, "error", mk_prim(TspType::TspPrim, prim_error, "error").unwrap());
+    tisp_env_add(st, "recmerge", mk_prim(TspType::TspPrim, prim_recmerge, "recmerge").unwrap());
+    tisp_env_add(st, "records", mk_prim(TspType::TspPrim, prim_records, "records").unwrap());
+    tisp_env_add(st, "def", mk_prim(TspType::TspForm, form_def, "def").unwrap());
+    tisp_env_add(st, "undefine!", mk_prim(TspType::TspForm, form_undefine, "undefine!").unwrap());
+    tisp_env_add(st, "defined?", mk_prim(TspType::TspForm, form_definedp, "defined?").unwrap());
+}
+```
+
+{{io.rs}}
+```rust
+use crate::tisp::{Tsp, Val, Rec, tsp_lstlen, car, cdr, cadr, cddr, mk_str, mk_sym, mk_pair, tsp_type_str, TspType, tisp_read_line, tisp_eval_body, tsp_fget};
+use std::io::{self, Read, Write};
+use std::fs::{self, File, OpenOptions};
+use std::path::Path;
+
+fn nilp(v: &Val) -> bool {
+    matches!(v.t, TspType::TspNil)
+}
+
+pub fn count_parens(s: &str, len: i32) -> i32 {
+    let mut pcount = 0;
+    let mut bcount = 0;
+    let mut ccount = 0;
+    
+    for c in s.chars().take(len as usize) {
+        match c {
+            '(' => pcount += 1,
+            '[' => bcount += 1,
+            '{' => ccount += 1,
+            ')' => pcount -= 1,
+            ']' => bcount -= 1,
+            '}' => ccount -= 1,
+            _ => {}
+        }
+    }
+    
+    if pcount != 0 {
+        pcount
+    } else if bcount != 0 {
+        bcount
+    } else {
+        ccount
+    }
+}
+
+pub fn read_file(fname: &str) -> String {
+    if fname.is_empty() {
+        let mut buffer = String::new();
+        io::stdin().read_to_string(&mut buffer).unwrap_or(0);
+        buffer
+    } else {
+        fs::read_to_string(fname).unwrap_or_else(|_| {
+            eprintln!("could not find file '{}'", fname);
+            String::new()
+        })
+    }
+}
+
+pub fn prim_write(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) < 2 {
+        eprintln!("write: expected at least 2 arguments, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let first = car(&args).unwrap_or(&st.nil);
+    let second = cadr(&args).unwrap_or(&st.nil);
+    
+    let append_mode = !nilp(second);
+    
+    let mut is_stdout = false;
+    let mut is_stderr = false;
+    let mut file: Option<File> = None;
+    
+    if matches!(first.t, TspType::TspSym) {
+        if let crate::tisp::ValUnion::S(s) = &first.v {
+            if s == "stdout" {
+                is_stdout = true;
+            } else if s == "stderr" {
+                is_stderr = true;
+            } else {
+                is_stderr = true;
+            }
+        }
+    } else if matches!(first.t, TspType::TspStr) {
+        if let crate::tisp::ValUnion::S(s) = &first.v {
+            match OpenOptions::new().write(true).create(true).append(append_mode).truncate(!append_mode).open(s) {
+                Ok(f) => file = Some(f),
+                Err(_) => {
+                    eprintln!("write: could not load file '{}'", s);
+                    return st.none.clone();
+                }
+            }
+        }
+    } else {
+        eprintln!("write: expected file name as string, received {}", tsp_type_str(first.t));
+        return st.none.clone();
+    }
+    
+    if is_stderr {
+        if let crate::tisp::ValUnion::S(s) = &first.v {
+            if s != "stderr" {
+                eprintln!("write: expected file name as string, or symbol stdout/stderr");
+            }
+        }
+    }
+    
+    let rest = cddr(&args).unwrap_or(&st.nil);
+    let mut current = rest;
+    
+    while !nilp(current) {
+        let val = car(current).unwrap_or(&st.nil);
+        if is_stdout {
+            print!("{:?}", val);
+        } else if is_stderr {
+            eprint!("{:?}", val);
+        } else if let Some(ref mut f) = file {
+            write!(f, "{:?}", val).unwrap_or(());
+        }
+        current = cdr(current).unwrap_or(&st.nil);
+    }
+    
+    if is_stdout {
+        io::stdout().flush().unwrap_or(());
+    } else if is_stderr {
+        io::stderr().flush().unwrap_or(());
+    }
+    
+    st.none.clone()
+}
+
+pub fn prim_read(st: &mut Tsp, _env: &mut Rec, args: Val) -> Val {
+    if tsp_lstlen(&args) > 1 {
+        eprintln!("read: expected at most 1 argument, received {}", tsp_lstlen(&args));
+        return st.none.clone();
+    }
+    
+    let fname = if

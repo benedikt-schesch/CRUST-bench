@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `roaring_bitmap::rset`", "file_path": "roaring_bitmap/src/bin/tests.rs", "row": "1", "col": "21", "error_snippet": "|\n1 | use roaring_bitmap::rset::RSet;\n  |                     ^^^^ could not find `rset` in `roaring_bitmap`"}]

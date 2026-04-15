@@ -1,0 +1,6 @@
+```rust
+{{lib.rs}}
+```rust
+pub mod clhash;
+pub use clhash::*;
+```

@@ -1,0 +1,68 @@
+```rust
+use std::cmp;
+
+/// Encodes the input buffer using Hamming ECC encoding.
+pub fn hecc_encode(input: &[u8]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(input.len() + input.len() / 15 + 1);
+    let mut chunks = input.chunks_exact(15);
+    
+    for chunk in &mut chunks {
+        let mut arr = [0u8; 15];
+        arr.copy_from_slice(chunk);
+        hecc_encode_impl(&arr, &mut output);
+    }
+    
+    let remainder = chunks.remainder();
+    if !remainder.is_empty() {
+        let mut arr = [0u8; 15];
+        arr[..remainder.len()].copy_from_slice(remainder);
+        let start_len = output.len();
+        hecc_encode_impl(&arr, &mut output);
+        
+        // `hecc_encode_impl` always pushes 16 bytes (15 data + 1 parity).
+        // We only want to keep `remainder.len()` data bytes and the parity byte.
+        let parity = output.pop().unwrap();
+        output.truncate(start_len + remainder.len());
+        output.push(parity);
+    }
+    
+    output
+}
+
+fn hecc_encode_impl(input: &[u8; 15], output: &mut Vec<u8>) {
+    let mut p1: u8 = 0;
+    let mut p2: u8 = 0;
+    let mut power2: usize = 4;
+    let mut data: u8 = 0;
+    let insize = 15 * 8;
+    
+    let mut in_idx = 0;
+    let mut j = 0;
+    let mut i = 3;
+    
+    while j < insize {
+        if power2 == i {
+            power2 *= 2;
+            i += 1;
+            continue;
+        }
+        if j % 8 == 0 {
+            data = input[in_idx];
+            in_idx += 1;
+            output.push(data);
+            p2 ^= (data.count_ones() as u8) % 2;
+        }
+        if (data & 1) != 0 {
+            p1 ^= i as u8;
+        }
+        data >>= 1;
+        j += 1;
+        i += 1;
+    }
+    
+    p2 ^= (p1.count_ones() as u8) % 2;
+    output.push(p1 + (p2 << 7));
+}
+
+/// Decodes the input buffer using Hamming ECC decoding.
+pub fn hecc_decode(input: &[u8]) -> Option

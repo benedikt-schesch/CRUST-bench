@@ -1,0 +1,1225 @@
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod data;
+pub mod em;
+pub mod env;
+pub mod parser;
+pub mod stack;
+pub mod utils;
+
+pub fn parse(_path: &str) -> em::Program {
+    em::Program::new(em::DEFAULT_PROGRAM_CAP)
+}
+
+pub fn usage(path: &str) {
+    println!(
+        ":O emlang :)\nhttps:\nUsage: {} FILE | OPTIONS\nOptions:\n  -h, --help    Show the usage",
+        path
+    );
+}
+```
+
+{{data.rs}}
+```rust
+// Generated Rust Code
+use std::fmt;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DataType {
+    Int,
+    Str,
+}
+
+#[derive(Debug, Clone)]
+pub struct Data {
+    pub dtype: DataType,
+    pub value: DataValue,
+}
+
+#[derive(Debug, Clone)]
+pub enum DataValue {
+    Int(i64),
+    Str(String),
+}
+
+impl fmt::Display for DataType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DataType::Int => write!(f, "int"),
+            DataType::Str => write!(f, "str"),
+        }
+    }
+}
+
+impl fmt::Display for Data {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[cfg(debug_assertions)]
+        {
+            write!(f, "[{} ", self.dtype)?;
+            match &self.value {
+                DataValue::Int(v) => write!(f, "{}", *v)?,
+                DataValue::Str(v) => write!(f, "'{}'", v)?,
+            }
+            write!(f, "]")
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            match &self.value {
+                DataValue::Int(v) => write!(f, "{}", *v),
+                DataValue::Str(v) => write!(f, "{}", v),
+            }
+        }
+    }
+}
+
+impl Data {
+    pub fn new(dtype: DataType) -> Data {
+        let value = match dtype {
+            DataType::Int => DataValue::Int(0),
+            DataType::Str => DataValue::Str(String::new()),
+        };
+        Data { dtype, value }
+    }
+
+    pub fn new_int(val: i64) -> Data {
+        Data {
+            dtype: DataType::Int,
+            value: DataValue::Int(val),
+        }
+    }
+
+    pub fn new_str(val: String) -> Data {
+        Data {
+            dtype: DataType::Str,
+            value: DataValue::Str(val),
+        }
+    }
+}
+```
+
+{{em.rs}}
+```rust
+// Generated Rust Code
+use crate::data;
+use core::fmt;
+
+pub const DEFAULT_PROGRAM_CAP: usize = 256;
+pub const DATA_STDOUT: i32 = 1;
+pub const DATA_STDERR: i32 = 2;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum EmType {
+    Push,
+    Pop,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Grt,
+    Less,
+    Equ,
+    Nequ,
+    PrintBegin,
+    PrintEnd,
+    IfBegin,
+    IfEnd,
+    LoopBegin,
+    LoopEnd,
+    Exit,
+    Dup,
+    Swap,
+    #[cfg(debug_assertions)]
+    Debug,
+}
+
+impl fmt::Display for EmType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EmType::Push => write!(f, "push"),
+            EmType::Pop => write!(f, "pop"),
+            EmType::Add => write!(f, "add"),
+            EmType::Sub => write!(f, "sub"),
+            EmType::Mul => write!(f, "mul"),
+            EmType::Div => write!(f, "div"),
+            EmType::Grt => write!(f, "grt"),
+            EmType::Less => write!(f, "less"),
+            EmType::Equ => write!(f, "equ"),
+            EmType::Nequ => write!(f, "nequ"),
+            EmType::PrintBegin => write!(f, "print_begin"),
+            EmType::PrintEnd => write!(f, "print_end"),
+            EmType::IfBegin => write!(f, "if_begin"),
+            EmType::IfEnd => write!(f, "if_end"),
+            EmType::LoopBegin => write!(f, "loop_begin"),
+            EmType::LoopEnd => write!(f, "loop_end"),
+            EmType::Exit => write!(f, "exit"),
+            EmType::Dup => write!(f, "dup"),
+            EmType::Swap => write!(f, "swap"),
+            #[cfg(debug_assertions)]
+            EmType::Debug => write!(f, "debug"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Em {
+    pub data: data::Data,
+    pub em_type: EmType,
+    pub path: String,
+    pub row: usize,
+    pub col: usize,
+    pub r#ref: usize,
+    pub ran: bool,
+}
+
+impl fmt::Display for Em {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<{}", self.em_type)?;
+        match self.em_type {
+            EmType::Push => {
+                write!(f, " {}", self.data)?;
+            }
+            EmType::PrintEnd => {
+                let target = match &self.data.value {
+                    data::DataValue::Int(v) if *v == DATA_STDOUT as i64 => "stdout",
+                    _ => "stderr",
+                };
+                write!(f, " {}", target)?;
+            }
+            EmType::PrintBegin | EmType::IfBegin => {
+                write!(f, " ref: {}", self.r#ref)?;
+            }
+            _ => {}
+        }
+        write!(f, " {}:{}:{}>\n", self.path, self.row, self.col)
+    }
+}
+
+impl Em {
+    pub fn new(typ: EmType) -> Self {
+        Em {
+            data: data::Data::new(data::DataType::Int),
+            em_type: typ,
+            path: String::new(),
+            row: 0,
+            col: 0,
+            r#ref: 0,
+            ran: false,
+        }
+    }
+
+    pub fn new_with_data(typ: EmType, data: data::Data) -> Self {
+        Em {
+            data,
+            em_type: typ,
+            path: String::new(),
+            row: 0,
+            col: 0,
+            r#ref: 0,
+            ran: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Program {
+    pub ems: Vec<Em>,
+    pub cap: usize,
+    pub size: usize,
+}
+
+impl Program {
+    pub fn new(cap: usize) -> Self {
+        assert!(cap > 0);
+        Program {
+            ems: Vec::with_capacity(cap),
+            cap,
+            size: 0,
+        }
+    }
+
+    pub fn push(&mut self, em: Em) {
+        if self.size >= self.cap {
+            self.cap *= 2;
+            let additional = self.cap.saturating_sub(self.ems.capacity());
+            if additional > 0 {
+                self.ems.reserve(additional);
+            }
+        }
+        self.ems.push(em);
+        self.size += 1;
+    }
+}
+```
+
+{{env.rs}}
+```rust
+// Generated Rust Code
+use crate::{
+    em::{self, Program},
+    stack,
+};
+use std::fmt;
+
+pub const GC_FREQUENCY_IN_TICKS: usize = 64;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RuntimeError {
+    StackUnderflow,
+    InvalidAccess,
+    DivByZero,
+    IncorrectType,
+}
+
+impl fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RuntimeError::StackUnderflow => write!(f, "Stack underflow"),
+            RuntimeError::InvalidAccess => write!(f, "Invalid access"),
+            RuntimeError::DivByZero => write!(f, "Division by zero"),
+            RuntimeError::IncorrectType => write!(f, "Incorrect type"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RuntimeResult {
+    pub ex: i64,
+    pub em: Result<em::Em, RuntimeError>,
+}
+
+#[derive(Debug)]
+pub struct Env<'a> {
+    pub prog: &'a Program,
+    pub stack: stack::Stack,
+    pub ip: usize,
+    pub ex: usize,
+    pub tick: usize,
+    pub halt: bool,
+    pub print: bool,
+    pub print_from: usize,
+}
+
+impl<'a> Env<'a> {
+    pub fn new(stack_cap: usize, popped_cap: usize) -> Self {
+        let leaked_prog = Box::leak(Box::new(Program::new(1)));
+        Env {
+            prog: leaked_prog,
+            stack: stack::Stack::new(stack_cap, popped_cap),
+            ip: 0,
+            ex: 0,
+            tick: 0,
+            halt: false,
+            print: false,
+            print_from: 0,
+        }
+    }
+
+    pub fn run(&mut self, prog: &Program) -> RuntimeResult {
+        self.ex = 0;
+        self.prog = prog;
+        self.halt = false;
+        self.print = false;
+        self.tick = 0;
+        self.ip = 0;
+
+        while self.ip < self.prog.size && !self.halt {
+            let emc = self.prog.ems[self.ip].clone();
+
+            match emc.em_type {
+                em::EmType::Push => self.stack.push(emc.data.clone()),
+                em::EmType::Pop => {
+                    if self.stack.pop().is_none() {
+                        return RuntimeResult {
+                            ex: 0,
+                            em: Err(RuntimeError::StackUnderflow),
+                        };
+                    }
+                    if self.print && self.print_from > self.stack.size {
+                        self.print_from = self.stack.size;
+                    }
+                }
+                em::EmType::Add
+                | em::EmType::Sub
+                | em::EmType::Mul
+                | em::EmType::Div
+                | em::EmType::Grt
+                | em::EmType::Less
+                | em::EmType::Equ
+                | em::EmType::Nequ => {
+                    let b = match self.stack.pop() {
+                        Some(v) => v,
+                        None => {
+                            return RuntimeResult {
+                                ex: 0,
+                                em: Err(RuntimeError::StackUnderflow),
+                            };
+                        }
+                    };
+                    let a = match self.stack.pop() {
+                        Some(v) => v,
+                        None => {
+                            return RuntimeResult {
+                                ex: 0,
+                                em: Err(RuntimeError::StackUnderflow),
+                            };
+                        }
+                    };
+
+                    let av = if let crate::data::DataValue::Int(v) = a.value {
+                        v
+                    } else {
+                        return RuntimeResult {
+                            ex: 0,
+                            em: Err(RuntimeError::IncorrectType),
+                        };
+                    };
+                    let bv = if let crate::data::DataValue::Int(v) = b.value {
+                        v
+                    } else {
+                        return RuntimeResult {
+                            ex: 0,
+                            em: Err(RuntimeError::IncorrectType),
+                        };
+                    };
+
+                    let out = match emc.em_type {
+                        em::EmType::Add => av + bv,
+                        em::EmType::Sub => av - bv,
+                        em::EmType::Mul => av * bv,
+                        em::EmType::Div => {
+                            if bv == 0 {
+                                return RuntimeResult {
+                                    ex: 0,
+                                    em: Err(RuntimeError::DivByZero),
+                                };
+                            }
+                            av / bv
+                        }
+                        em::EmType::Grt => (av > bv) as i64,
+                        em::EmType::Less => (av < bv) as i64,
+                        em::EmType::Equ => (av == bv) as i64,
+                        em::EmType::Nequ => (av != bv) as i64,
+                        _ => 0,
+                    };
+                    self.stack.push(crate::data::Data::new_int(out));
+                }
+                em::EmType::PrintBegin => {
+                    if self.ip == emc.r#ref.saturating_sub(1) {
+                        if let Some(data) = self.stack.pop() {
+                            println!("{}", data);
+                        } else {
+                            return RuntimeResult {
+                                ex: 0,
+                                em: Err(RuntimeError::StackUnderflow),
+                            };
+                        }
+                    } else {
+                        self.print = true;
+                        self.print_from = self.stack.size;
+                    }
+                }
+                em::EmType::PrintEnd => {
+                    if !self.print || self.print_from == self.stack.size {
+                        self.tick += 1;
+                        if self.tick % GC_FREQUENCY_IN_TICKS == 0 {
+                            self.stack.gc();
+                        }
+                        self.ip += 1;
+                        continue;
+                    }
+                    self.print = false;
+                    let mut parts = Vec::new();
+                    for i in self.print_from..self.stack.size {
+                        parts.push(format!("{}", self.stack.buf[i]));
+                    }
+                    println!("{}", parts.join(" "));
+                    self.stack.shrink_to(self.print_from);
+                }
+                em::EmType::IfBegin => {
+                    let cond = match self.stack.pop() {
+                        Some(v) => v,
+                        None => {
+                            return RuntimeResult {
+                                ex: 0,
+                                em: Err(RuntimeError::StackUnderflow),
+                            };
+                        }
+                    };
+                    let cv = if let crate::data::DataValue::Int(v) = cond.value {
+                        v
+                    } else {
+                        return RuntimeResult {
+                            ex: 0,
+                            em: Err(RuntimeError::IncorrectType),
+                        };
+                    };
+                    if cv == 0 {
+                        self.ip = emc.r#ref;
+                    }
+                }
+                em::EmType::IfEnd => {}
+                em::EmType::LoopBegin => {
+                    let cond = match self.stack.pop() {
+                        Some(v) => v,
+                        None => {
+                            return RuntimeResult {
+                                ex: 0,
+                                em: Err(RuntimeError::StackUnderflow),
+                            };
+                        }
+                    };
+                    let cv = if let crate::data::DataValue::Int(v) = cond.value {
+                        v
+                    } else {
+                        return RuntimeResult {
+                            ex: 0,
+                            em: Err(RuntimeError::IncorrectType),
+                        };
+                    };
+                    if cv == 0 {
+                        self.ip = emc.r#ref;
+                    }
+                }
+                em::EmType::LoopEnd => {
+                    self.ip = emc.r#ref.saturating_sub(1);
+                }
+                em::EmType::Exit => {
+                    let ex = match self.stack.pop() {
+                        Some(v) => v,
+                        None => {
+                            return RuntimeResult {
+                                ex: 0,
+                                em: Err(RuntimeError::StackUnderflow),
+                            };
+                        }
+                    };
+                    let xv = if let crate::data::DataValue::Int(v) = ex.value {
+                        v
+                    } else {
+                        return RuntimeResult {
+                            ex: 0,
+                            em: Err(RuntimeError::IncorrectType),
+                        };
+                    };
+                    self.ex = xv as usize;
+                    self.halt = true;
+                }
+                em::EmType::Dup => {
+                    let off = match self.stack.pop() {
+                        Some(v) => v,
+                        None => {
+                            return RuntimeResult {
+                                ex: 0,
+                                em: Err(RuntimeError::StackUnderflow),
+                            };
+                        }
+                    };
+                    let ov = if let crate::data::DataValue::Int(v) = off.value {
+                        v
+                    } else {
+                        return RuntimeResult {
+                            ex: 0,
+                            em: Err(RuntimeError::IncorrectType),
+                        };
+                    };
+                    if self.stack.dup(ov as usize) != 0 {
+                        return RuntimeResult {
+                            ex: 0,
+                            em: Err(RuntimeError::InvalidAccess),
+                        };
+                    }
+                }
+                em::EmType::Swap => {
+                    let off = match self.stack.pop() {
+                        Some(v) => v,
+                        None => {
+                            return RuntimeResult {
+                                ex: 0,
+                                em: Err(RuntimeError::StackUnderflow),
+                            };
+                        }
+                    };
+                    let ov = if let crate::data::DataValue::Int(v) = off.value {
+                        v
+                    } else {
+                        return RuntimeResult {
+                            ex: 0,
+                            em: Err(RuntimeError::IncorrectType),
+                        };
+                    };
+                    if self.stack.swap(ov as usize) != 0 {
+                        return RuntimeResult {
+                            ex: 0,
+                            em: Err(RuntimeError::InvalidAccess),
+                        };
+                    }
+                }
+                #[cfg(debug_assertions)]
+                em::EmType::Debug => {
+                    for (i, item) in self.stack.buf.iter().enumerate().take(self.stack.size) {
+                        println!("stack[{}]: {}", i, item);
+                    }
+                }
+            }
+
+            self.tick += 1;
+            if self.tick % GC_FREQUENCY_IN_TICKS == 0 {
+                self.stack.gc();
+            }
+            self.ip += 1;
+        }
+
+        self.stack.clear();
+        self.gc();
+        RuntimeResult {
+            ex: self.ex as i64,
+            em: Ok(em::Em::new(em::EmType::Push)),
+        }
+    }
+
+    pub fn gc(&mut self) {}
+}
+```
+
+{{main.rs}}
+```rust
+// Generated Rust Code
+use emlang::em as em;
+use emlang::parser as parser;
+
+pub fn parse(path: &str) -> em::Program {
+    let mut p = parser::Parser::new();
+    if p.load_file(path) != 0 {
+        eprintln!("Error: Failed to open file '{}'", path);
+        std::process::exit(1);
+    }
+    let result = p.parse();
+    match result.prog {
+        Ok(prog) => prog,
+        Err(err) => {
+            eprintln!(
+                "Error at {}:{}:{}: {}",
+                result.path, result.row, result.col, err
+            );
+            std::process::exit(1);
+        }
+    }
+}
+
+pub fn usage(path: &str) {
+    println!(
+        ":O emlang :)\nhttps:\nUsage: {} FILE | OPTIONS\nOptions:\n  -h, --help    Show the usage",
+        path
+    );
+}
+
+pub fn main() {}
+```
+
+{{parser.rs}}
+```rust
+// Generated Rust Code
+use crate::em;
+use core::fmt;
+
+pub const PARSER_MAX_TOKEN_LENGTH: usize = 1024;
+pub const PARSER_MAX_NESTS: usize = 256;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ParserError {
+    UnexpectedEscape,
+    UnknownEscape,
+    UnterminatedQuotes,
+    UnexpectedEnd,
+    IllegalPrintNest,
+    ExpectedEnd,
+}
+
+impl fmt::Display for ParserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParserError::UnexpectedEscape => write!(f, "Unexpected escape"),
+            ParserError::UnknownEscape => write!(f, "Unknown escape"),
+            ParserError::UnterminatedQuotes => write!(f, "Unterminated quotes"),
+            ParserError::UnexpectedEnd => write!(f, "Unexpected end"),
+            ParserError::IllegalPrintNest => write!(f, "Illegal print nesting"),
+            ParserError::ExpectedEnd => write!(f, "Expected matching end"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ParserResult {
+    pub path: String,
+    pub row: usize,
+    pub col: usize,
+    pub prog: Result<em::Program, ParserError>,
+}
+
+#[derive(Debug)]
+pub struct Parser {
+    pub path: String,
+    pub row: usize,
+    pub col: usize,
+    pub from_file: bool,
+    pub input: String,
+    pub ch: i32,
+    pub pos: usize,
+    pub tok: String,
+    pub tok_len: usize,
+    pub prog: em::Program,
+}
+
+impl Parser {
+    pub fn new() -> Self {
+        Parser {
+            path: String::new(),
+            row: 1,
+            col: 0,
+            from_file: false,
+            input: String::new(),
+            ch: 0,
+            pos: 0,
+            tok: String::new(),
+            tok_len: 0,
+            prog: em::Program::new(em::DEFAULT_PROGRAM_CAP),
+        }
+    }
+
+    pub fn load_mem(&mut self, input: &str) {
+        self.input = input.to_string();
+        self.path.clear();
+        self.from_file = false;
+        self.pos = 0;
+        self.row = 1;
+        self.col = 0;
+        self.ch = 0;
+    }
+
+    pub fn load_file(&mut self, path: &str) -> i32 {
+        self.from_file = true;
+        self.path = path.to_string();
+        match std::fs::read_to_string(path) {
+            Ok(s) => {
+                self.input = s;
+                self.pos = 0;
+                self.row = 1;
+                self.col = 0;
+                self.ch = 0;
+                0
+            }
+            Err(_) => -1,
+        }
+    }
+
+    pub fn parse(&mut self) -> ParserResult {
+        self.advance();
+        if self.ch == 0 {
+            return ParserResult {
+                path: self.path.clone(),
+                row: self.row,
+                col: self.col,
+                prog: Ok(self.prog.clone()),
+            };
+        }
+
+        loop {
+            let result = self.parse_next();
+            if result.prog.is_err() {
+                return result;
+            }
+            if self.ch == 0 {
+                break;
+            }
+        }
+
+        let result = self.cross_ref();
+        if result.prog.is_err() {
+            return result;
+        }
+
+        ParserResult {
+            path: self.path.clone(),
+            row: self.row,
+            col: self.col,
+            prog: Ok(self.prog.clone()),
+        }
+    }
+
+    pub fn cross_ref(&mut self) -> ParserResult {
+        let mut expects: Vec<em::EmType> = Vec::with_capacity(PARSER_MAX_NESTS);
+        let mut begins: Vec<usize> = Vec::with_capacity(PARSER_MAX_NESTS);
+        let mut print = false;
+
+        for i in 0..self.prog.size {
+            let typ = self.prog.ems[i].em_type;
+            match typ {
+                em::EmType::PrintBegin => {
+                    if print {
+                        return ParserResult {
+                            path: self.prog.ems[i].path.clone(),
+                            row: self.prog.ems[i].row,
+                            col: self.prog.ems[i].col,
+                            prog: Err(ParserError::IllegalPrintNest),
+                        };
+                    }
+                    print = true;
+                    expects.push(em::EmType::PrintEnd);
+                    begins.push(i);
+                }
+                em::EmType::IfBegin => {
+                    expects.push(em::EmType::IfEnd);
+                    begins.push(i);
+                }
+                em::EmType::LoopBegin => {
+                    expects.push(em::EmType::LoopEnd);
+                    begins.push(i);
+                }
+                em::EmType::PrintEnd => {
+                    print = false;
+                    if expects.is_empty() || *expects.last().unwrap() != em::EmType::PrintEnd {
+                        return ParserResult {
+                            path: self.prog.ems[i].path.clone(),
+                            row: self.prog.ems[i].row,
+                            col: self.prog.ems[i].col,
+                            prog: Err(ParserError::UnexpectedEnd),
+                        };
+                    }
+                    let begin = begins.pop().unwrap();
+                    expects.pop();
+                    self.prog.ems[begin].r#ref = i;
+                    self.prog.ems[i].r#ref = begin;
+                }
+                em::EmType::IfEnd | em::EmType::LoopEnd => {
+                    if expects.is_empty() || *expects.last().unwrap() != typ {
+                        return ParserResult {
+                            path: self.prog.ems[i].path.clone(),
+                            row: self.prog.ems[i].row,
+                            col: self.prog.ems[i].col,
+                            prog: Err(ParserError::UnexpectedEnd),
+                        };
+                    }
+                    let begin = begins.pop().unwrap();
+                    expects.pop();
+                    self.prog.ems[begin].r#ref = i;
+                    self.prog.ems[i].r#ref = begin;
+                }
+                _ => {}
+            }
+        }
+
+        if !begins.is_empty() {
+            let idx = *begins.last().unwrap();
+            return ParserResult {
+                path: self.prog.ems[idx].path.clone(),
+                row: self.prog.ems[idx].row,
+                col: self.prog.ems[idx].col,
+                prog: Err(ParserError::ExpectedEnd),
+            };
+        }
+
+        ParserResult {
+            path: self.path.clone(),
+            row: self.row,
+            col: self.col,
+            prog: Ok(self.prog.clone()),
+        }
+    }
+
+    pub fn advance(&mut self) {
+        if self.ch == '\n' as i32 {
+            self.row += 1;
+            self.col = 0;
+        }
+
+        if self.pos >= self.input.chars().count() {
+            self.ch = 0;
+            return;
+        }
+
+        let c = self.input.chars().nth(self.pos).unwrap();
+        self.pos += 1;
+        self.ch = c as i32;
+
+        if self.ch != 0 {
+            self.col += 1;
+        }
+    }
+
+    pub fn parse_plain(&mut self) -> ParserResult {
+        self.tok.clear();
+        self.tok_len = 0;
+        let start_row = self.row;
+        let start_col = self.col;
+
+        if self.ch == '\\' as i32 {
+            self.advance();
+            if self.ch == 0 || (self.ch as u8 as char).is_whitespace() {
+                return ParserResult {
+                    path: self.path.clone(),
+                    row: start_row,
+                    col: start_col,
+                    prog: Err(ParserError::UnexpectedEscape),
+                };
+            } else if self.ch != '"' as i32 {
+                self.tok.push('\\');
+                self.tok_len += 1;
+            }
+        }
+
+        let mut is_int = true;
+        loop {
+            let c = char::from_u32(self.ch as u32).unwrap_or('\0');
+            if is_int && !(self.tok_len == 0 && c == '-') && !c.is_ascii_digit() {
+                is_int = false;
+            }
+            self.tok.push(c);
+            self.tok_len += 1;
+            self.advance();
+            if self.ch == 0 {
+                break;
+            }
+            let nc = char::from_u32(self.ch as u32).unwrap_or('\0');
+            if nc.is_whitespace() {
+                break;
+            }
+        }
+
+        if self.tok == "-" {
+            is_int = false;
+        }
+
+        let tok = self.tok.clone();
+        let mut emv: Option<em::Em> = None;
+
+        let keywords: Vec<(em::EmType, &str)> = vec![
+            (em::EmType::Pop, ":P"),
+            (em::EmType::Add, ";)"),
+            (em::EmType::Sub, ";("),
+            (em::EmType::Mul, "x)"),
+            (em::EmType::Div, "x("),
+            (em::EmType::Grt, ":>"),
+            (em::EmType::Less, ":<"),
+            (em::EmType::Equ, ":|"),
+            (em::EmType::Nequ, "x|"),
+            (em::EmType::PrintBegin, ":O"),
+            (em::EmType::IfBegin, ":/"),
+            (em::EmType::IfEnd, ":\\"),
+            (em::EmType::LoopBegin, ":@"),
+            (em::EmType::LoopEnd, "@:"),
+            (em::EmType::Exit, "X_X"),
+            (em::EmType::Dup, ":D"),
+            (em::EmType::Swap, ":S"),
+            #[cfg(debug_assertions)]
+            (em::EmType::Debug, "D:"),
+        ];
+
+        for (t, kw) in keywords {
+            if tok == kw {
+                emv = Some(em::Em::new(t));
+                break;
+            }
+        }
+
+        if emv.is_none() {
+            if tok == ":x" {
+                while self.ch != 0 && char::from_u32(self.ch as u32).unwrap_or('\0') != '\n' {
+                    self.advance();
+                }
+                return ParserResult {
+                    path: self.path.clone(),
+                    row: self.row,
+                    col: self.col,
+                    prog: Ok(self.prog.clone()),
+                };
+            } else if tok == ":)" {
+                emv = Some(em::Em::new_with_data(
+                    em::EmType::PrintEnd,
+                    crate::data::Data::new_int(em::DATA_STDOUT as i64),
+                ));
+            } else if tok == ":(" {
+                emv = Some(em::Em::new_with_data(
+                    em::EmType::PrintEnd,
+                    crate::data::Data::new_int(em::DATA_STDERR as i64),
+                ));
+            } else if tok == ":3" || tok == ";3" || tok == "<3" || tok == "x3" || tok == "><>" {
+                let text = match tok.chars().next().unwrap() {
+                    ':' => "meow",
+                    ';' => "nya",
+                    'x' => "rawr",
+                    '>' => "le fishe",
+                    '<' => "i <3 emlang",
+                    _ => "",
+                };
+                emv = Some(em::Em::new_with_data(
+                    em::EmType::Push,
+                    crate::data::Data::new_str(text.to_string()),
+                ));
+            } else if is_int {
+                emv = Some(em::Em::new_with_data(
+                    em::EmType::Push,
+                    crate::data::Data::new_int(tok.parse::<i64>().unwrap_or(0)),
+                ));
+            } else {
+                emv = Some(em::Em::new_with_data(
+                    em::EmType::Push,
+                    crate::data::Data::new_str(tok),
+                ));
+            }
+        }
+
+        let mut final_em = emv.unwrap();
+        final_em.row = start_row;
+        final_em.col = start_col;
+        final_em.path = self.path.clone();
+        self.prog.push(final_em);
+
+        ParserResult {
+            path: self.path.clone(),
+            row: self.row,
+            col: self.col,
+            prog: Ok(self.prog.clone()),
+        }
+    }
+
+    pub fn parse_quotes(&mut self) -> ParserResult {
+        self.tok.clear();
+        self.tok_len = 0;
+        let start_row = self.row;
+        let start_col = self.col;
+        let mut escape = false;
+
+        loop {
+            self.advance();
+            if self.ch == 0 || self.ch == '\n' as i32 {
+                return ParserResult {
+                    path: self.path.clone(),
+                    row: start_row,
+                    col: start_col,
+                    prog: Err(ParserError::UnterminatedQuotes),
+                };
+            }
+
+            let c = char::from_u32(self.ch as u32).unwrap_or('\0');
+
+            if escape {
+                let mapped = match c {
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    'f' => '\u{000C}',
+                    'v' => '\u{000B}',
+                    'b' => '\u{0008}',
+                    'a' => '\u{0007}',
+                    '"' => '"',
+                    'e' => '\u{001B}',
+                    '\\' => '\\',
+                    _ => {
+                        return ParserResult {
+                            path: self.path.clone(),
+                            row: self.row,
+                            col: self.col,
+                            prog: Err(ParserError::UnknownEscape),
+                        };
+                    }
+                };
+                self.tok.push(mapped);
+                self.tok_len += 1;
+                escape = false;
+            } else if c == '\\' {
+                escape = true;
+            } else if c == '"' {
+                break;
+            } else {
+                self.tok.push(c);
+                self.tok_len += 1;
+            }
+        }
+
+        self.advance();
+
+        let mut emv = em::Em::new_with_data(
+            em::EmType::Push,
+            crate::data::Data::new_str(self.tok.clone()),
+        );
+        emv.row = start_row;
+        emv.col = start_col;
+        emv.path = self.path.clone();
+        self.prog.push(emv);
+
+        ParserResult {
+            path: self.path.clone(),
+            row: self.row,
+            col: self.col,
+            prog: Ok(self.prog.clone()),
+        }
+    }
+
+    pub fn parse_next(&mut self) -> ParserResult {
+        while self.ch != 0 && char::from_u32(self.ch as u32).unwrap_or('\0').is_whitespace() {
+            self.advance();
+            if self.ch == 0 {
+                return ParserResult {
+                    path: self.path.clone(),
+                    row: self.row,
+                    col: self.col,
+                    prog: Ok(self.prog.clone()),
+                };
+            }
+        }
+
+        if self.ch == '"' as i32 {
+            self.parse_quotes()
+        } else {
+            self.parse_plain()
+        }
+    }
+}
+```
+
+{{stack.rs}}
+```rust
+// Generated Rust Code
+use crate::{data, utils};
+
+pub const DEFAULT_POPPED_CAP: usize = 32;
+pub const DEFAULT_STACK_CAP: usize = 1024;
+
+#[derive(Debug)]
+pub struct Popped {
+    pub str: String,
+    pub marked: bool,
+}
+
+#[derive(Debug)]
+pub struct Stack {
+    pub buf: Vec<data::Data>,
+    pub cap: usize,
+    pub size: usize,
+    pub popped: Vec<Popped>,
+    pub popped_cap: usize,
+    pub popped_size: usize,
+}
+
+impl Stack {
+    pub fn new(cap: usize, popped_cap: usize) -> Self {
+        Stack {
+            buf: Vec::with_capacity(cap),
+            cap,
+            size: 0,
+            popped: Vec::with_capacity(popped_cap),
+            popped_cap,
+            popped_size: 0,
+        }
+    }
+
+    fn add_popped(&mut self, s: String) {
+        if self.popped_size >= self.popped_cap {
+            self.popped_cap *= 2;
+            let additional = self.popped_cap.saturating_sub(self.popped.capacity());
+            if additional > 0 {
+                self.popped.reserve(additional);
+            }
+        }
+        self.popped.push(Popped {
+            str: s,
+            marked: false,
+        });
+        self.popped_size += 1;
+    }
+
+    pub fn push(&mut self, data: data::Data) {
+        if self.size >= self.cap {
+            self.cap *= 2;
+            let additional = self.cap.saturating_sub(self.buf.capacity());
+            if additional > 0 {
+                self.buf.reserve(additional);
+            }
+        }
+        self.buf.push(data);
+        self.size += 1;
+    }
+
+    pub fn pop(&mut self) -> Option<data::Data> {
+        if self.size == 0 {
+            return None;
+        }
+        self.size -= 1;
+        let data = self.buf.pop()?;
+        if let data::DataValue::Str(s) = &data.value {
+            self.add_popped(utils::strcpy_to_heap(s));
+        }
+        Some(data)
+    }
+
+    pub fn dup(&mut self, off: usize) -> i32 {
+        if off + 1 > self.size {
+            return -1;
+        }
+        let idx = self.size - off - 1;
+        let item = self.buf[idx].clone();
+        self.push(item);
+        0
+    }
+
+    pub fn swap(&mut self, off: usize) -> i32 {
+        if off + 1 > self.size {
+            return -1;
+        }
+        let idx = self.size - off - 1;
+        self.buf.swap(idx, self.size - 1);
+        0
+    }
+
+    pub fn shrink_to(&mut self, size: usize) {
+        if size == self.size {
+            return;
+        }
+        assert!(size < self.size);
+        for i in size..self.size {
+            if let data::DataValue::Str(s) = &self.buf[i].value {
+                self.add_popped(utils::strcpy_to_heap(s));
+            }
+        }
+        self.buf.truncate(size);
+        self.size = size;
+    }
+
+    pub fn clear(&mut self) {
+        self.shrink_to(0);
+        self.gc();
+    }
+
+    pub fn gc(&mut self) {
+        if self.popped_size == 0 {
+            return;
+        }
+
+        for popped in self.popped.iter_mut() {
+            popped.marked = false;
+        }
+
+        for item in self.buf.iter().take(self.size) {
+            if let data::DataValue::Str(s) = &item.value {
+                for popped in self.popped.iter_mut().take(self.popped_size) {
+                    if s == &popped.str {
+                        popped.marked = true;
+                    }
+                }
+            }
+        }
+
+        self.popped.clear();
+        self.popped_size = 0;
+    }
+}
+```
+
+{{utils.rs}}
+```rust
+// Generated Rust Code
+pub fn strcpy_to_heap(s: &str) -> String {
+    s.to_string()
+}
+```

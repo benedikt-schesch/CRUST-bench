@@ -1,0 +1,29 @@
+ {{src/lib.rs}}
+```rust
+pub mod buffer_mgr_stat;
+pub mod dberror;
+pub mod buffer_mgr;
+pub mod dt;
+pub mod expr;
+pub mod record_mgr;
+pub mod rm_serializer;
+pub mod storage_mgr;
+pub mod tables;
+```
+
+{{src/bin/test.rs}}
+```rust
+use crate::buffer_mgr;
+use crate::buffer_mgr_stat;
+use crate::dberror;
+use crate::dt;
+use crate::expr;
+use crate::record_mgr;
+use crate::rm_serializer;
+use crate::storage_mgr;
+use crate::tables;
+
+fn main() {
+// Binary entry point for testing record manager modules
+}
+```

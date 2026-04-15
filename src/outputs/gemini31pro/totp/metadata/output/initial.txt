@@ -1,0 +1,92 @@
+{{std.rs}} 
+```rust
+// Generated Rust Code
+// Constants
+pub const SIZE_MAX: usize = !0;
+
+// Function Declarations
+pub fn memset(s: &mut [u8], c: i32, n: usize) -> &mut [u8] {
+    for i in 0..n {
+        s[i] = c as u8;
+    }
+    s
+}
+
+pub fn memcpy<'a>(dst: &'a mut [u8], src: &'a [u8], n: usize) -> &'a mut [u8] {
+    for i in 0..n {
+        dst[i] = src[i];
+    }
+    dst
+}
+
+pub fn strlen(s: &str) -> usize {
+    s.len()
+}
+```
+
+{{totp.rs}} 
+```rust
+// Generated Rust Code
+// Importing required modules
+use crate::std;
+
+// Constants
+pub const TOTP_EXPORT: &str = "__attribute__((visibility(\"default\")))";
+
+// Function Declarations
+pub fn hotp(key: &[u8; 64], counter: u64) -> i32 {
+    let mut data = [0u8; 8];
+    let mut hash = [0u8; 20];
+    unpack64(counter, &mut data);
+    hmac_sha1(key, &data, 8, &mut hash);
+    
+    let offset = (hash[19] & 0xF) as usize;
+    let mut tmp = [0u8; 4];
+    tmp.copy_from_slice(&hash[offset..offset + 4]);
+    let trunc = pack32(&tmp) & 0x7FFFFFFF;
+    
+    (trunc % 1000000) as i32
+}
+
+pub fn sha1(buf: &mut [u8], len: usize, cap: usize, hash: &mut [u8; 20]) -> i32 {
+    let k: [u32; 4] = [0x5A827999, 0x6ED9EBA1, 0x8F1BBCDC, 0xCA62C1D6];
+    
+    if len > crate::std::SIZE_MAX - 9 - 63 {
+        return 1; // TOTP_EBOUNDS
+    }
+    let new_len = (len + 9 + 63) / 64 * 64;
+    if new_len > cap {
+        return 1; // TOTP_EBOUNDS
+    }
+    
+    crate::std::memset(&mut buf[len..new_len], 0, new_len - len);
+    buf[len] = 1 << 7;
+    
+    let mut len_buf = [0u8; 8];
+    unpack64((len * 8) as u64, &mut len_buf);
+    buf[new_len - 8..new_len].copy_from_slice(&len_buf);
+    
+    let mut h: [u32; 5] = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
+    let mut w: [u32; 80] = [0; 80];
+    
+    for i in 0..(new_len / 64) {
+        for t in 0..16 {
+            let mut tmp = [0u8; 4];
+            tmp.copy_from_slice(&buf[i * 64 + t * 4..i * 64 + t * 4 + 4]);
+            w[t] = pack32(&tmp);
+        }
+        for t in 16..80 {
+            w[t] = rotl(w[t - 3] ^ w[t - 8] ^ w[t - 14] ^ w[t - 16], 1);
+        }
+        let mut a = h[0];
+        let mut b = h[1];
+        let mut c = h[2];
+        let mut d = h[3];
+        let mut e = h[4];
+        
+        for t in 0..80 {
+            let f = if t < 20 {
+                (b & c) ^ (!b & d)
+            } else if t < 40 {
+                b ^ c ^ d
+            } else if t < 60 {

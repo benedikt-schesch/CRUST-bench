@@ -1,0 +1,326 @@
+// Generated Rust Code
+use crate::{
+em::{self, Program},
+stack,
+};
+use std::fmt;
+
+pub const GC_FREQUENCY_IN_TICKS: usize = 64;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RuntimeError {
+StackUnderflow,
+InvalidAccess,
+DivByZero,
+IncorrectType,
+}
+
+impl fmt::Display for RuntimeError {
+fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+match self {
+RuntimeError::StackUnderflow => write!(f, "Stack underflow"),
+RuntimeError::InvalidAccess => write!(f, "Invalid access"),
+RuntimeError::DivByZero => write!(f, "Division by zero"),
+RuntimeError::IncorrectType => write!(f, "Incorrect type"),
+}
+}
+}
+
+#[derive(Debug)]
+pub struct RuntimeResult {
+pub ex: i64,
+pub em: Result<em::Em, RuntimeError>,
+}
+
+#[derive(Debug)]
+pub struct Env<'a> {
+pub prog: &'a Program,
+pub stack: stack::Stack,
+pub ip: usize,
+pub ex: usize,
+pub tick: usize,
+pub halt: bool,
+pub print: bool,
+pub print_from: usize,
+}
+
+impl<'a> Env<'a> {
+pub fn new(stack_cap: usize, popped_cap: usize) -> Self {
+let leaked_prog = Box::leak(Box::new(Program::new(1)));
+Env {
+prog: leaked_prog,
+stack: stack::Stack::new(stack_cap, popped_cap),
+ip: 0,
+ex: 0,
+tick: 0,
+halt: false,
+print: false,
+print_from: 0,
+}
+}
+
+pub fn run(&mut self, prog: &'a Program) -> RuntimeResult {
+self.ex = 0;
+self.prog = prog;
+self.halt = false;
+self.print = false;
+self.tick = 0;
+self.ip = 0;
+
+while self.ip < self.prog.size && !self.halt {
+let emc = self.prog.ems[self.ip].clone();
+
+match emc.em_type {
+em::EmType::Push => self.stack.push(emc.data.clone()),
+em::EmType::Pop => {
+if self.stack.pop().is_none() {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::StackUnderflow),
+};
+}
+if self.print && self.print_from > self.stack.size {
+self.print_from = self.stack.size;
+}
+}
+em::EmType::Add
+| em::EmType::Sub
+| em::EmType::Mul
+| em::EmType::Div
+| em::EmType::Grt
+| em::EmType::Less
+| em::EmType::Equ
+| em::EmType::Nequ => {
+let b = match self.stack.pop() {
+Some(v) => v,
+None => {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::StackUnderflow),
+};
+}
+};
+let a = match self.stack.pop() {
+Some(v) => v,
+None => {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::StackUnderflow),
+};
+}
+};
+
+let av = if let crate::data::DataValue::Int(v) = a.value {
+v
+} else {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::IncorrectType),
+};
+};
+let bv = if let crate::data::DataValue::Int(v) = b.value {
+v
+} else {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::IncorrectType),
+};
+};
+
+let out = match emc.em_type {
+em::EmType::Add => av + bv,
+em::EmType::Sub => av - bv,
+em::EmType::Mul => av * bv,
+em::EmType::Div => {
+if bv == 0 {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::DivByZero),
+};
+}
+av / bv
+}
+em::EmType::Grt => (av > bv) as i64,
+em::EmType::Less => (av < bv) as i64,
+em::EmType::Equ => (av == bv) as i64,
+em::EmType::Nequ => (av != bv) as i64,
+_ => 0,
+};
+self.stack.push(crate::data::Data::new_int(out));
+}
+em::EmType::PrintBegin => {
+if self.ip == emc.r#ref.saturating_sub(1) {
+if let Some(data) = self.stack.pop() {
+println!("{}", data);
+} else {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::StackUnderflow),
+};
+}
+} else {
+self.print = true;
+self.print_from = self.stack.size;
+}
+}
+em::EmType::PrintEnd => {
+if !self.print || self.print_from == self.stack.size {
+self.tick += 1;
+if self.tick % GC_FREQUENCY_IN_TICKS == 0 {
+self.stack.gc();
+}
+self.ip += 1;
+continue;
+}
+self.print = false;
+let mut parts = Vec::new();
+for i in self.print_from..self.stack.size {
+parts.push(format!("{}", self.stack.buf[i]));
+}
+println!("{}", parts.join(" "));
+self.stack.shrink_to(self.print_from);
+}
+em::EmType::IfBegin => {
+let cond = match self.stack.pop() {
+Some(v) => v,
+None => {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::StackUnderflow),
+};
+}
+};
+let cv = if let crate::data::DataValue::Int(v) = cond.value {
+v
+} else {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::IncorrectType),
+};
+};
+if cv == 0 {
+self.ip = emc.r#ref;
+}
+}
+em::EmType::IfEnd => {}
+em::EmType::LoopBegin => {
+let cond = match self.stack.pop() {
+Some(v) => v,
+None => {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::StackUnderflow),
+};
+}
+};
+let cv = if let crate::data::DataValue::Int(v) = cond.value {
+v
+} else {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::IncorrectType),
+};
+};
+if cv == 0 {
+self.ip = emc.r#ref;
+}
+}
+em::EmType::LoopEnd => {
+self.ip = emc.r#ref.saturating_sub(1);
+}
+em::EmType::Exit => {
+let ex = match self.stack.pop() {
+Some(v) => v,
+None => {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::StackUnderflow),
+};
+}
+};
+let xv = if let crate::data::DataValue::Int(v) = ex.value {
+v
+} else {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::IncorrectType),
+};
+};
+self.ex = xv as usize;
+self.halt = true;
+}
+em::EmType::Dup => {
+let off = match self.stack.pop() {
+Some(v) => v,
+None => {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::StackUnderflow),
+};
+}
+};
+let ov = if let crate::data::DataValue::Int(v) = off.value {
+v
+} else {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::IncorrectType),
+};
+};
+if self.stack.dup(ov as usize) != 0 {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::InvalidAccess),
+};
+}
+}
+em::EmType::Swap => {
+let off = match self.stack.pop() {
+Some(v) => v,
+None => {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::StackUnderflow),
+};
+}
+};
+let ov = if let crate::data::DataValue::Int(v) = off.value {
+v
+} else {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::IncorrectType),
+};
+};
+if self.stack.swap(ov as usize) != 0 {
+return RuntimeResult {
+ex: 0,
+em: Err(RuntimeError::InvalidAccess),
+};
+}
+}
+#[cfg(debug_assertions)]
+em::EmType::Debug => {
+for (i, item) in self.stack.buf.iter().enumerate().take(self.stack.size) {
+println!("stack[{}]: {}", i, item);
+}
+}
+}
+
+self.tick += 1;
+if self.tick % GC_FREQUENCY_IN_TICKS == 0 {
+self.stack.gc();
+}
+self.ip += 1;
+}
+
+self.stack.clear();
+self.gc();
+RuntimeResult {
+ex: self.ex as i64,
+em: Ok(em::Em::new(em::EmType::Push)),
+}
+}
+
+pub fn gc(&mut self) {}
+}

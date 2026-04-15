@@ -1,0 +1,66 @@
+```rust
+// Generated Rust Code
+```
+
+{{myutils.rs}}
+```rust
+pub fn print_bin(n: u64) -> String {
+    let mut s = String::with_capacity(64);
+    let mut i = 1u64 << 63;
+    while i > 0 {
+        if (n & i) != 0 {
+            s.push('1');
+        } else {
+            s.push('0');
+        }
+        i /= 2;
+    }
+    s
+}
+```
+
+{{fnv.rs}}
+```rust
+pub const FNV_PRIME: u64 = 1099511628211;
+pub const FNV_OFFSET_BASIS: u64 = 14695981039346656037;
+
+pub fn fnv1(buf: &[u8]) -> u64 {
+    let mut h = FNV_OFFSET_BASIS;
+    for &b in buf {
+        h = h.wrapping_mul(FNV_PRIME);
+        h ^= b as u64;
+    }
+    h
+}
+
+#[allow(non_snake_case)]
+pub fn getDigest(h: u64) -> String {
+    let bytes = h.to_ne_bytes();
+    format!("{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        bytes[7], bytes[6], bytes[5], bytes[4], bytes[3], bytes[2], bytes[1], bytes[0])
+}
+```
+
+{{fleur.rs}}
+```rust
+use std::{fmt, fs::File};
+use std::io::{Read, Write, Seek, SeekFrom};
+use crate::fnv::fnv1;
+
+const M: u64 = 18446744073709551557;
+const G: u64 = 18446744073709550147;
+const FNV_PRIME: u64 = 1099511628211;
+const FNV_OFFSET_BASIS: u64 = 14695981039346656037;
+
+#[derive(Debug, Clone)]
+pub struct Header {
+    pub version: u64,
+    pub n: u64,
+    pub p: f64,
+    pub k: u64,
+    pub m: u64,
+    pub n_value: u64,
+}
+
+impl fmt::Display for Header {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>)

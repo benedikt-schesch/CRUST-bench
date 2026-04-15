@@ -1,0 +1,1 @@
+[{"error_code": null, "error_message": "expected one of `;` or `{`, found `/`", "file_path": "razz_simulation/src/lib.rs", "row": "2", "col": "24", "error_snippet": "|\n2 | pub mod razz_simulation/src/bin/test;\n  |                        ^ expected one of `;` or `{`"}]

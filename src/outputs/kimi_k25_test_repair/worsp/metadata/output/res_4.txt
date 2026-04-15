@@ -1,0 +1,46 @@
+ {{lib.rs}}
+```rust
+pub mod worsp;
+
+// Re-export items from the worsp module so they are accessible at the crate root
+// This allows src/bin/test.rs to use worsp::ParseState, etc.
+pub use crate::worsp::ParseState;
+pub use crate::worsp::TokenKind;
+pub use crate::worsp::next;
+```
+
+{{src/worsp.rs}}
+```rust
+// Module containing parsing functionality
+
+pub struct ParseState {
+// Placeholder for parse state implementation
+pub position: usize,
+}
+
+pub enum TokenKind {
+// Placeholder for token kinds
+Identifier,
+Number,
+Symbol,
+EndOfFile,
+}
+
+pub fn next() -> Option<TokenKind> {
+// Placeholder implementation for next token retrieval
+None
+}
+```
+
+{{src/bin/test.rs}}
+```rust
+use worsp::ParseState;
+use worsp::TokenKind;
+use worsp::next;
+
+fn main() {
+// Binary entry point using the imported items
+let _state = ParseState { position: 0 };
+let _token = next();
+}
+```

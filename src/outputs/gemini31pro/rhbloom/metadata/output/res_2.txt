@@ -1,0 +1,5 @@
+```rust
+// Generated Rust Code
+pub mod rhbloom;
+pub use crate::rhbloom::RHBloom;
+```

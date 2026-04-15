@@ -1,0 +1,15 @@
+ {{lib.rs}}
+```rust
+pub mod mdb {
+    pub mod mdb {
+        pub struct Mdb;
+        pub struct MdbOptions;
+        pub struct MdbError;
+
+        pub enum MdbStatusCode {
+            Success,
+            Error,
+        }
+    }
+}
+```

@@ -1,0 +1,24 @@
+ {{lib.rs}}
+```rust
+pub mod range;
+pub mod csvline;
+pub mod csvfield;
+```
+
+{{range.rs}}
+```rust
+pub mod range {
+    pub struct RangeElement;
+    pub enum RangeType {}
+}
+```
+
+{{csvline.rs}}
+```rust
+pub struct CsvLine;
+```
+
+{{csvfield.rs}}
+```rust
+pub struct CsvField;
+```

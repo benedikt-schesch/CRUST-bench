@@ -1,0 +1,60 @@
+```rust
+// Generated Rust Code
+```
+
+{{blake2b.rs}}
+```rust
+pub const BLAKE2B_BLOCKBYTES: usize = 128;
+pub const BLAKE2B_OUTBYTES: usize = 64;
+pub const BLAKE2B_KEYBYTES: usize = 64;
+pub const BLAKE2B_SALTBYTES: usize = 16;
+pub const BLAKE2B_PERSONALBYTES: usize = 16;
+
+#[derive(Debug, Clone)]
+pub struct Blake2bState {
+    pub h: [u64; 8],
+    pub t: [u64; 2],
+    pub f: [u64; 2],
+    pub buf: [u8; BLAKE2B_BLOCKBYTES],
+    pub buflen: usize,
+    pub outlen: usize,
+    pub last_node: u8,
+}
+
+#[repr(packed)]
+#[derive(Debug, Clone)]
+pub struct Blake2bParam {
+    pub digest_length: u8,
+    pub key_length: u8,
+    pub fanout: u8,
+    pub depth: u8,
+    pub leaf_length: u32,
+    pub node_offset: u32,
+    pub xof_length: u32,
+    pub node_depth: u8,
+    pub inner_length: u8,
+    pub reserved: [u8; 14],
+    pub salt: [u8; BLAKE2B_SALTBYTES],
+    pub personal: [u8; BLAKE2B_PERSONALBYTES],
+}
+
+impl Blake2bParam {
+    fn to_bytes(&self) -> [u8; 64] {
+        let mut bytes = [0u8; 64];
+        bytes[0] = self.digest_length;
+        bytes[1] = self.key_length;
+        bytes[2] = self.fanout;
+        bytes[3] = self.depth;
+        bytes[4..8].copy_from_slice(&self.leaf_length.to_le_bytes());
+        bytes[8..12].copy_from_slice(&self.node_offset.to_le_bytes());
+        bytes[12..16].copy_from_slice(&self.xof_length.to_le_bytes());
+        bytes[16] = self.node_depth;
+        bytes[17] = self.inner_length;
+        bytes[18..32].copy_from_slice(&self.reserved);
+        bytes[32..48].copy_from_slice(&self.salt);
+        bytes[48..64].copy_from_slice(&self.personal);
+        bytes
+    }
+}
+
+const BLAKE2B_IV: [u64; 

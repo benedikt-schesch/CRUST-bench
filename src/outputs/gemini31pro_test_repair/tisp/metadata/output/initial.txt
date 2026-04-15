@@ -1,0 +1,67 @@
+```rust
+// Generated Rust Code
+```
+
+{{core.rs}}
+```rust
+use crate::tisp::{Rec, Tsp, Val, ValUnion, TspType};
+
+fn car(v: &Val) -> Val {
+    if let ValUnion::P { ref car, .. } = v.v {
+        *car.clone()
+    } else {
+        v.clone()
+    }
+}
+
+fn cdr(v: &Val) -> Val {
+    if let ValUnion::P { ref cdr, .. } = v.v {
+        *cdr.clone()
+    } else {
+        v.clone()
+    }
+}
+
+fn caar(v: &Val) -> Val { car(&car(v)) }
+fn cadr(v: &Val) -> Val { car(&cdr(v)) }
+fn cdar(v: &Val) -> Val { cdr(&car(v)) }
+fn cddr(v: &Val) -> Val { cdr(&cdr(v)) }
+fn nilp(v: &Val) -> bool { matches!(v.t, TspType::TspNil) }
+
+pub fn prim_car(st: &mut Tsp, env: &mut Rec, args: Val) -> Val {
+    if crate::tisp::tsp_lstlen(&args) != 1 {
+        return st.none.clone();
+    }
+    let c = car(&args);
+    if (c.t as u32 & TspType::TspPair as u32) == 0 {
+        return st.none.clone();
+    }
+    caar(&args)
+}
+
+pub fn prim_cdr(st: &mut Tsp, env: &mut Rec, args: Val) -> Val {
+    if crate::tisp::tsp_lstlen(&args) != 1 {
+        return st.none.clone();
+    }
+    let c = car(&args);
+    if (c.t as u32 & TspType::TspPair as u32) == 0 {
+        return st.none.clone();
+    }
+    cdar(&args)
+}
+
+pub fn prim_cons(st: &mut Tsp, env: &mut Rec, args: Val) -> Val {
+    if crate::tisp::tsp_lstlen(&args) != 2 {
+        return st.none.clone();
+    }
+    crate::tisp::mk_pair(car(&args), cadr(&args)).unwrap_or(st.none.clone())
+}
+
+pub fn form_quote(st: &mut Tsp, env: &mut Rec, args: Val) -> Val {
+    if crate::tisp::tsp_lstlen(&args) != 1 {
+        return st.none.clone();
+    }
+    car(&args)
+}
+
+pub fn prim_eval(

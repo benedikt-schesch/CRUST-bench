@@ -1,0 +1,73 @@
+```rust
+// Generated Rust Code
+```
+
+{{for_gen.rs}}
+```rust
+pub fn pack_bits(base: u32, input: &[u32], output: &mut [u8], length: usize, bits: usize) -> u32 {
+    if length == 0 {
+        return 0;
+    }
+    if bits == 0 {
+        return 0;
+    }
+    let mut out_idx = 0;
+    let mut tmp: u32 = 0;
+    let mut bit_pos = 0;
+
+    for i in 0..length {
+        let val = input[i].wrapping_sub(base);
+        
+        if bit_pos + bits < 32 {
+            tmp |= val << bit_pos;
+            bit_pos += bits;
+        } else {
+            tmp |= val << bit_pos;
+            let bytes = tmp.to_le_bytes();
+            if out_idx + 4 <= output.len() {
+                output[out_idx..out_idx+4].copy_from_slice(&bytes);
+            } else {
+                for j in 0..(output.len() - out_idx) {
+                    output[out_idx + j] = bytes[j];
+                }
+            }
+            out_idx += 4;
+            
+            if bit_pos + bits == 32 {
+                tmp = 0;
+                bit_pos = 0;
+            } else {
+                tmp = val >> (32 - bit_pos);
+                bit_pos = bits - (32 - bit_pos);
+            }
+        }
+    }
+    
+    let total_bytes = (length * bits + 7) / 8;
+    let remaining_bytes = total_bytes % 4;
+    let bytes_to_write = if remaining_bytes == 0 && (length * bits) % 32 != 0 { 4 } else { remaining_bytes };
+    
+    if bytes_to_write > 0 {
+        let bytes = tmp.to_le_bytes();
+        for i in 0..bytes_to_write {
+            if out_idx + i < output.len() {
+                output[out_idx + i] = bytes[i];
+            }
+        }
+    }
+    
+    total_bytes as u32
+}
+
+pub fn unpack_bits(base: u32, input: &[u8], output: &mut [u32], length: usize, bits: usize) -> u32 {
+    if length == 0 {
+        return 0;
+    }
+    if bits == 0 {
+        for i in 0..length {
+            output[i] = base;
+        }
+        return 0;
+    }
+    
+    let mut in_idx = 0

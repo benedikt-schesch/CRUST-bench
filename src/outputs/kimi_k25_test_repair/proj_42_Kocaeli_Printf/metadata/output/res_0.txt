@@ -1,0 +1,51 @@
+ {{lib.rs}}
+```rust
+pub mod ft_printf;
+```
+
+{{ft_printf.rs}}
+```rust
+use std::io::{self, Write};
+
+/// Writes an integer to stdout and returns the number of bytes written
+pub fn writeint(n: i32) -> io::Result<usize> {
+    let s = n.to_string();
+    io::stdout().write_all(s.as_bytes())?;
+    Ok(s.len())
+}
+
+/// Writes an unsigned integer to stdout and returns the number of bytes written
+pub fn writeuint(n: u32) -> io::Result<usize> {
+    let s = n.to_string();
+    io::stdout().write_all(s.as_bytes())?;
+    Ok(s.len())
+}
+
+/// Writes a number in hexadecimal format to stdout and returns the number of bytes written
+pub fn writehex(n: usize) -> io::Result<usize> {
+    let s = format!("{:x}", n);
+    io::stdout().write_all(s.as_bytes())?;
+    Ok(s.len())
+}
+
+/// Writes a pointer address to stdout and returns the number of bytes written
+pub fn writepoint(p: *const ()) -> io::Result<usize> {
+    let s = format!("{:p}", p);
+    io::stdout().write_all(s.as_bytes())?;
+    Ok(s.len())
+}
+
+/// Writes a single character to stdout and returns the number of bytes written
+pub fn writechar(c: char) -> io::Result<usize> {
+    let mut buf = [0u8; 4];
+    let s = c.encode_utf8(&mut buf);
+    io::stdout().write_all(s.as_bytes())?;
+    Ok(s.len())
+}
+
+/// Writes a string to stdout and returns the number of bytes written
+pub fn writestring(s: &str) -> io::Result<usize> {
+    io::stdout().write_all(s.as_bytes())?;
+    Ok(s.len())
+}
+```

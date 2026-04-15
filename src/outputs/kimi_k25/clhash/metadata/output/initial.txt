@@ -1,0 +1,112 @@
+ {{clhash.rs}} 
+```rust
+pub const RANDOM_64BITWORDS_NEEDED_FOR_CLHASH: usize = 133;
+pub const RANDOM_BYTES_NEEDED_FOR_CLHASH: usize = 133 * 8;
+
+#[derive(Clone, Copy, Debug, Default)]
+struct U128 {
+    high: u64,
+    low: u64,
+}
+
+impl U128 {
+    fn new(high: u64, low: u64) -> Self {
+        U128 { high, low }
+    }
+    
+    fn from_u128(x: u128) -> Self {
+        U128 {
+            high: (x >> 64) as u64,
+            low: x as u64,
+        }
+    }
+    
+    fn to_u128(self) -> u128 {
+        ((self.high as u128) << 64) | (self.low as u128)
+    }
+    
+    fn xor(self, other: U128) -> U128 {
+        U128::new(self.high ^ other.high, self.low ^ other.low)
+    }
+    
+    fn and(self, other: U128) -> U128 {
+        U128::new(self.high & other.high, self.low & other.low)
+    }
+}
+
+fn clmul(a: u64, b: u64) -> U128 {
+    let mut result: u128 = 0;
+    let a = a as u128;
+    let b = b as u128;
+    for i in 0..64 {
+        if (a >> i) & 1 == 1 {
+            result ^= b << i;
+        }
+    }
+    U128::from_u128(result)
+}
+
+fn leftshift1(a: U128) -> U128 {
+    let new_low = a.low << 1;
+    let new_high = (a.high << 1) | (a.low >> 63);
+    U128::new(new_high, new_low)
+}
+
+fn leftshift2(a: U128) -> U128 {
+    let new_low = a.low << 2;
+    let new_high = (a.high << 2) | (a.low >> 62);
+    U128::new(new_high, new_low)
+}
+
+fn lazymod127(Alow: U128, Ahigh: U128) -> U128 {
+    let shift1 = leftshift1(Ahigh);
+    let shift2 = leftshift2(Ahigh);
+    Alow.xor(shift1).xor(shift2)
+}
+
+fn mul128by128to128_lazymod127(A: U128, B: U128) -> U128 {
+    let Amix1 = clmul(A.low, B.high);
+    let Amix2 = clmul(A.high, B.low);
+    let Alow_prod = clmul(A.low, B.low);
+    let Ahigh_prod = clmul(A.high, B.high);
+    
+    let Amix = Amix1.xor(Amix2);
+    let Amix1_shifted = U128::new(Amix.low, 0);
+    let Amix2_shifted = U128::new(0, Amix.high);
+    
+    let new_Alow = Alow_prod.xor(Amix1_shifted);
+    let new_Ahigh = Ahigh_prod.xor(Amix2_shifted);
+    
+    lazymod127(new_Alow, new_Ahigh)
+}
+
+fn lazyLengthHash(keylength: u64, length: u64) -> U128 {
+    let lengthvector = U128::new(keylength, length);
+    clmul(lengthvector.high, lengthvector.low)
+}
+
+fn precompReduction64_si128(A: U128) -> U128 {
+    let c: u64 = (1u64 << 4) + (1u64 << 3) + (1u64 << 1) + (1u64 << 0);
+    let Q2 = clmul(A.high, c);
+    
+    let table: [u8; 16] = [
+        0, 27, 54, 45, 108, 119, 90, 65, 
+        0xD8, 0xC3, 0xEE, 0xF5, 0xB4, 0xAF, 0x82, 0x99
+    ];
+    
+    let q2_high_bytes = Q2.high.to_le_bytes();
+    let mut q3_bytes = [0u8; 16];
+    
+    for i in 0..8 {
+        let idx = q2_high_bytes[i];
+        if (idx & 0x80) == 0 {
+            q3_bytes[i] = table[(idx & 0x0F) as usize];
+        } else {
+            q3_bytes[i] = 0;
+        }
+    }
+    for i in 8..16 {
+        q3_bytes[i] = table[0];
+    }
+    
+    let Q3 = U128

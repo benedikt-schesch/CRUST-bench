@@ -1,0 +1,1015 @@
+{{skp.rs}}
+```rust
+use std::fmt::Arguments;
+
+pub const SKP_VER: u32 = 0x0003001C;
+pub const SKP_VER_STR: &str = "0.3.1rc";
+
+#[derive(Debug, Default, Clone)]
+pub struct SkpLoop {
+    pub start: String,
+    pub to: Option<String>,
+    pub end: Option<String>,
+    pub alt: i32,
+}
+
+pub mod skp_ {
+    pub use super::{
+        chr_cmp, get_close, get_qclose, is_alnum, is_alpha, is_blank, is_break, is_ctrl, is_digit,
+        is_idchr, is_lower, is_oneof, is_space, is_string, is_upper, is_xdigit, match_pat,
+        skp_loop_len, skp_next, skp_scan, skptrace, SkpLoop, MATCHED, MATCHED_FAIL,
+        MATCHED_GOAL, MATCHED_GOALNOT, SKP_VER, SKP_VER_STR,
+    };
+}
+
+pub fn skp_loop_len(start: &str, to: &str) -> i32 {
+    let ret = start.len() as i32 - to.len() as i32;
+    if (0..=(1 << 16)).contains(&ret) {
+        ret
+    } else {
+        0
+    }
+}
+
+pub fn skp_<'a>(src: &'a str, pat: &'a str) -> (i32, &'a str, &'a str) {
+    let mut flg = 0i32;
+    let mut s = src;
+    let mut p = pat;
+    let start = src;
+    let mut alt = MATCHED_FAIL;
+
+    while !p.is_empty() {
+        while first_byte(p) == b' ' {
+            p = slice_from(p, 1);
+        }
+        if p.is_empty() {
+            break;
+        }
+
+        if first_byte(p) == b'>' {
+            p = slice_from(p, 1);
+            while first_byte(p) == b' ' {
+                p = slice_from(p, 1);
+            }
+
+            if p.is_empty() {
+                alt = MATCHED_FAIL;
+                s = start;
+                break;
+            }
+
+            let mut search = s;
+            let mut found = None;
+            loop {
+                let (r, search_end, pat_end) = match_pat(p, search, &mut flg);
+                if r != MATCHED_FAIL {
+                    found = Some((r, search, search_end, pat_end));
+                    break;
+                }
+                let (_, next_search) = skp_next(search, flg & 2);
+                if next_search.len() == search.len() {
+                    break;
+                }
+                search = next_search;
+            }
+
+            if let Some((r, matched_from, _search_end, pat_end)) = found {
+                alt = r;
+                s = matched_from;
+                p = pat_end;
+                if alt == MATCHED_GOAL || alt == MATCHED_GOALNOT {
+                    break;
+                }
+                return (alt, s, p);
+            } else {
+                alt = MATCHED_FAIL;
+                s = start;
+                break;
+            }
+        }
+
+        let (r, s_end, p_end) = match_pat(p, s, &mut flg);
+        if r == MATCHED_FAIL {
+            alt = MATCHED_FAIL;
+            s = start;
+            break;
+        }
+
+        alt = r;
+        s = s_end;
+        p = p_end;
+
+        if alt == MATCHED_GOAL || alt == MATCHED_GOALNOT {
+            break;
+        }
+
+        while first_byte(p) == b' ' {
+            p = slice_from(p, 1);
+        }
+    }
+
+    if alt == MATCHED_GOAL {
+        let n = first_byte(p) as i32;
+        return (n, s, p);
+    }
+    if alt == MATCHED_GOALNOT {
+        let n = first_byte(p) as i32;
+        return (-n, s, p);
+    }
+
+    let term = first_byte(p);
+    if term != 0 {
+        let alt_code = term as i32;
+        if alt != MATCHED_FAIL {
+            return (alt_code, s, slice_from(p, 1));
+        }
+        return (alt_code, start, slice_from(p, 1));
+    }
+
+    (alt, s, p)
+}
+
+pub static mut SKP_ZERO: i32 = 0;
+
+pub fn skptrace(args: Arguments<'_>) {
+    eprintln!("TRCE: {}", args);
+}
+
+fn first_byte(s: &str) -> u8 {
+    s.as_bytes().first().copied().unwrap_or(0)
+}
+
+fn byte_at(s: &str, idx: usize) -> u8 {
+    s.as_bytes().get(idx).copied().unwrap_or(0)
+}
+
+fn slice_from(s: &str, idx: usize) -> &str {
+    if idx >= s.len() {
+        ""
+    } else {
+        &s[idx..]
+    }
+}
+
+fn lower_ascii_u32(c: u32) -> u32 {
+    if (b'A' as u32) <= c && c <= (b'Z' as u32) {
+        c + 32
+    } else {
+        c
+    }
+}
+
+pub fn skp_next(s: &str, iso: i32) -> (u32, &str) {
+    if s.is_empty() {
+        return (0, s);
+    }
+
+    if iso != 0 {
+        let b = s.as_bytes()[0] as u32;
+        if b == 0x0D && s.len() >= 2 && s.as_bytes()[1] == 0x0A {
+            return (0x0D0A, slice_from(s, 2));
+        }
+        return (b, slice_from(s, 1));
+    }
+
+    let mut chars = s.chars();
+    if let Some(ch) = chars.next() {
+        let len = ch.len_utf8();
+        if ch == '\r' && s[len..].starts_with('\n') {
+            return (0x0D0A, slice_from(s, len + 1));
+        }
+        return (ch as u32, slice_from(s, len));
+    }
+
+    (0, s)
+}
+
+pub fn chr_cmp(a: u32, b: u32, fold: i32) -> bool {
+    let mut aa = a;
+    let mut bb = b;
+    if fold != 0 && aa <= 0x7F && bb <= 0x7F {
+        aa = lower_ascii_u32(aa);
+        bb = lower_ascii_u32(bb);
+    }
+    aa == bb
+}
+
+pub fn is_blank(c: u32) -> bool {
+    matches!(
+        c,
+        0x09
+            | 0x20
+            | 0x00A0
+            | 0x1680
+            | 0x2000
+            | 0x2001
+            | 0x2002
+            | 0x2003
+            | 0x2004
+            | 0x2005
+            | 0x2006
+            | 0x2007
+            | 0x2008
+            | 0x2009
+            | 0x200A
+            | 0x202F
+            | 0x3000
+    )
+}
+
+pub fn is_break(c: u32) -> bool {
+    matches!(c, 0x0A | 0x0C | 0x0D | 0x85 | 0x2028 | 0x2029 | 0x0D0A)
+}
+
+pub fn is_space(c: u32) -> bool {
+    is_blank(c) || is_break(c)
+}
+
+pub fn is_digit(c: u32) -> bool {
+    (b'0' as u32) <= c && c <= (b'9' as u32)
+}
+
+pub fn is_xdigit(c: u32) -> bool {
+    ((b'0' as u32) <= c && c <= (b'9' as u32))
+        || ((b'A' as u32) <= c && c <= (b'F' as u32))
+        || ((b'a' as u32) <= c && c <= (b'f' as u32))
+}
+
+pub fn is_upper(c: u32) -> bool {
+    (b'A' as u32) <= c && c <= (b'Z' as u32)
+}
+
+pub fn is_lower(c: u32) -> bool {
+    (b'a' as u32) <= c && c <= (b'z' as u32)
+}
+
+pub fn is_alpha(c: u32) -> bool {
+    is_upper(c) || is_lower(c)
+}
+
+pub fn is_idchr(c: u32) -> bool {
+    is_alpha(c) || is_digit(c) || c == b'_' as u32
+}
+
+pub fn is_alnum(c: u32) -> bool {
+    is_alpha(c) || is_digit(c)
+}
+
+pub fn is_ctrl(c: u32) -> bool {
+    c < 0x20 || c == 0x7F || (0x80..0xA0).contains(&c)
+}
+
+pub fn is_oneof(ch: u32, set: &str, iso: i32) -> bool {
+    if ch == 0 {
+        return false;
+    }
+
+    let mut chars: Vec<u32> = Vec::new();
+    let mut rest = set;
+    while !rest.is_empty() {
+        let (c, next) = skp_next(rest, iso);
+        rest = next;
+        if c == b']' as u32 {
+            break;
+        }
+        chars.push(c);
+    }
+
+    if chars.is_empty() {
+        return false;
+    }
+
+    let mut i = 0usize;
+    while i < chars.len() {
+        if chars[i] == ch {
+            return true;
+        }
+        if i + 2 < chars.len() && chars[i + 1] == b'-' as u32 {
+            let start = chars[i];
+            let end = chars[i + 2];
+            if start <= ch && ch <= end {
+                return true;
+            }
+            i += 3;
+        } else {
+            i += 1;
+        }
+    }
+
+    false
+}
+
+pub fn is_string(s: &str, p: &str, len: i32, flg: i32) -> i32 {
+    let mut alts: Vec<&str> = Vec::new();
+    let mut rem = len.max(0) as usize;
+    let mut p_cur = p;
+
+    while rem > 0 && !p_cur.is_empty() {
+        let b = first_byte(p_cur);
+        if b == 0x0E {
+            p_cur = slice_from(p_cur, 1);
+            rem = rem.saturating_sub(1);
+            continue;
+        }
+
+        let start_seg = p_cur;
+        while rem > 0 && !p_cur.is_empty() && first_byte(p_cur) != 0x0E {
+            let step = if flg & 2 != 0 {
+                1
+            } else {
+                p_cur.chars().next().map(|c| c.len_utf8()).unwrap_or(1)
+            };
+            p_cur = slice_from(p_cur, step);
+            rem = rem.saturating_sub(step);
+        }
+        let seg_len = start_seg.len() - p_cur.len();
+        alts.push(&start_seg[..seg_len]);
+
+        if rem > 0 && first_byte(p_cur) == 0x0E {
+            p_cur = slice_from(p_cur, 1);
+            rem = rem.saturating_sub(1);
+        }
+    }
+
+    for alt in alts {
+        let mut s_cur = s;
+        let mut p_alt = alt;
+        let mut matched = 0i32;
+        let mut ok = true;
+
+        while !p_alt.is_empty() {
+            let (pc, p_next) = skp_next(p_alt, flg & 2);
+            let (sc, s_next) = skp_next(s_cur, flg & 2);
+            if sc == 0 || !chr_cmp(sc, pc, flg & 1) {
+                ok = false;
+                break;
+            }
+            matched += (s_cur.len() - s_next.len()) as i32;
+            s_cur = s_next;
+            p_alt = p_next;
+        }
+
+        if ok {
+            return matched;
+        }
+    }
+
+    0
+}
+
+pub fn get_close(open: u32) -> u32 {
+    match open {
+        x if x == b'(' as u32 => b')' as u32,
+        x if x == b'[' as u32 => b']' as u32,
+        x if x == b'{' as u32 => b'}' as u32,
+        x if x == b'<' as u32 => b'>' as u32,
+        _ => 0,
+    }
+}
+
+pub fn get_qclose(open: u32) -> u32 {
+    match open {
+        x if x == b'\'' as u32 => x,
+        x if x == b'"' as u32 => x,
+        x if x == b'`' as u32 => x,
+        _ => 0,
+    }
+}
+
+pub const MATCHED_FAIL: i32 = 0;
+pub const MATCHED: i32 = 1;
+pub const MATCHED_GOAL: i32 = 2;
+pub const MATCHED_GOALNOT: i32 = 3;
+
+pub fn match_pat<'a>(pat: &'a str, src: &'a str, flg: &mut i32) -> (i32, &'a str, &'a str) {
+    let mut pat_cur = pat;
+    let mut src_cur = src;
+    let mut ret = MATCHED_FAIL;
+
+    loop {
+        while first_byte(pat_cur) == b' ' {
+            pat_cur = slice_from(pat_cur, 1);
+        }
+
+        if pat_cur.is_empty() {
+            return (ret, src_cur, pat_cur);
+        }
+
+        let mut match_min: u32 = 1;
+        let mut match_max: u32 = 1;
+        let mut quantifier_used = false;
+        let mut match_not: u32 = 0;
+
+        match first_byte(pat_cur) {
+            b'*' => {
+                match_min = 0;
+                match_max = u32::MAX;
+                quantifier_used = true;
+                pat_cur = slice_from(pat_cur, 1);
+            }
+            b'+' => {
+                match_max = u32::MAX;
+                quantifier_used = true;
+                pat_cur = slice_from(pat_cur, 1);
+            }
+            b'?' => {
+                match_min = 0;
+                quantifier_used = true;
+                pat_cur = slice_from(pat_cur, 1);
+            }
+            _ => {}
+        }
+
+        if first_byte(pat_cur) == b'!' {
+            match_not = 1;
+            pat_cur = slice_from(pat_cur, 1);
+        }
+
+        while first_byte(pat_cur) == b' ' {
+            pat_cur = slice_from(pat_cur, 1);
+        }
+
+        let op = first_byte(pat_cur);
+        if op == 0 {
+            return (ret, src_cur, pat_cur);
+        }
+        pat_cur = slice_from(pat_cur, 1);
+
+        let mut s_end = src_cur;
+        let (mut s_chr, mut s_tmp) = skp_next(s_end, *flg & 2);
+
+        ret = match op {
+            b'.' => {
+                if match_not != 0 {
+                    if s_chr == 0 {
+                        MATCHED
+                    } else {
+                        MATCHED_FAIL
+                    }
+                } else {
+                    let mut cnt = 0u32;
+                    while cnt < match_max && s_chr != 0 {
+                        cnt += 1;
+                        s_end = s_tmp;
+                        let t = skp_next(s_end, *flg & 2);
+                        s_chr = t.0;
+                        s_tmp = t.1;
+                    }
+                    if cnt >= match_min {
+                        MATCHED
+                    } else {
+                        MATCHED_FAIL
+                    }
+                }
+            }
+            b'$' => {
+                if s_chr == 0 {
+                    MATCHED
+                } else {
+                    let mut cnt = 0u32;
+                    while cnt < match_max
+                        && s_chr != 0
+                        && ((is_break(s_chr) as u32) != match_not)
+                    {
+                        cnt += 1;
+                        s_end = s_tmp;
+                        let t = skp_next(s_end, *flg & 2);
+                        s_chr = t.0;
+                        s_tmp = t.1;
+                    }
+                    if cnt >= match_min {
+                        MATCHED
+                    } else {
+                        MATCHED_FAIL
+                    }
+                }
+            }
+            b'n' => {
+                let mut cnt = 0u32;
+                while cnt < match_max && s_chr != 0 && ((is_break(s_chr) as u32) != match_not) {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'd' => {
+                let mut cnt = 0u32;
+                while cnt < match_max && s_chr != 0 && ((is_digit(s_chr) as u32) != match_not) {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'x' => {
+                let mut cnt = 0u32;
+                while cnt < match_max && s_chr != 0 && ((is_xdigit(s_chr) as u32) != match_not) {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'a' => {
+                let mut cnt = 0u32;
+                while cnt < match_max && s_chr != 0 && ((is_alpha(s_chr) as u32) != match_not) {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'u' => {
+                let mut cnt = 0u32;
+                while cnt < match_max && s_chr != 0 && ((is_upper(s_chr) as u32) != match_not) {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'l' => {
+                let mut cnt = 0u32;
+                while cnt < match_max && s_chr != 0 && ((is_lower(s_chr) as u32) != match_not) {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b's' => {
+                let mut cnt = 0u32;
+                while cnt < match_max && s_chr != 0 && ((is_space(s_chr) as u32) != match_not) {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'w' => {
+                let mut cnt = 0u32;
+                while cnt < match_max && s_chr != 0 && ((is_blank(s_chr) as u32) != match_not) {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'c' => {
+                let mut cnt = 0u32;
+                while cnt < match_max && s_chr != 0 && ((is_ctrl(s_chr) as u32) != match_not) {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'i' => {
+                let mut cnt = 0u32;
+                while cnt < match_max && s_chr != 0 && ((is_idchr(s_chr) as u32) != match_not) {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'@' => {
+                let mut cnt = 0u32;
+                while cnt < match_max && s_chr != 0 && ((is_alnum(s_chr) as u32) != match_not) {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'&' => {
+                if quantifier_used {
+                    if match_min == 0 {
+                        if match_not != 0 {
+                            MATCHED_GOALNOT
+                        } else {
+                            MATCHED_GOAL
+                        }
+                    } else {
+                        MATCHED_FAIL
+                    }
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'[' => {
+                let mut set_end = pat_cur;
+                while !set_end.is_empty() {
+                    let (c, next) = skp_next(set_end, *flg & 2);
+                    if c == b']' as u32 {
+                        break;
+                    }
+                    set_end = next;
+                }
+
+                let mut cnt = 0u32;
+                while cnt < match_max
+                    && s_chr != 0
+                    && ((is_oneof(s_chr, pat_cur, *flg & 2) as u32) != match_not)
+                {
+                    cnt += 1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+
+                while !pat_cur.is_empty() {
+                    let (c, next) = skp_next(pat_cur, *flg & 2);
+                    pat_cur = next;
+                    if c == b']' as u32 {
+                        break;
+                    }
+                }
+
+                if cnt >= match_min {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'"' | b'\'' | b'`' => {
+                let quote = op;
+                let mut l = 0usize;
+                while l < pat_cur.len() {
+                    let step = if *flg & 2 != 0 {
+                        1
+                    } else {
+                        pat_cur[l..].chars().next().map(|c| c.len_utf8()).unwrap_or(1)
+                    };
+                    if byte_at(pat_cur, l) == quote {
+                        break;
+                    }
+                    l += step;
+                }
+
+                let ml = if l > 0 {
+                    is_string(s_end, &pat_cur[..l], l as i32, *flg)
+                } else {
+                    0
+                };
+
+                let result = if l > 0 && ml > 0 {
+                    if match_not == 0 {
+                        s_end = slice_from(s_end, ml as usize);
+                        MATCHED
+                    } else {
+                        MATCHED_FAIL
+                    }
+                } else if l == 0 && match_not == 0 {
+                    MATCHED
+                } else if match_min == 0 || match_not != 0 {
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                };
+
+                pat_cur = slice_from(pat_cur, l.saturating_add(1));
+                result
+            }
+            b'C' => {
+                *flg = (*flg & !1) | (match_not as i32);
+                MATCHED
+            }
+            b'U' => {
+                *flg = (*flg & !2) | ((match_not as i32) * 2);
+                MATCHED
+            }
+            b'S' => {
+                while is_space(s_chr) {
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                MATCHED
+            }
+            b'W' => {
+                while is_blank(s_chr) {
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                MATCHED
+            }
+            b'N' => {
+                while s_chr != 0 && !is_break(s_chr) {
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if s_chr != 0 {
+                    s_end = s_tmp;
+                }
+                MATCHED
+            }
+            b'I' => {
+                if is_alpha(s_chr) || s_chr == b'_' as u32 {
+                    loop {
+                        s_end = s_tmp;
+                        let t = skp_next(s_end, *flg & 2);
+                        s_chr = t.0;
+                        s_tmp = t.1;
+                        if !(is_alnum(s_chr) || s_chr == b'_' as u32) {
+                            break;
+                        }
+                    }
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+            b'(' => {
+                if first_byte(pat_cur) != b')' || s_chr != b'(' as u32 {
+                    MATCHED_FAIL
+                } else {
+                    pat_cur = slice_from(pat_cur, 1);
+                    let open = s_chr;
+                    let close = get_close(open);
+                    let mut result = MATCHED_FAIL;
+                    if close != 0 {
+                        let mut count: i32 = 1;
+                        while s_chr != 0 && count > 0 {
+                            s_end = s_tmp;
+                            let t = skp_next(s_end, *flg & 2);
+                            s_chr = t.0;
+                            s_tmp = t.1;
+                            if s_chr == open {
+                                count += 1;
+                            }
+                            if s_chr == close {
+                                count -= 1;
+                            }
+                        }
+                        if count == 0 {
+                            s_end = s_tmp;
+                            result = MATCHED;
+                        }
+                    }
+                    result
+                }
+            }
+            b'B' => {
+                let open = s_chr;
+                let close = get_close(open);
+                let mut result = MATCHED_FAIL;
+                if close != 0 {
+                    let mut count: i32 = 1;
+                    while s_chr != 0 && count > 0 {
+                        s_end = s_tmp;
+                        let t = skp_next(s_end, *flg & 2);
+                        s_chr = t.0;
+                        s_tmp = t.1;
+                        if s_chr == open {
+                            count += 1;
+                        }
+                        if s_chr == close {
+                            count -= 1;
+                        }
+                    }
+                    if count == 0 {
+                        s_end = s_tmp;
+                        result = MATCHED;
+                    }
+                }
+                result
+            }
+            b'Q' => {
+                let qclose = get_qclose(s_chr);
+                let mut result = MATCHED_FAIL;
+                if qclose != 0 {
+                    while s_chr != 0 {
+                        s_end = s_tmp;
+                        let t = skp_next(s_end, *flg & 2);
+                        s_chr = t.0;
+                        s_tmp = t.1;
+                        if s_chr == qclose {
+                            break;
+                        }
+                        if s_chr == b'\\' as u32 {
+                            s_end = s_tmp;
+                            let t = skp_next(s_end, *flg & 2);
+                            s_chr = t.0;
+                            s_tmp = t.1;
+                        }
+                    }
+                    if s_chr != 0 {
+                        s_end = s_tmp;
+                        result = MATCHED;
+                    }
+                }
+                result
+            }
+            b'X' => {
+                let mut result = MATCHED_FAIL;
+                if s_chr == b'0' as u32
+                    && (byte_at(s_end, 1) == b'x' || byte_at(s_end, 1) == b'X')
+                    && is_xdigit(byte_at(s_end, 2) as u32)
+                {
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                    result = MATCHED;
+                }
+                while is_xdigit(s_chr) {
+                    result = MATCHED;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                result
+            }
+            b'D' => {
+                let mut result = MATCHED_FAIL;
+                if s_chr == b'+' as u32 || s_chr == b'-' as u32 {
+                    loop {
+                        s_end = s_tmp;
+                        let t = skp_next(s_end, *flg & 2);
+                        s_chr = t.0;
+                        s_tmp = t.1;
+                        if !is_space(s_chr) {
+                            break;
+                        }
+                    }
+                }
+                while is_digit(s_chr) {
+                    result = MATCHED;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                result
+            }
+            b'F' => {
+                let mut result = MATCHED_FAIL;
+                if s_chr == b'+' as u32 || s_chr == b'-' as u32 {
+                    loop {
+                        s_end = s_tmp;
+                        let t = skp_next(s_end, *flg & 2);
+                        s_chr = t.0;
+                        s_tmp = t.1;
+                        if !is_space(s_chr) {
+                            break;
+                        }
+                    }
+                }
+                while is_digit(s_chr) {
+                    result = MATCHED;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if s_chr == b'.' as u32 {
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                while is_digit(s_chr) {
+                    result = MATCHED;
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                }
+                if result == MATCHED && (s_chr == b'E' as u32 || s_chr == b'e' as u32) {
+                    s_end = s_tmp;
+                    let t = skp_next(s_end, *flg & 2);
+                    s_chr = t.0;
+                    s_tmp = t.1;
+                    if s_chr == b'+' as u32 || s_chr == b'-' as u32 {
+                        s_end = s_tmp;
+                        let t = skp_next(s_end, *flg & 2);
+                        s_chr = t.0;
+                        s_tmp = t.1;
+                    }
+                    while is_digit(s_chr) {
+                        s_end = s_tmp;
+                        let t = skp_next(s_end, *flg & 2);
+                        s_chr = t.0;
+                        s_tmp = t.1;
+                    }
+                    if s_chr == b'.' as u32 {
+                        s_end = s_tmp;
+                        let t = skp_next(s_end, *flg & 2);
+                        s_chr = t.0;
+                        s_tmp = t.1;
+                    }
+                    while is_digit(s_chr) {
+                        s_end = s_tmp;
+                        let t = skp_next(s_end, *flg & 2);
+                        s_chr = t.0;
+                        s_tmp = t.1;
+                    }
+                }
+                result
+            }
+            _ => {
+                if chr_cmp(s_chr, op as u32, *flg & 1) {
+                    s_end = s_tmp;
+                    MATCHED
+                } else {
+                    MATCHED_FAIL
+                }
+            }
+        };
+
+        if ret == MATCHED_FAIL || ret == MATCHED_GOAL || ret == MATCHED_GOALNOT {
+            return (ret, s_end, pat_cur);
+        }
+
+        src_cur = s_end;
+    }
+}
+
+pub fn skp_scan(src: &str, pat: &str, flg: &mut i32) -> (i32, usize, usize) {
+    let (ret, src_end, pat_end) = match_pat(pat, src, flg);
+    (ret, src.len() - src_end.len(), pat.len() - pat_end.len())
+}
+```

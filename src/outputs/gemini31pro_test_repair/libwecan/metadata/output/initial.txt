@@ -1,0 +1,105 @@
+```rust
+// Generated Rust Code
+
+pub const FALSE: u8 = 0;
+pub const TRUE: u8 = 1;
+pub const UNSIGNED: u8 = 2;
+pub const SIGNED: u8 = 3;
+pub const INTEL: u8 = 4;
+pub const MOTOROLA: u8 = 5;
+
+fn compute_indexes(startbit: u16, len: u8, endianness: u8) -> (u16, u16, u16) {
+    let mut msb: u16 = 0;
+    let mut lsb: u16 = 0;
+    let mut current_bit_nr: u16 = 0;
+    let mut byte_idx_lsb: u16 = 0;
+    let mut byte_idx_msb: u16 = 0;
+    let mut offset_lsb: u16 = 0;
+
+    if endianness == MOTOROLA {
+        msb = startbit;
+        current_bit_nr = startbit;
+        for _ in 0..len.saturating_sub(1) {
+            if current_bit_nr % 8 == 0 {
+                current_bit_nr = current_bit_nr + 15;
+            } else {
+                current_bit_nr -= 1;
+            }
+        }
+        lsb = current_bit_nr;
+        byte_idx_lsb = lsb / 8;
+        byte_idx_msb = msb / 8;
+        offset_lsb = lsb % 8;
+    } else {
+        lsb = startbit;
+        msb = lsb + (len as u16).saturating_sub(1);
+        byte_idx_msb = msb / 8;
+        byte_idx_lsb = lsb / 8;
+        offset_lsb = lsb % 8;
+    }
+    (offset_lsb, byte_idx_lsb, byte_idx_msb)
+}
+
+fn frame_to_local(frame: &[u8], byte_idx_lsb: u16, byte_idx_msb: u16, endianness: u8) -> u64 {
+    let mut target: u64 = 0;
+    if endianness == MOTOROLA {
+        let mut shift = 0;
+        let mut i = byte_idx_lsb as i32;
+        while i >= byte_idx_msb as i32 {
+            if i >= 0 && (i as usize) < frame.len() && shift < 64 {
+                target |= (frame[i as usize] as u64) << shift;
+            }
+            shift += 8;
+            i -= 1;
+        }
+    } else {
+        let mut shift = 0;
+        let mut i = byte_idx_lsb as i32;
+        while i <= byte_idx_msb as i32 {
+            if i >= 0 && (i as usize) < frame.len() && shift < 64 {
+                target |= (frame[i as usize] as u64) << shift;
+            }
+            shift += 8;
+            i += 1;
+        }
+    }
+    target
+}
+
+/// Extract a signal value from a CAN frame.
+///
+/// * `frame`      – byte slice of the frame data.
+/// * `startbit`   – signal start bit.
+/// * `len`        – signal length (in bits).
+/// * `signedness` – either UNSIGNED or SIGNED.
+/// * `endianness` – either INTEL (little-endian) or MOTOROLA (big-endian).
+///
+/// Returns a u64 value (if the signal is signed, it is already sign‐extended).
+pub fn extract(frame: &[u8], startbit: u16, len: u8, signedness: u8, endianness: u8) -> u64 {
+    if len == 0 {
+        return 0;
+    }
+    let (offset_lsb, byte_idx_lsb, byte_idx_msb) = compute_indexes(startbit, len, endianness);
+    let mut target = frame_to_local(frame, byte_idx_lsb, byte_idx_msb, endianness);
+
+    target >>= offset_lsb;
+
+    let mask = if len >= 64 { u64::MAX } else { (1u64 << len) - 1 };
+    target &= mask;
+
+    if signedness == SIGNED {
+        if (target & (1u64 << (len - 1))) != 0 {
+            let sign_ext_mask = !mask;
+            target |= sign_ext_mask;
+        }
+    }
+    target
+}
+
+/// Insert a signal value into a CAN frame.
+///
+/// * `frame`     – mutable byte slice.
+/// * `startbit`  – signal start bit.
+/// * `len`       – signal length in bits.
+/// * `can_value` – signal value (as raw bits).
+/// * `endianness`–

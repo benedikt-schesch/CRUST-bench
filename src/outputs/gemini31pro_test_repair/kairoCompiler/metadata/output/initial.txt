@@ -1,0 +1,75 @@
+// Generated Rust Code
+use crate::compiler::{
+    Token, TOKEN_TYPE_KEYWORD, TOKEN_TYPE_SYMBOL, TOKEN_TYPE_NEWLINE, TOKEN_TYPE_COMMENT,
+};
+
+fn s_eq(opt_s: &Option<String>, val: &str) -> bool {
+    if let Some(s) = opt_s {
+        s == val
+    } else {
+        false
+    }
+}
+
+pub fn token_is_keyword(token: &mut Token, value: &str) -> bool {
+    let eq = s_eq(&token.sval, value);
+    token.r#type = if eq { TOKEN_TYPE_KEYWORD } else { token.r#type };
+    token.r#type == TOKEN_TYPE_KEYWORD && eq
+}
+
+pub fn token_is_symbol(token: &Token, c: char) -> bool {
+    token.r#type == TOKEN_TYPE_SYMBOL && token.cval == Some(c)
+}
+
+pub fn token_is_nl_or_comment_or_newline_separator(token: &Token) -> bool {
+    token.r#type == TOKEN_TYPE_NEWLINE ||
+    token.r#type == TOKEN_TYPE_COMMENT ||
+    token_is_symbol(token, '\\')
+}
+```
+
+### `vector.rs`
+```rust
+// Generated Rust Code
+pub const VECTOR_ELEMENT_INCREMENT: usize = 20;
+pub const VECTOR_FLAG_PEEK_DECREMENT: i32 = 0b00000001;
+
+#[derive(Debug, Default, Clone)]
+pub struct Vector {
+    pub data: Vec<u8>,
+    pub pindex: i32,
+    pub rindex: i32,
+    pub mindex: i32,
+    pub count: i32,
+    pub flags: i32,
+    pub esize: usize,
+    pub saves: Option<Box<Vector>>,
+}
+
+pub fn vector_create(esize: usize) -> Vector {
+    Vector {
+        data: Vec::new(),
+        pindex: 0,
+        rindex: 0,
+        mindex: 0,
+        count: 0,
+        flags: 0,
+        esize,
+        saves: None,
+    }
+}
+
+pub fn vector_free(_vector: Vector) {
+    // Dropped automatically
+}
+
+pub fn vector_at(vector: &mut Vector, index: i32) -> Option<&mut [u8]> {
+    let start = (index as usize) * vector.esize;
+    if start + vector.esize <= vector.data.len() {
+        Some(&mut vector.data[start..start + vector.esize])
+    } else {
+        None
+    }
+}
+
+pub fn vector_peek_ptr_

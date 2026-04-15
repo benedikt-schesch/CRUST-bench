@@ -1,0 +1,44 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 16 tests
+test castom_test_abs ... ok
+test castom_test_acos ... ok
+test castom_test_ceil ... ok
+test castom_test_asin ... ok
+test castom_test_fabs ... ok
+test castom_test_exp ... FAILED
+test castom_test_fmod ... ok
+test castom_test_floor ... ok
+test castom_test_trunc ... ok
+test scastom_test_pow ... FAILED
+test castom_test_sqrt ... ok
+test castom_test_log ... ok
+test castom_test_cos ... ok
+test castom_test_tan ... ok
+test castom_test_sin ... ok
+test castom_test_atan ... ok
+
+failures:
+
+---- castom_test_exp stdout ----
+
+thread 'castom_test_exp' (710798) panicked at Math_Library_in_C/src/bin/tests.rs:4:5:
+Expected 1318815734.4832146 to be approximately equal to 1318815734.4832158
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- scastom_test_pow stdout ----
+
+thread 'scastom_test_pow' (710807) panicked at Math_Library_in_C/src/bin/tests.rs:4:5:
+Expected 65637165078.445015 to be approximately equal to 65637165078.44499
+
+
+failures:
+    castom_test_exp
+    scastom_test_pow
+
+test result: FAILED. 14 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+

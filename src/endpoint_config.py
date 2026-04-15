@@ -21,6 +21,8 @@ def endpoint_resolver(config, endpoint):
             config = json.loads((CONFIG_PATH / "o1_mini.json").read_text())
         elif endpoint == "gemini":
             config = json.loads((CONFIG_PATH / "gemini.json").read_text())
+        elif endpoint == "openrouter":
+            config = json.loads((CONFIG_PATH / "openrouter_deepseek_r1.json").read_text())
         else:
             raise ValueError("Endpoint not supported")
     return config

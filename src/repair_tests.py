@@ -47,13 +47,12 @@ def load_benchmarks(r_path: Path):
             else:
                 c_proj = project_name
                 if 'proj_' in project_name:
-                    c_proj = project_name.split('_')[1]
-                    assert(c_proj != '')
+                    c_proj = project_name[len('proj_'):]
                 if Path(C_BENCH / c_proj).exists():
                     
                     benchmarks.append(Benchmark(C_BENCH / c_proj, project))
                 else:
-                    c_proj = project_name.replace('_', '-')
+                    c_proj = c_proj.replace('_', '-')
                     benchmarks.append(Benchmark(C_BENCH / c_proj, project))
     return benchmarks
 
@@ -79,6 +78,9 @@ def main():
     for proj in r_path.iterdir():
         if proj.is_dir() and Path(proj/'Cargo.toml').exists():
             shutil.copytree(proj, output_dir / proj.name)
+    # Copy workspace Cargo.toml if it exists
+    if (r_path / 'Cargo.toml').exists():
+        shutil.copy2(r_path / 'Cargo.toml', output_dir / 'Cargo.toml')
     
     if config != None:
         config = Path(config)

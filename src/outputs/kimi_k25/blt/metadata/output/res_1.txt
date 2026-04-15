@@ -1,0 +1,125 @@
+ {{bm.rs}}
+```rust
+// Bitmap module
+// Add your bm module contents here
+```
+
+{{lib.rs}}
+```rust
+pub mod blt;
+pub mod bm;
+pub mod cbt;
+```
+
+{{cbt.rs}}
+```rust
+// Counted B-Tree module
+// Add your cbt module contents here
+```
+
+{{blt.rs}}
+```rust
+// Binary Tree module
+
+pub struct Blt {
+    root: Option<Box<Node>>,
+}
+
+struct Node {
+    value: BltIt,
+    left: Option<Box<Node>>,
+    right: Option<Box<Node>>,
+}
+
+pub struct BltIt(pub String);
+
+impl Blt {
+    pub fn blt_new() -> Self {
+        Blt { root: None }
+    }
+
+    pub fn insert(&mut self, value: String) {
+        let value = BltIt(value);
+        match self.root {
+            None => {
+                self.root = Some(Box::new(Node {
+                    value,
+                    left: None,
+                    right: None,
+                }));
+            }
+            Some(ref mut root) => {
+                Self::insert_recursive(root, value);
+            }
+        }
+    }
+
+    fn insert_recursive(current: &mut Box<Node>, value: BltIt) {
+        if value.0 < current.value.0 {
+            match current.left {
+                None => {
+                    current.left = Some(Box::new(Node {
+                        value,
+                        left: None,
+                        right: None,
+                    }));
+                }
+                Some(ref mut left) => {
+                    Self::insert_recursive(left, value);
+                }
+            }
+        } else {
+            match current.right {
+                None => {
+                    current.right = Some(Box::new(Node {
+                        value,
+                        left: None,
+                        right: None,
+                    }));
+                }
+                Some(ref mut right) => {
+                    Self::insert_recursive(right, value);
+                }
+            }
+        }
+    }
+
+    pub fn blt_forall<F>(&self, f: F)
+    where
+        F: Fn(&BltIt),
+    {
+        Self::inorder(&self.root, &f);
+    }
+
+    fn inorder<F>(node: &Option<Box<Node>>, f: &F)
+    where
+        F: Fn(&BltIt),
+    {
+        if let Some(ref n) = node {
+            Self::inorder(&n.left, f);
+            f(&n.value);
+            Self::inorder(&n.right, f);
+        }
+    }
+
+    pub fn blt_allprefixed<F>(&self, prefix: &str, f: F)
+    where
+        F: Fn(&BltIt),
+    {
+        Self::inorder_prefixed(&self.root, prefix, &f);
+    }
+
+    fn inorder_prefixed<F>(node: &Option<Box<Node>>, prefix: &str, f: &F)
+    where
+        F: Fn(&BltIt),
+    {
+        if let Some(ref n) = node {
+            Self::inorder_prefixed(&n.left, prefix, f);
+            if n.value.0.starts_with(prefix) {
+                f(&n.value);
+            }
+            Self::inorder_prefixed(&n.right, prefix, f);
+        }
+    }
+}
+```

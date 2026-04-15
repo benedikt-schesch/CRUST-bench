@@ -1,0 +1,23 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_kd ... FAILED
+
+failures:
+
+---- test_kd stdout ----
+
+thread 'test_kd' (267450) panicked at kd3/src/bin/test.rs:39:5:
+assertion failed: iter.size == count
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_kd
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,297 @@
+ {{lib.rs}}
+```rust
+pub mod utils;
+pub mod settings;
+pub mod parser;
+pub mod vm;
+pub mod lexer;
+pub mod ast;
+pub mod token;
+pub mod compiler;
+```
+
+{{token.rs}}
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum TokenType {
+    Identifier,
+    Number,
+    String,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Semicolon,
+    Equals,
+    EOF,
+}
+
+#[derive(Debug, Clone)]
+pub struct Token {
+    pub token_type: TokenType,
+    pub lexeme: String,
+    pub line: usize,
+}
+
+impl Token {
+    pub fn new(token_type: TokenType, lexeme: String, line: usize) -> Self {
+        Token {
+            token_type,
+            lexeme,
+            line,
+        }
+    }
+}
+```
+
+{{lexer.rs}}
+```rust
+use crate::token::{Token, TokenType};
+
+pub fn tokenize(input: &str) -> Vec<Token> {
+    let mut tokens = Vec::new();
+    let mut line = 1;
+    
+    for ch in input.chars() {
+        match ch {
+            '\n' => line += 1,
+            '+' => tokens.push(Token::new(TokenType::Plus, ch.to_string(), line)),
+            '-' => tokens.push(Token::new(TokenType::Minus, ch.to_string(), line)),
+            '*' => tokens.push(Token::new(TokenType::Star, ch.to_string(), line)),
+            '/' => tokens.push(Token::new(TokenType::Slash, ch.to_string(), line)),
+            '(' => tokens.push(Token::new(TokenType::LeftParen, ch.to_string(), line)),
+            ')' => tokens.push(Token::new(TokenType::RightParen, ch.to_string(), line)),
+            '{' => tokens.push(Token::new(TokenType::LeftBrace, ch.to_string(), line)),
+            '}' => tokens.push(Token::new(TokenType::RightBrace, ch.to_string(), line)),
+            ';' => tokens.push(Token::new(TokenType::Semicolon, ch.to_string(), line)),
+            '=' => tokens.push(Token::new(TokenType::Equals, ch.to_string(), line)),
+            c if c.is_alphabetic() => {
+                tokens.push(Token::new(TokenType::Identifier, c.to_string(), line));
+            }
+            c if c.is_numeric() => {
+                tokens.push(Token::new(TokenType::Number, c.to_string(), line));
+            }
+            _ => {}
+        }
+    }
+    
+    tokens.push(Token::new(TokenType::EOF, "".to_string(), line));
+    tokens
+}
+```
+
+{{ast.rs}}
+```rust
+#[derive(Debug)]
+pub struct Program {
+    pub statements: Vec<Statement>,
+}
+
+impl Program {
+    pub fn new() -> Self {
+        Program {
+            statements: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Statement {
+    Expression(Expression),
+    Print(Expression),
+    VarDeclaration(String, Option<Expression>),
+    Block(Vec<Statement>),
+}
+
+#[derive(Debug)]
+pub enum Expression {
+    Number(f64),
+    String(String),
+    Identifier(String),
+    Binary(Box<Expression>, BinaryOp, Box<Expression>),
+    Unary(UnaryOp, Box<Expression>),
+}
+
+#[derive(Debug)]
+pub enum BinaryOp {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Equal,
+}
+
+#[derive(Debug)]
+pub enum UnaryOp {
+    Negate,
+    Not,
+}
+```
+
+{{parser.rs}}
+```rust
+use crate::token::{Token, TokenType};
+use crate::ast::{Program, Statement, Expression, BinaryOp, UnaryOp};
+
+pub fn parse(tokens: &[Token]) -> Result<Program, String> {
+    let mut program = Program::new();
+    let mut pos = 0;
+    
+    while pos < tokens.len() && tokens[pos].token_type != TokenType::EOF {
+        let (stmt, new_pos) = parse_statement(tokens, pos)?;
+        program.statements.push(stmt);
+        pos = new_pos;
+    }
+    
+    Ok(program)
+}
+
+fn parse_statement(tokens: &[Token], pos: usize) -> Result<(Statement, usize), String> {
+    let (expr, new_pos) = parse_expression(tokens, pos)?;
+    Ok((Statement::Expression(expr), new_pos))
+}
+
+fn parse_expression(tokens: &[Token], pos: usize) -> Result<(Expression, usize), String> {
+    if pos >= tokens.len() {
+        return Err("Unexpected end of input".to_string());
+    }
+    
+    let token = &tokens[pos];
+    match token.token_type {
+        TokenType::Number => {
+            let value = token.lexeme.parse::<f64>().map_err(|_| "Invalid number".to_string())?;
+            Ok((Expression::Number(value), pos + 1))
+        }
+        TokenType::Identifier => {
+            Ok((Expression::Identifier(token.lexeme.clone()), pos + 1))
+        }
+        TokenType::String => {
+            Ok((Expression::String(token.lexeme.clone()), pos + 1))
+        }
+        _ => Err(format!("Unexpected token: {:?}", token.token_type)),
+    }
+}
+```
+
+{{vm.rs}}
+```rust
+#[derive(Debug, Clone)]
+pub enum OpCode {
+    Constant(f64),
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Negate,
+    Return,
+    Print,
+    Pop,
+    DefineGlobal(String),
+    GetGlobal(String),
+    SetGlobal(String),
+}
+```
+
+{{compiler.rs}}
+```rust
+use crate::ast::{Program, Statement, Expression, BinaryOp, UnaryOp};
+use crate::vm::OpCode;
+
+pub fn compile(program: &Program) -> Result<Vec<OpCode>, String> {
+    let mut bytecode = Vec::new();
+    
+    for stmt in &program.statements {
+        compile_statement(stmt, &mut bytecode)?;
+    }
+    
+    Ok(bytecode)
+}
+
+fn compile_statement(stmt: &Statement, bytecode: &mut Vec<OpCode>) -> Result<(), String> {
+    match stmt {
+        Statement::Expression(expr) => {
+            compile_expression(expr, bytecode)?;
+            bytecode.push(OpCode::Pop);
+        }
+        Statement::Print(expr) => {
+            compile_expression(expr, bytecode)?;
+            bytecode.push(OpCode::Print);
+        }
+        Statement::VarDeclaration(name, init) => {
+            if let Some(expr) = init {
+                compile_expression(expr, bytecode)?;
+            } else {
+                bytecode.push(OpCode::Constant(0.0));
+            }
+            bytecode.push(OpCode::DefineGlobal(name.clone()));
+        }
+        Statement::Block(stmts) => {
+            for stmt in stmts {
+                compile_statement(stmt, bytecode)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn compile_expression(expr: &Expression, bytecode: &mut Vec<OpCode>) -> Result<(), String> {
+    match expr {
+        Expression::Number(n) => {
+            bytecode.push(OpCode::Constant(*n));
+        }
+        Expression::String(_) => {
+            bytecode.push(OpCode::Constant(0.0));
+        }
+        Expression::Identifier(name) => {
+            bytecode.push(OpCode::GetGlobal(name.clone()));
+        }
+        Expression::Binary(left, op, right) => {
+            compile_expression(left, bytecode)?;
+            compile_expression(right, bytecode)?;
+            match op {
+                BinaryOp::Add => bytecode.push(OpCode::Add),
+                BinaryOp::Subtract => bytecode.push(OpCode::Subtract),
+                BinaryOp::Multiply => bytecode.push(OpCode::Multiply),
+                BinaryOp::Divide => bytecode.push(OpCode::Divide),
+                BinaryOp::Equal => {}
+            }
+        }
+        Expression::Unary(op, expr) => {
+            compile_expression(expr, bytecode)?;
+            match op {
+                UnaryOp::Negate => bytecode.push(OpCode::Negate),
+                UnaryOp::Not => {}
+            }
+        }
+    }
+    Ok(())
+}
+```
+
+{{utils.rs}}
+```rust
+pub fn debug_print(msg: &str) {
+    println!("{}", msg);
+}
+```
+
+{{settings.rs}}
+```rust
+pub struct Settings {
+    pub debug: bool,
+    pub optimize: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            debug: false,
+            optimize: true,
+        }
+    }
+}
+```

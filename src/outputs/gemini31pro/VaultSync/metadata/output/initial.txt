@@ -1,0 +1,60 @@
+{{hashing.rs}}
+```rust
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+pub const RANDOM_SIZE: usize = 16;
+
+pub fn generate_random_data(buffer: &mut [u8]) {
+    let charset = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let mut seed = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos() as u64;
+    for i in 0..buffer.len() {
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+        buffer[i] = charset[(seed as usize) % charset.len()];
+    }
+}
+
+pub fn generate_hash(data: &[u8], hash: &mut [u8]) {
+    let mut hasher = DefaultHasher::new();
+    data.hash(&mut hasher);
+    let h1 = hasher.finish();
+    hasher.write_u64(h1);
+    let h2 = hasher.finish();
+    hasher.write_u64(h2);
+    let h3 = hasher.finish();
+    hasher.write_u64(h3);
+    let h4 = hasher.finish();
+    
+    let bytes = [
+        h1.to_le_bytes(),
+        h2.to_le_bytes(),
+        h3.to_le_bytes(),
+        h4.to_le_bytes(),
+    ];
+    
+    for i in 0..32 {
+        if i < hash.len() {
+            hash[i] = bytes[i / 8][i % 8];
+        }
+    }
+}
+```
+
+{{logger.rs}}
+```rust
+use std::time::{SystemTime, UNIX_EPOCH};
+
+pub const KNORMAL: &str = "\x1B[0m";
+pub const KRED: &str = "\x1B[31m";
+pub const KGREEN: &str = "\x1B[32m";
+pub const KYELLOW: &str = "\x1B[33m";
+pub const KBLUE: &str = "\x1B[34m";
+pub const KMAGENTA: &str = "\x1B[35m";
+pub const KCYAN: &str = "\x1B[36m";
+pub const KWHITE: &str = "\x1B[37m";
+pub const COLOR_BOLD: &str = "\x1B[1m";
+pub const COLOR_OFF: &str = "\x1B[m";
+
+pub enum LOGGING_TAG {
+    INFO_TAG = 1,

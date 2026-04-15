@@ -1,0 +1,160 @@
+pub fn generate_matrix(x: usize, y: usize, random: bool) -> Vec<Vec<f32>> {
+let mut matrix = vec![vec![0.0_f32; y]; x];
+
+if !random {
+for i in 0..x {
+for j in 0..y {
+matrix[i][j] = (j + i * x) as f32;
+}
+}
+} else {
+// Deterministic pseudo-random fill to avoid external crates/FFI.
+let mut seed: u32 = 1;
+for i in 0..x {
+for j in 0..y {
+seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
+matrix[i][j] = seed as f32;
+}
+}
+}
+
+matrix
+}
+
+pub fn free_matrix(matrix: &mut Vec<Vec<f32>>) -> i32 {
+matrix.clear();
+0
+}
+
+pub fn multiply(m1: &[Vec<f32>], m2: &[Vec<f32>], result: &mut [Vec<f32>], method: i32) -> i32 {
+if m1.is_empty() || m2.is_empty() {
+if !m1.is_empty() || !m2.is_empty() {
+println!("The number of columns in the first matrix must be equal to the number of rows in the second matrix. ");
+return -1;
+}
+} else if m1[0].len() != m2.len() {
+println!("The number of columns in the first matrix must be equal to the number of rows in the second matrix. ");
+return -1;
+}
+
+match method {
+1 => algorithm1(m1, m2, result),
+2 => algorithm2(m1, m2, result),
+3 => algorithm3(m1, m2, result),
+_ => {
+println!("Choose the correct method!");
+return -1;
+}
+}
+0
+}
+
+pub fn algorithm1(m1: &[Vec<f32>], m2: &[Vec<f32>], result: &mut [Vec<f32>]) {
+let x1 = m1.len();
+let y1 = if x1 > 0 { m1[0].len() } else { 0 };
+let y2 = if !m2.is_empty() { m2[0].len() } else { 0 };
+
+for i in 0..x1 {
+for j in 0..y2 {
+result[i][j] = 0.0;
+for k in 0..y1 {
+result[i][j] += m1[i][k] * m2[k][j];
+}
+}
+}
+}
+
+pub fn algorithm3(m1: &[Vec<f32>], m2: &[Vec<f32>], result: &mut [Vec<f32>]) {
+let x1 = m1.len();
+let y1 = if x1 > 0 { m1[0].len() } else { 0 };
+let y2 = if !m2.is_empty() { m2[0].len() } else { 0 };
+
+for i in 0..x1 {
+for j in 0..y2 {
+result[i][j] = 0.0;
+}
+}
+
+for i in 0..x1 {
+for k in 0..y1 {
+for j in 0..y2 {
+result[i][j] += m1[i][k] * m2[k][j];
+}
+}
+}
+}
+
+pub fn algorithm2(m1: &[Vec<f32>], m2: &[Vec<f32>], result: &mut [Vec<f32>]) {
+let size = m1.len();
+if size == 0 {
+return;
+}
+
+let mut b = vec![vec![0.0_f32; size]; size];
+
+for i in 0..size {
+for j in 0..size {
+b[i][j] = m2[j][i];
+result[i][j] = 0.0;
+}
+}
+
+for i in 0..size {
+let mut j = 0usize;
+while j < size {
+let chunk_end = (j + 8).min(size);
+
+for k in 0..size {
+let mut sum = 0.0_f32;
+for t in j..chunk_end {
+sum += m1[i][t] * b[k][t];
+}
+result[i][k] += sum;
+}
+
+j += 16;
+if j >= size {
+break;
+}
+
+let chunk_end = (j + 8).min(size);
+for k in 0..size {
+let mut sum = 0.0_f32;
+for t in j..chunk_end {
+sum += m1[i][t] * b[k][t];
+}
+result[i][k] += sum;
+}
+
+j += 16;
+if j >= size {
+break;
+}
+
+let chunk_end = (j + 8).min(size);
+for k in 0..size {
+let mut sum = 0.0_f32;
+for t in j..chunk_end {
+sum += m1[i][t] * b[k][t];
+}
+result[i][k] += sum;
+}
+
+j += 16;
+if j >= size {
+break;
+}
+
+let chunk_end = (j + 8).min(size);
+for k in 0..size {
+let mut sum = 0.0_f32;
+for t in j..chunk_end {
+sum += m1[i][t] * b[k][t];
+}
+result[i][k] += sum;
+}
+
+j += 8;
+}
+}
+}

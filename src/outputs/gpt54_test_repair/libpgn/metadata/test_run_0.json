@@ -1,0 +1,61 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test test_parsing_moves_with_annotation ... ok
+test test_parsing_moves_with_nag_annotation ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test test_parsing_comments_on_position_after ... ok
+test test_parsing_comments_on_position_after_alt ... FAILED
+test test_parsing_comments_on_position_all ... FAILED
+test test_parsing_comments_on_position_before ... FAILED
+test test_parsing_moves_with_comments_nested ... ok
+test test_parsing_comments_on_position_between ... FAILED
+
+failures:
+
+---- test_parsing_comments_on_position_after_alt stdout ----
+
+thread 'test_parsing_comments_on_position_after_alt' (219038) panicked at libpgn/src/moves.rs:392:1:
+assertion `left == right` failed
+  left: 3
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_parsing_comments_on_position_all stdout ----
+
+thread 'test_parsing_comments_on_position_all' (219039) panicked at libpgn/src/moves.rs:392:1:
+assertion `left == right` failed
+  left: 3
+ right: 1
+
+---- test_parsing_comments_on_position_before stdout ----
+
+thread 'test_parsing_comments_on_position_before' (219040) panicked at libpgn/src/moves.rs:392:1:
+assertion `left == right` failed
+  left: 3
+ right: 1
+
+---- test_parsing_comments_on_position_between stdout ----
+
+thread 'test_parsing_comments_on_position_between' (219041) panicked at libpgn/src/moves.rs:392:1:
+assertion `left == right` failed
+  left: 3
+ right: 1
+
+
+failures:
+    test_parsing_comments_on_position_after_alt
+    test_parsing_comments_on_position_all
+    test_parsing_comments_on_position_before
+    test_parsing_comments_on_position_between
+
+test result: FAILED. 2 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,260 @@
+use std::io::{self, Write, Read};
+use std::fs;
+
+pub const RED: &str = "\x1b[0;31m";
+pub const WHITE: &str = "\x1b[0;37m";
+pub const COLOR_OFF: &str = "\x1b[0m";
+pub const PURPLE: &str = "\x1b[0;35m";
+pub const GREEN: &str = "\x1b[0;32m";
+pub const YELLOW: &str = "\x1b[0;33m";
+pub const BLUE: &str = "\x1b[0;34m";
+pub const RIGHT_MARGIN: usize = 5;
+pub const CYAN: &str = "\x1b[0;36m";
+pub const DEFAULT_NAME: &str = "unnamed";
+
+pub struct Command {
+pub key: char,
+pub name: String,
+pub command: String,
+pub children: Option<Box<Command>>,
+pub next: Option<Box<Command>>,
+}
+
+impl Command {
+pub fn new(key: char, name: String, command: String) -> Self {
+Command {
+key,
+name,
+command,
+children: None,
+next: None,
+}
+}
+}
+
+pub fn read_field(file: &mut &[u8], field: &str) -> String {
+let mut i = 0;
+while i < file.len() && file[i] != b',' && file[i] != b'\n' && file[i] != 0 {
+i += 1;
+}
+if i >= file.len() || file[i] != b',' {
+panic!("Found incorrect end after {}, found: {}", field, file[i] as char);
+}
+let result = String::from_utf8_lossy(&file[..i]).to_string();
+*file = &file[i + 1..];
+result
+}
+
+pub fn load_file(c: &mut Command, file: &str) {
+let content = read_file(file);
+let mut bytes = content.as_bytes();
+while !bytes.is_empty() {
+read_line(c, &mut bytes);
+}
+}
+
+pub fn start(c: &Command) {
+let mut current: Option<&Command> = Some(c);
+while let Some(cmd) = current {
+if cmd.children.is_none() {
+break;
+}
+let last_printed_lines = print_command(cmd);
+let ch = getch();
+clear_lines(last_printed_lines);
+
+if let Some(next_cmd) = find_command(cmd, ch) {
+if command_run(next_cmd) > 0 {
+return;
+}
+current = Some(next_cmd);
+} else {
+current = None;
+}
+}
+}
+
+pub fn tree_add_command(tree: &mut Command, keys: &str, name: &str, command: &str) {
+if keys.is_empty() {
+return;
+}
+let key_char = keys.chars().next().unwrap();
+
+if let Some(child) = find_command_mut(tree, key_char) {
+if keys.len() == 1 {
+child.name = name.to_string();
+child.command = command.to_string();
+} else {
+tree_add_command(child, &keys[1..], name, command);
+}
+} else {
+if keys.len() == 1 {
+let new_cmd = Command::new(key_char, name.to_string(), command.to_string());
+command_add_child(tree, new_cmd);
+} else {
+let new_cmd = Command::new(key_char, DEFAULT_NAME.to_string(), String::new());
+command_add_child(tree, new_cmd);
+if let Some(child) = find_command_mut(tree, key_char) {
+tree_add_command(child, &keys[1..], name, command);
+}
+}
+}
+}
+
+fn find_command_mut(c: &mut Command, key: char) -> Option<&mut Command> {
+let mut child = c.children.as_mut();
+while let Some(node) = child {
+if node.key == key {
+return Some(node);
+}
+child = node.next.as_mut();
+}
+None
+}
+
+pub fn read_line(c: &mut Command, file: &mut &[u8]) {
+let key = read_field(file, "key");
+let name = read_field(file, "name");
+let command = read_until_eol(file);
+tree_add_command(c, &key, &name, &command);
+}
+
+pub fn command_add_child(c: &mut Command, child: Command) {
+let mut new_child = Box::new(child);
+
+if c.children.is_none() {
+c.children = Some(new_child);
+return;
+}
+
+let head = c.children.as_ref().unwrap();
+if head.key > new_child.key {
+new_child.next = c.children.take();
+c.children = Some(new_child);
+return;
+}
+
+let mut current = c.children.as_mut().unwrap();
+while current.next.is_some() && current.next.as_ref().unwrap().key <= new_child.key {
+current = current.next.as_mut().unwrap();
+}
+
+new_child.next = current.next.take();
+current.next = Some(new_child);
+}
+
+pub fn getch() -> char {
+let mut buf = [0u8; 1];
+if io::stdin().read_exact(&mut buf).is_err() {
+return '\0';
+}
+buf[0] as char
+}
+
+pub fn print_command(c: &Command) -> i32 {
+let width = std::env::var("COLUMNS")
+.ok()
+.and_then(|s| s.parse().ok())
+.unwrap_or(80);
+
+let mut lines = 0;
+
+if !c.name.is_empty() {
+eprintln!("{}{}{}", BLUE, c.name, COLOR_OFF);
+lines += 1;
+}
+
+let mut max_line_width = 0;
+let mut child_opt = c.children.as_ref();
+while let Some(child) = child_opt {
+let line_width = child.name.len();
+if line_width > max_line_width {
+max_line_width = line_width;
+}
+child_opt = child.next.as_ref();
+}
+max_line_width += RIGHT_MARGIN;
+if max_line_width > width {
+max_line_width = width;
+}
+
+let items_per_row = (width / (max_line_width + 5)).max(1);
+
+let mut child_opt = c.children.as_ref();
+let mut current_item = 0;
+
+while let Some(child) = child_opt {
+current_item += 1;
+
+if child.children.is_some() {
+eprint!("{}{}{} {}➔{} {}{:+<width$}{}",
+YELLOW, child.key, COLOR_OFF,
+PURPLE, COLOR_OFF,
+BLUE, child.name, COLOR_OFF,
+width = max_line_width);
+} else {
+eprint!("{}{}{} {}➔{}  {:<width$}",
+YELLOW, child.key, COLOR_OFF,
+PURPLE, COLOR_OFF,
+child.name,
+width = max_line_width);
+}
+
+if current_item % items_per_row == 0 {
+eprintln!();
+lines += 1;
+}
+
+child_opt = child.next.as_ref();
+}
+
+eprintln!();
+lines += 1;
+
+lines as i32
+}
+
+pub fn clear_lines(count: i32) {
+for _ in 0..count {
+eprint!("\x1B[A\r\x1B[2K");
+}
+}
+
+pub fn find_command(c: &Command, key: char) -> Option<&Command> {
+let mut child = c.children.as_ref();
+while let Some(node) = child {
+if node.key == key {
+return Some(node);
+}
+child = node.next.as_ref();
+}
+None
+}
+
+pub fn read_until_eol(file: &mut &[u8]) -> String {
+let mut i = 0;
+while i < file.len() && file[i] != b'\n' && file[i] != 0 {
+i += 1;
+}
+let result = String::from_utf8_lossy(&file[..i]).to_string();
+if i < file.len() && file[i] == b'\n' {
+*file = &file[i + 1..];
+} else {
+*file = &file[i..];
+}
+result
+}
+
+pub fn read_file(file: &str) -> String {
+fs::read_to_string(file).expect("Failed to open file")
+}
+
+pub fn command_run(c: &Command) -> i32 {
+if !c.command.is_empty() {
+print!("{}", c.command);
+io::stdout().flush().unwrap();
+c.command.len() as i32
+} else {
+0
+}
+}

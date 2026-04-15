@@ -1,0 +1,119 @@
+
+use std::collections::VecDeque;
+pub const SZ_MAX: usize = usize::MAX;
+pub struct ChtrieEdge {
+pub next: Option<Box<ChtrieEdge>>,
+pub from: i32,
+pub sym: i32,
+pub to: i32,
+}
+pub struct Chtrie {
+pub etab: Vec<Option<Box<ChtrieEdge>>>,
+pub idxpool: VecDeque<i32>,
+pub idxptr: i32,
+pub idxmax: i32,
+pub maxn: i32,
+pub alphsz: i32,
+pub ecap: i32,
+}
+impl Chtrie {
+pub fn new(n: usize, m: usize) -> Option<Self> {
+let mut n = n;
+let mut m = m;
+if n < 1 {
+n = 1;
+}
+if m < 1 {
+m = 1;
+}
+if n > i32::MAX as usize || m > i32::MAX as usize {
+return None;
+}
+let min_int_sz = std::cmp::min(i32::MAX as usize, SZ_MAX);
+if min_int_sz - (n - 1) < (n - 1) / 3 {
+return None;
+}
+let ecap = (n - 1) + (n - 1) / 3;
+Some(Self {
+etab: std::iter::repeat_with(|| None).take(ecap).collect(),
+idxpool: VecDeque::with_capacity(n),
+idxptr: 0,
+idxmax: 1,
+maxn: n as i32,
+alphsz: m as i32,
+ecap: ecap as i32,
+})
+}
+pub fn walk(&mut self, from: i32, sym: i32, creat: i32) -> i32 {
+let h = ((from as u64)
+.wrapping_mul(self.alphsz as u64)
+.wrapping_add(sym as u64)
+% (self.ecap as u64)) as usize;
+let mut current = self.etab[h].as_ref();
+while let Some(edge) = current {
+if edge.from == from && edge.sym == sym {
+return edge.to;
+}
+current = edge.next.as_ref();
+}
+if creat != 0 {
+if self.idxpool.is_empty() && self.idxmax >= self.maxn {
+return -1;
+}
+let to = if let Some(v) = self.idxpool.pop_back() {
+v
+} else {
+let v = self.idxmax;
+self.idxmax += 1;
+v
+};
+let new_edge = Box::new(ChtrieEdge {
+next: self.etab[h].take(),
+from,
+sym,
+to,
+});
+self.etab[h] = Some(new_edge);
+return to;
+}
+-1
+}
+pub fn del(&mut self, from: i32, sym: i32) {
+let h = ((from as u64)
+.wrapping_mul(self.alphsz as u64)
+.wrapping_add(sym as u64)
+% (self.ecap as u64)) as usize;
+let mut link = &mut self.etab[h];
+loop {
+match link {
+Some(node) if node.from == from && node.sym == sym => {
+let to = node.to;
+let next = node.next.take();
+*link = next;
+self.idxpool.push_back(to);
+self.idxptr = self.idxpool.len() as i32;
+return;
+}
+Some(node) => {
+link = &mut node.next;
+}
+None => return,
+}
+}
+}
+pub fn free(&mut self) {
+self.etab.clear();
+self.idxpool.clear();
+self.idxptr = 0;
+self.idxmax = 0;
+self.maxn = 0;
+self.alphsz = 0;
+self.ecap = 0;
+}
+}
+pub fn chtrie_walk(trie: &mut Chtrie, from: i32, sym: i32, creat: i32) -> i32 {
+trie.walk(from, sym, creat)
+}
+pub fn chtrie_del(trie: &mut Chtrie, from: i32, sym: i32) {
+trie.del(from, sym)
+}

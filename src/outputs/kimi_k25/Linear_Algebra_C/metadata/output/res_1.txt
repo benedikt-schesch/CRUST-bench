@@ -1,0 +1,516 @@
+ {{matrix.rs}}
+```rust
+//! Matrix module providing matrix data structures and operations.
+
+use crate::vector::{Vector, new_vector};
+
+/// A basic matrix structure
+pub struct Matrix {
+    pub rows: usize,
+    pub cols: usize,
+    pub data: Vec<f64>,
+}
+
+impl Matrix {
+    /// Creates a new matrix with the specified dimensions
+    pub fn new(rows: usize, cols: usize) -> Self {
+        Self {
+            rows,
+            cols,
+            data: vec![0.0; rows * cols],
+        }
+    }
+}
+
+pub fn new_matrix(data: &[f64], rows: usize, cols: usize) -> Matrix {
+    assert_eq!(data.len(), rows * cols, "Data length must match rows * cols");
+    Matrix {
+        rows,
+        cols,
+        data: data.to_vec(),
+    }
+}
+
+pub fn delete_matrix(_m: Matrix) {
+    // Matrix is dropped when it goes out of scope
+}
+
+pub fn get_matrix_element(m: &Matrix, row: usize, col: usize) -> f64 {
+    assert!(row < m.rows, "Row index out of bounds");
+    assert!(col < m.cols, "Column index out of bounds");
+    m.data[row * m.cols + col]
+}
+
+pub fn set_matrix_element(m: &mut Matrix, row: usize, col: usize, val: f64) {
+    assert!(row < m.rows, "Row index out of bounds");
+    assert!(col < m.cols, "Column index out of bounds");
+    m.data[row * m.cols + col] = val;
+}
+
+pub fn zero_matrix(rows: usize, cols: usize) -> Matrix {
+    Matrix::new(rows, cols)
+}
+
+pub fn copy_matrix(m: &Matrix) -> Matrix {
+    Matrix {
+        rows: m.rows,
+        cols: m.cols,
+        data: m.data.clone(),
+    }
+}
+
+pub fn matrix_size(m: &Matrix) -> usize {
+    m.rows * m.cols
+}
+
+pub fn matrix_size_bytes(m: &Matrix) -> usize {
+    m.rows * m.cols * std::mem::size_of::<f64>()
+}
+
+pub fn flatten_matrix(m: &Matrix) -> Vector {
+    new_vector(&m.data, m.data.len())
+}
+
+pub fn get_row_vector(m: &Matrix, row: usize) -> Vector {
+    assert!(row < m.rows, "Row index out of bounds");
+    let start = row * m.cols;
+    let end = start + m.cols;
+    new_vector(&m.data[start..end], m.cols)
+}
+
+pub fn set_row_vector(m: &mut Matrix, row: usize, v: &Vector) {
+    assert!(row < m.rows, "Row index out of bounds");
+    assert_eq!(v.data.len(), m.cols, "Vector length must match matrix columns");
+    let start = row * m.cols;
+    for (i, &val) in v.data.iter().enumerate() {
+        m.data[start + i] = val;
+    }
+}
+
+pub fn get_col_vector(m: &Matrix, col: usize) -> Vector {
+    assert!(col < m.cols, "Column index out of bounds");
+    let mut data = Vec::with_capacity(m.rows);
+    for row in 0..m.rows {
+        data.push(m.data[row * m.cols + col]);
+    }
+    new_vector(&data, m.rows)
+}
+
+pub fn set_col_vector(m: &mut Matrix, col: usize, v: &Vector) {
+    assert!(col < m.cols, "Column index out of bounds");
+    assert_eq!(v.data.len(), m.rows, "Vector length must match matrix rows");
+    for (row, &val) in v.data.iter().enumerate() {
+        m.data[row * m.cols + col] = val;
+    }
+}
+
+pub fn get_main_diagonal(m: &Matrix) -> Vector {
+    assert!(m.rows == m.cols, "Matrix must be square");
+    let n = m.rows;
+    let mut data = Vec::with_capacity(n);
+    for i in 0..n {
+        data.push(m.data[i * m.cols + i]);
+    }
+    new_vector(&data, n)
+}
+
+pub fn set_main_diagonal(m: &mut Matrix, v: &Vector) {
+    assert!(m.rows == m.cols, "Matrix must be square");
+    assert_eq!(v.data.len(), m.rows, "Vector length must match matrix dimension");
+    for i in 0..m.rows {
+        m.data[i * m.cols + i] = v.data[i];
+    }
+}
+
+pub fn get_anti_diagonal(m: &Matrix) -> Vector {
+    assert!(m.rows == m.cols, "Matrix must be square");
+    let n = m.rows;
+    let mut data = Vec::with_capacity(n);
+    for i in 0..n {
+        data.push(m.data[i * m.cols + (n - 1 - i)]);
+    }
+    new_vector(&data, n)
+}
+
+pub fn set_anti_diagonal(m: &mut Matrix, v: &Vector) {
+    assert!(m.rows == m.cols, "Matrix must be square");
+    assert_eq!(v.data.len(), m.rows, "Vector length must match matrix dimension");
+    let n = m.rows;
+    for i in 0..n {
+        m.data[i * m.cols + (n - 1 - i)] = v.data[i];
+    }
+}
+
+pub fn is_matrix_equal(m1: &Matrix, m2: &Matrix) -> bool {
+    if m1.rows != m2.rows || m1.cols != m2.cols {
+        return false;
+    }
+    m1.data.iter().zip(m2.data.iter()).all(|(a, b)| (a - b).abs() < 1e-9)
+}
+
+pub fn is_zero_matrix(m: &Matrix) -> bool {
+    m.data.iter().all(|&x| x.abs() < 1e-9)
+}
+
+pub fn is_identity_matrix(m: &Matrix) -> bool {
+    if m.rows != m.cols {
+        return false;
+    }
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            let val = m.data[i * m.cols + j];
+            if i == j {
+                if (val - 1.0).abs() > 1e-9 {
+                    return false;
+                }
+            } else {
+                if val.abs() > 1e-9 {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
+pub fn identity_matrix(n: usize) -> Matrix {
+    let mut m = zero_matrix(n, n);
+    for i in 0..n {
+        m.data[i * n + i] = 1.0;
+    }
+    m
+}
+
+pub fn is_square_matrix(m: &Matrix) -> bool {
+    m.rows == m.cols
+}
+
+pub fn is_diagonal_matrix(m: &Matrix) -> bool {
+    if m.rows != m.cols {
+        return false;
+    }
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            if i != j && m.data[i * m.cols + j].abs() > 1e-9 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn is_up_tri_matrix(m: &Matrix) -> bool {
+    if m.rows != m.cols {
+        return false;
+    }
+    for i in 1..m.rows {
+        for j in 0..i {
+            if m.data[i * m.cols + j].abs() > 1e-9 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn is_lo_tri_matrix(m: &Matrix) -> bool {
+    if m.rows != m.cols {
+        return false;
+    }
+    for i in 0..m.rows {
+        for j in (i+1)..m.cols {
+            if m.data[i * m.cols + j].abs() > 1e-9 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn is_triangular_matrix(m: &Matrix) -> bool {
+    is_up_tri_matrix(m) || is_lo_tri_matrix(m)
+}
+
+pub fn is_matrix_symmetric(m: &Matrix) -> bool {
+    if m.rows != m.cols {
+        return false;
+    }
+    for i in 0..m.rows {
+        for j in (i+1)..m.cols {
+            if (m.data[i * m.cols + j] - m.data[j * m.cols + i]).abs() > 1e-9 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn transpose_matrix(m: &Matrix) -> Matrix {
+    let mut result = zero_matrix(m.cols, m.rows);
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            result.data[j * m.rows + i] = m.data[i * m.cols + j];
+        }
+    }
+    result
+}
+
+pub fn trace_matrix(m: &Matrix) -> f64 {
+    assert!(m.rows == m.cols, "Matrix must be square");
+    let mut sum = 0.0;
+    for i in 0..m.rows {
+        sum += m.data[i * m.cols + i];
+    }
+    sum
+}
+
+pub fn add_matrices(m1: &Matrix, m2: &Matrix) -> Matrix {
+    assert!(m1.rows == m2.rows && m1.cols == m2.cols, "Matrices must have same dimensions");
+    let mut result = zero_matrix(m1.rows, m1.cols);
+    for i in 0..m1.data.len() {
+        result.data[i] = m1.data[i] + m2.data[i];
+    }
+    result
+}
+
+pub fn multiply_matrices(m1: &Matrix, m2: &Matrix) -> Matrix {
+    assert!(m1.cols == m2.rows, "First matrix columns must equal second matrix rows");
+    let mut result = zero_matrix(m1.rows, m2.cols);
+    for i in 0..m1.rows {
+        for j in 0..m2.cols {
+            let mut sum = 0.0;
+            for k in 0..m1.cols {
+                sum += m1.data[i * m1.cols + k] * m2.data[k * m2.cols + j];
+            }
+            result.data[i * m2.cols + j] = sum;
+        }
+    }
+    result
+}
+
+pub fn scale_matrix(m: &Matrix, scalar: f64) -> Matrix {
+    let mut result = copy_matrix(m);
+    for val in result.data.iter_mut() {
+        *val *= scalar;
+    }
+    result
+}
+
+pub fn sub_matrix(m: &Matrix, rows: usize, cols: usize) -> Matrix {
+    assert!(rows <= m.rows && cols <= m.cols, "Submatrix dimensions must be smaller than original");
+    let mut result = zero_matrix(rows, cols);
+    for i in 0..rows {
+        for j in 0..cols {
+            result.data[i * cols + j] = m.data[i * m.cols + j];
+        }
+    }
+    result
+}
+
+fn get_minor(m: &Matrix, row: usize, col: usize) -> Matrix {
+    let n = m.rows;
+    let mut minor = zero_matrix(n - 1, n - 1);
+    let mut mi = 0;
+    for i in 0..n {
+        if i == row { continue; }
+        let mut mj = 0;
+        for j in 0..n {
+            if j == col { continue; }
+            minor.data[mi * (n - 1) + mj] = m.data[i * n + j];
+            mj += 1;
+        }
+        mi += 1;
+    }
+    minor
+}
+
+pub fn determinant(m: &Matrix) -> f64 {
+    assert!(m.rows == m.cols, "Matrix must be square");
+    let n = m.rows;
+    if n == 1 {
+        return m.data[0];
+    }
+    if n == 2 {
+        return m.data[0] * m.data[3] - m.data[1] * m.data[2];
+    }
+    
+    let mut det = 0.0;
+    for j in 0..n {
+        let minor = get_minor(m, 0, j);
+        let sign = if j % 2 == 0 { 1.0 } else { -1.0 };
+        det += sign * m.data[j] * determinant(&minor);
+    }
+    det
+}
+
+pub fn inverse_matrix(m: &Matrix) -> Matrix {
+    assert!(m.rows == m.cols, "Matrix must be square");
+    let det = determinant(m);
+    assert!(det.abs() > 1e-9, "Matrix is singular");
+    
+    let n = m.rows;
+    if n == 1 {
+        return new_matrix(&vec![1.0 / m.data[0]], 1, 1);
+    }
+    
+    let mut adj = zero_matrix(n, n);
+    for i in 0..n {
+        for j in 0..n {
+            let minor = get_minor(m, i, j);
+            let sign = if (i + j) % 2 == 0 { 1.0 } else { -1.0 };
+            adj.data[j * n + i] = sign * determinant(&minor);
+        }
+    }
+    
+    scale_matrix(&adj, 1.0 / det)
+}
+
+pub fn print_matrix(m: &Matrix, newline: bool) {
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            print!("{} ", m.data[i * m.cols + j]);
+        }
+        println!();
+    }
+    if newline {
+        println!();
+    }
+}
+```
+
+{{vector.rs}}
+```rust
+//! Vector module providing vector data structures and operations.
+
+/// A basic vector structure
+pub struct Vector {
+    pub data: Vec<f64>,
+}
+
+impl Vector {
+    /// Creates a new vector with the specified size
+    pub fn new(size: usize) -> Self {
+        Self {
+            data: vec![0.0; size],
+        }
+    }
+
+    /// Returns the dimension of the vector
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+}
+
+pub fn new_vector(data: &[f64], size: usize) -> Vector {
+    assert_eq!(data.len(), size, "Data length must match size");
+    Vector {
+        data: data.to_vec(),
+    }
+}
+
+pub fn delete_vector(_v: Vector) {
+    // Vector is dropped when it goes out of scope
+}
+
+pub fn get_vector_element(v: &Vector, idx: usize) -> f64 {
+    assert!(idx < v.data.len(), "Index out of bounds");
+    v.data[idx]
+}
+
+pub fn set_vector_element(v: &mut Vector, idx: usize, val: f64) {
+    assert!(idx < v.data.len(), "Index out of bounds");
+    v.data[idx] = val;
+}
+
+pub fn zero_vector(size: usize) -> Vector {
+    Vector::new(size)
+}
+
+pub fn copy_vector(v: &Vector) -> Vector {
+    Vector {
+        data: v.data.clone(),
+    }
+}
+
+pub fn vector_size_bytes(v: &Vector) -> usize {
+    v.data.len() * std::mem::size_of::<f64>()
+}
+
+pub fn is_vector_equal(v1: &Vector, v2: &Vector) -> bool {
+    if v1.data.len() != v2.data.len() {
+        return false;
+    }
+    v1.data.iter().zip(v2.data.iter()).all(|(a, b)| (a - b).abs() < 1e-9)
+}
+
+pub fn vector_magnitude(v: &Vector) -> f64 {
+    v.data.iter().map(|&x| x * x).sum::<f64>().sqrt()
+}
+
+pub fn is_unit_vector(v: &Vector) -> bool {
+    (vector_magnitude(v) - 1.0).abs() < 1e-9
+}
+
+pub fn dot_product(v1: &Vector, v2: &Vector) -> f64 {
+    assert_eq!(v1.data.len(), v2.data.len(), "Vectors must have same length");
+    v1.data.iter().zip(v2.data.iter()).map(|(a, b)| a * b).sum()
+}
+
+pub fn is_vector_orthogonal(v1: &Vector, v2: &Vector) -> bool {
+    dot_product(v1, v2).abs() < 1e-9
+}
+
+pub fn vector_distance(v1: &Vector, v2: &Vector) -> f64 {
+    assert_eq!(v1.data.len(), v2.data.len(), "Vectors must have same length");
+    v1.data.iter().zip(v2.data.iter())
+        .map(|(a, b)| (a - b) * (a - b))
+        .sum::<f64>()
+        .sqrt()
+}
+
+pub fn cross_product(v1: &Vector, v2: &Vector) -> Vector {
+    assert_eq!(v1.data.len(), 3, "Cross product only defined for 3D vectors");
+    assert_eq!(v2.data.len(), 3, "Cross product only defined for 3D vectors");
+    let a = &v1.data;
+    let b = &v2.data;
+    let result = vec![
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ];
+    new_vector(&result, 3)
+}
+```
+
+{{utils.rs}}
+```rust
+//! Utility module providing helper functions for linear algebra operations.
+
+/// Utility function placeholder
+pub fn utility_placeholder() {}
+
+/// Helper function to check if a value is close to zero
+pub fn is_close_to_zero(val: f64, epsilon: f64) -> bool {
+    val.abs() < epsilon
+}
+
+/// Round a floating point number to n decimal places
+pub fn roundn(val: f64, n: i32) -> f64 {
+    let factor = 10f64.powi(n);
+    (val * factor).round() / factor
+}
+```
+
+{{linear_algebra.rs}}
+```rust
+//! Linear algebra module providing common linear algebra operations and types.
+
+pub use crate::matrix::{
+    Matrix, new_matrix, delete_matrix, get_matrix_element, set_matrix_element,
+    zero_matrix, copy_matrix, matrix_size, matrix_size_bytes,
+    flatten_matrix, get_row_vector, set_row_vector, get_col_vector, set_col_vector,
+    get_main_diagonal, set_main_diagonal, get_anti

@@ -1,0 +1,23 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_card_operations ... FAILED
+
+failures:
+
+---- test_card_operations stdout ----
+
+thread 'test_card_operations' (297186) panicked at razz_simulation/src/bin/test.rs:124:5:
+assertion failed: d.as_ref().unwrap().is_card_in_deck(CardSuitRank::HeartK) != 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_card_operations
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

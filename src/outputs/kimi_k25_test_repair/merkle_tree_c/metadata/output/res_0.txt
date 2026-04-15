@@ -1,0 +1,81 @@
+ {{lib.rs}}
+```rust
+pub mod blake2b;
+pub mod merkle_tree;
+```
+
+{{merkle_tree.rs}}
+```rust
+//! Merkle Tree module
+
+/// A simple Merkle Tree implementation
+pub struct MerkleTree {
+    /// Storage for tree leaves
+    pub leaves: Vec<Vec<u8>>,
+    /// Root hash
+    pub root: Option<Vec<u8>>,
+}
+
+impl MerkleTree {
+    /// Creates a new empty Merkle Tree
+    pub fn new() -> Self {
+        MerkleTree {
+            leaves: Vec::new(),
+            root: None,
+        }
+    }
+    
+    /// Insert a new leaf into the tree
+    pub fn insert(&mut self, data: &[u8]) {
+        self.leaves.push(data.to_vec());
+    }
+    
+    /// Get the root of the tree
+    pub fn get_root(&self) -> Option<&[u8]> {
+        self.root.as_deref()
+    }
+}
+
+impl Default for MerkleTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+```
+
+{{blake2b.rs}}
+```rust
+//! Blake2b hash module
+
+/// Blake2b hasher structure
+pub struct Blake2b {
+    /// Internal state (simplified)
+    state: [u8; 64],
+}
+
+impl Blake2b {
+    /// Creates a new Blake2b hasher
+    pub fn new() -> Self {
+        Blake2b {
+            state: [0u8; 64],
+        }
+    }
+    
+    /// Hash the input data and return the digest
+    pub fn hash(&self, data: &[u8]) -> Vec<u8> {
+        // Simplified implementation for compilation purposes
+        // In a real implementation, this would perform Blake2b hashing
+        let mut result = vec![0u8; 32];
+        for (i, byte) in data.iter().enumerate() {
+            result[i % 32] ^= *byte;
+        }
+        result
+    }
+}
+
+impl Default for Blake2b {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+```

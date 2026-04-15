@@ -1,0 +1,414 @@
+ {{throw.rs}}
+```rust
+pub fn math_err(msg: &str) {
+    panic!("[ERROR] {}", msg);
+}
+
+pub fn op_err(type_: &str, code: u8) {
+    panic!("[ERROR] invalid {} code: 0x{:02x}", type_, code);
+}
+```
+
+{{stack.rs}}
+```rust
+use crate::{parser, throw, slothvm};
+
+pub struct ListNode {
+    pub data: i32,
+    pub next: Option<Box<ListNode>>,
+}
+
+pub struct Stack {
+    pub top: Option<Box<ListNode>>,
+    pub bottom: Option<Box<ListNode>>,
+}
+
+impl Stack {
+    pub fn new() -> Self {
+        Stack {
+            top: None,
+            bottom: None,
+        }
+    }
+
+    pub fn push(&mut self, x: i32) {
+        let new_node = Box::new(ListNode {
+            data: x,
+            next: self.top.take(),
+        });
+        self.top = Some(new_node);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.top.is_none()
+    }
+
+    pub fn pop(&mut self) -> Option<i32> {
+        self.top.take().map(|node| {
+            self.top = node.next;
+            node.data
+        })
+    }
+
+    pub fn peek(&self, pos: usize) -> Option<i32> {
+        let mut current = self.top.as_ref();
+        for _ in 0..pos {
+            current = current?.next.as_ref();
+        }
+        current.map(|node| node.data)
+    }
+
+    pub fn print(&self) {
+        print!("|");
+        let mut current = self.top.as_ref();
+        while let Some(node) = current {
+            print!("{} ", node.data);
+            current = node.next.as_ref();
+        }
+        println!();
+    }
+}
+
+impl Drop for Stack {
+    fn drop(&mut self) {
+        let mut current = self.top.take();
+        while let Some(mut node) = current {
+            current = node.next.take();
+        }
+        self.bottom.take();
+    }
+}
+```
+
+{{slothvm.rs}}
+```rust
+use crate::{parser, throw};
+use crate::stack::Stack;
+
+pub type UByte = u8;
+
+pub enum Opcodes {
+    Exit = 0x00,
+    Push = 0x01,
+    Add = 0x02,
+    Sub = 0x03,
+    Mult = 0x04,
+    Div = 0x05,
+    Comp = 0x06,
+    Inp = 0x07,
+    Out = 0x08,
+    Goto = 0x09,
+    Dup = 0x0A,
+}
+
+pub enum CompCodes {
+    Eq = 0x01,
+    Neq = 0x02,
+    Lt = 0x03,
+    Le = 0x04,
+    Gt = 0x05,
+    Ge = 0x06,
+}
+
+pub enum TypeCode {
+    Int = 0x01,
+    Chr = 0x02,
+}
+
+pub struct SlothProgram {
+    pub codes: Vec<UByte>,
+    pub pc: usize,
+}
+
+pub fn execute(sbin: &mut Option<SlothProgram>) -> i32 {
+    let program = sbin.as_mut().expect("Program is None");
+    let mut stack = Stack::new();
+    let mut pc: usize = 0;
+    let codes = &program.codes;
+    
+    loop {
+        if pc >= codes.len() {
+            break;
+        }
+        
+        let opcode = codes[pc];
+        
+        match opcode {
+            0x00 => { // EXIT
+                if stack.is_empty() {
+                    return 0;
+                } else {
+                    return stack.pop().unwrap();
+                }
+            }
+            0x01 => { // PUSH
+                pc += 1;
+                if pc >= codes.len() {
+                    break;
+                }
+                stack.push(codes[pc] as i32);
+                pc += 1;
+            }
+            0x02 => { // ADD
+                let b = stack.pop().unwrap();
+                let a = stack.pop().unwrap();
+                stack.push(a + b);
+                pc += 1;
+            }
+            0x03 => { // SUB
+                let b = stack.pop().unwrap();
+                let a = stack.pop().unwrap();
+                stack.push(a - b);
+                pc += 1;
+            }
+            0x04 => { // MULT
+                let b = stack.pop().unwrap();
+                let a = stack.pop().unwrap();
+                stack.push(a * b);
+                pc += 1;
+            }
+            0x05 => { // DIV
+                let b = stack.pop().unwrap();
+                let a = stack.pop().unwrap();
+                if b == 0 {
+                    throw::math_err("division by zero");
+                }
+                if a == i32::MIN && b == -1 {
+                    throw::math_err("division by zero");
+                }
+                stack.push(a / b);
+                pc += 1;
+            }
+            0x06 => { // COMP
+                let b = stack.pop().unwrap();
+                let a = stack.pop().unwrap();
+                pc += 1;
+                if pc >= codes.len() {
+                    break;
+                }
+                let comp_code = codes[pc];
+                let res = match comp_code {
+                    0x01 => a == b,
+                    0x02 => a != b,
+                    0x03 => a < b,
+                    0x04 => a <= b,
+                    0x05 => a > b,
+                    0x06 => a >= b,
+                    _ => {
+                        throw::op_err("comparison", comp_code);
+                        false
+                    }
+                };
+                stack.push(res as i32);
+                pc += 1;
+            }
+            0x07 => { // INP
+                pc += 1;
+                if pc >= codes.len() {
+                    break;
+                }
+                let type_code = codes[pc];
+                match type_code {
+                    0x01 => { // INT
+                        print!(">");
+                        use std::io::Write;
+                        std::io::stdout().flush().unwrap();
+                        let mut input = String::new();
+                        std::io::stdin().read_line(&mut input).unwrap();
+                        let x: i32 = input.trim().parse().unwrap_or(0);
+                        stack.push(x);
+                    }
+                    0x02 => { // CHR
+                        let mut input = String::new();
+                        std::io::stdin().read_line(&mut input).unwrap();
+                        let x = input.chars().next().unwrap_or('\0') as i32;
+                        stack.push(x);
+                    }
+                    _ => {
+                        throw::op_err("input type", type_code);
+                    }
+                }
+                pc += 1;
+            }
+            0x08 => { // OUT
+                pc += 1;
+                if pc >= codes.len() {
+                    break;
+                }
+                let type_code = codes[pc];
+                match type_code {
+                    0x01 => { // INT
+                        let x = stack.pop().unwrap();
+                        print!("{}", x);
+                    }
+                    0x02 => { // CHR
+                        let x = stack.pop().unwrap();
+                        print!("{}", x as u8 as char);
+                    }
+                    _ => {
+                        throw::op_err("output type", type_code);
+                    }
+                }
+                pc += 1;
+            }
+            0x09 => { // GOTO
+                pc += 1;
+                if pc >= codes.len() {
+                    break;
+                }
+                if stack.pop().unwrap() == 1 {
+                    pc = codes[pc] as usize;
+                } else {
+                    pc += 1;
+                }
+            }
+            0x0A => { // DUP
+                let x = stack.pop().unwrap();
+                stack.push(x);
+                stack.push(x);
+                pc += 1;
+            }
+            _ => {
+                throw::op_err("operation", opcode);
+            }
+        }
+    }
+    
+    0
+}
+```
+
+{{parser.rs}}
+```rust
+use crate::{throw, slothvm};
+use crate::slothvm::SlothProgram;
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom, BufRead};
+
+pub fn parse(filename: &str) -> Option<SlothProgram> {
+    let file = File::open(filename).ok()?;
+    let mut file_for_len = file.try_clone().ok()?;
+    let _num_codes = prog_len(&mut file_for_len);
+    
+    let mut byte_code: Vec<u8> = Vec::new();
+    let reader = std::io::BufReader::new(&file);
+    let mut had_token = false;
+    
+    for line_result in reader.lines() {
+        let line = line_result.ok()?;
+        if line.is_empty() {
+            continue;
+        }
+        
+        let mut count = 0;
+        let mut current_code: u8 = 0;
+        let len = line.len();
+        
+        while count < len {
+            let remaining = &line[count..];
+            
+            if remaining.starts_with("slothy") {
+                byte_code.push(0x1);
+                count += 6;
+                had_token = true;
+            } else if remaining.starts_with("sloth") {
+                current_code = current_code.wrapping_add(1);
+                count += 5;
+                had_token = true;
+            } else if remaining.starts_with("and") {
+                byte_code.push(current_code);
+                current_code = 0;
+                count += 3;
+                had_token = true;
+            } else if remaining.starts_with("nap") {
+                byte_code.push(0x0);
+                count += 3;
+                had_token = true;
+            } else if remaining.starts_with("#") {
+                break;
+            } else {
+                count += 1;
+            }
+        }
+        
+        if had_token {
+            byte_code.push(current_code);
+            had_token = false;
+        }
+    }
+    
+    Some(SlothProgram {
+        codes: byte_code,
+        pc: 0,
+    })
+}
+
+pub fn free_program(_program: Option<SlothProgram>) {
+    // Just drop
+}
+
+pub fn readline(file: &std::fs::File) -> Option<String> {
+    let mut line = String::new();
+    let mut byte = [0u8; 1];
+    loop {
+        match file.read(&mut byte) {
+            Ok(0) => {
+                if line.is_empty() {
+                    return None;
+                } else {
+                    return Some(line);
+                }
+            }
+            Ok(_) => {
+                if byte[0] == b'\n' {
+                    return Some(line);
+                }
+                line.push(byte[0] as char);
+            }
+            Err(_) => return None,
+        }
+    }
+}
+
+pub fn prog_len(file: &std::fs::File) -> usize {
+    let mut reader = std::io::BufReader::new(file);
+    let mut count = 0;
+    let mut buf = [0u8; 1024];
+    
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                for i in 0..n {
+                    if buf[i] == b'\n' {
+                        count += 1;
+                    }
+                }
+            }
+            Err(_) => break,
+        }
+    }
+    
+    let _ = file.seek(SeekFrom::Start(0));
+    count * 3
+}
+```
+
+{{sloth.rs}}
+```rust
+use crate::{parser, throw, slothvm, stack};
+
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() != 2 {
+        eprintln!("Usage: sloth <source file>");
+        std::process::exit(1);
+    }
+    let filename = &args[1];
+    let program = parser::parse(filename);
+    let mut program_opt = program;
+    let result = slothvm::execute(&mut program_opt);
+    println!("Returned: {}", result);
+    parser::free_program(program_opt);
+}
+```

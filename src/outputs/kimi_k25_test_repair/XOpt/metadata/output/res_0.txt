@@ -1,0 +1,14 @@
+ {{lib.rs}}
+```rust
+pub mod xopt;
+pub mod snprintf;
+```
+
+{{XOpt/src/bin/test.rs}}
+```rust
+use crate::xopt::{xopt_context, xopt_parse, XoptOption, XoptContext, XOPT_SOMETHING};
+
+fn main() {
+    // Binary entry point
+}
+```

@@ -1,0 +1,5 @@
+```rust
+// Generated Rust Code
+pub mod simple_sparsehash;
+pub use crate::simple_sparsehash::*;
+```

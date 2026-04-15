@@ -1,0 +1,34 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test tests::test_bounds ... ok
+test tests::test_node ... FAILED
+test tests::test_points ... ok
+test tests::test_tree ... FAILED
+
+failures:
+
+---- tests::test_node stdout ----
+
+thread 'tests::test_node' (248661) panicked at quadtree/src/bin/test.rs:11:9:
+assertion failed: node.quadtree_node_ispointer()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- tests::test_tree stdout ----
+
+thread 'tests::test_tree' (248663) panicked at quadtree/src/bin/test.rs:47:9:
+assertion `left == right` failed
+  left: 3
+ right: 2
+
+
+failures:
+    tests::test_node
+    tests::test_tree
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,782 @@
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod range;
+pub mod csvline;
+pub mod csvfield;
+pub mod cissy;
+```
+
+{{csvfield.rs}}
+```rust
+// Generated Rust Code
+use std::fs::File;
+use std::io::Write;
+
+#[derive(Debug, Clone)]
+pub struct CsvField {
+    pub data: String,
+    pub len: usize,
+}
+
+impl CsvField {
+    pub fn new() -> Self {
+        let len = 10;
+        Self {
+            data: String::new(),
+            len,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.data.clear();
+    }
+
+    pub fn set(&mut self, buf: &str, buf_start_idx: usize, len: usize) {
+        const STR_MEM_PAD: usize = 10;
+        if len + 1 > self.len {
+            self.len = len + 1 + STR_MEM_PAD;
+        }
+
+        let start = buf_start_idx.min(buf.len());
+        let end = start.saturating_add(len).min(buf.len());
+        self.data = buf[start..end].to_string();
+    }
+
+    pub fn append(&mut self, buf: &str, buf_start_idx: usize, buflen: usize) {
+        const STR_MEM_PAD: usize = 10;
+        let origflen = self.data.len();
+        if origflen + buflen + 1 > self.len {
+            self.len = self.len + buflen + STR_MEM_PAD;
+        }
+
+        let start = buf_start_idx.min(buf.len());
+        let end = start.saturating_add(buflen).min(buf.len());
+        self.data.push_str(&buf[start..end]);
+    }
+
+    pub fn print_to_file(&self, fp: &mut File) {
+        let _ = writeln!(fp, "[{}:{}]", self.data, self.len as i32);
+    }
+}
+```
+
+{{csvline.rs}}
+```rust
+// Generated Rust Code
+use crate::csvfield::CsvField;
+use std::fs::File;
+use std::io::Write;
+
+#[derive(Debug, Clone)]
+pub struct CsvLine {
+    pub field: Vec<CsvField>,
+    pub fieldsize: usize,
+    pub current_idx: usize,
+    pub eol_str: String,
+}
+
+impl CsvLine {
+    pub fn new() -> Self {
+        Self {
+            field: Vec::new(),
+            fieldsize: 0,
+            current_idx: 0,
+            eol_str: "\n".to_string(),
+        }
+    }
+
+    pub fn get_field_count(&self) -> usize {
+        self.current_idx
+    }
+
+    pub fn get_field(&self, idx: usize) -> Option<&str> {
+        if idx >= self.current_idx {
+            Some("")
+        } else {
+            self.field.get(idx).map(|f| f.data.as_str())
+        }
+    }
+
+    pub fn reset(&mut self) {
+        for f in &mut self.field {
+            f.reset();
+        }
+        self.current_idx = 0;
+        self.eol_str = "\n".to_string();
+    }
+
+    pub fn add_field(&mut self, txtfield: &str, fieldstartidx: usize, fieldlen: usize) {
+        if self.fieldsize <= self.current_idx {
+            for _ in 0..10 {
+                self.field.push(CsvField::new());
+            }
+            self.fieldsize += 10;
+        }
+
+        if let Some(field) = self.field.get_mut(self.current_idx) {
+            field.set(txtfield, fieldstartidx, fieldlen);
+        }
+        self.current_idx += 1;
+    }
+
+    pub fn append_field(&mut self, txtfield: &str, fieldstartidx: usize, fieldlen: usize) {
+        if self.current_idx == 0 {
+            return;
+        }
+        if let Some(field) = self.field.get_mut(self.current_idx - 1) {
+            field.append(txtfield, fieldstartidx, fieldlen);
+        }
+    }
+
+    pub fn print_to_file(&self, fp: &mut File) {
+        let _ = write!(fp, "[[");
+        for f in &self.field {
+            let _ = write!(fp, "[{}:{}]", f.data, f.len as i32);
+        }
+        let _ = write!(fp, "]");
+        let _ = write!(fp, "fs({}):", self.fieldsize as i32);
+        let _ = write!(fp, "i({})", self.current_idx as i32);
+        let _ = writeln!(fp, "]");
+    }
+}
+```
+
+{{range.rs}}
+```rust
+// Generated Rust Code
+pub mod range {
+    #[derive(Debug, Clone, PartialEq)]
+    pub enum RangeType {
+        Empty,
+        Single,
+        StartEnd,
+        GreaterEqual,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct RangeElement {
+        pub start: u32,
+        pub end: u32,
+        pub rangetype: RangeType,
+        pub next: Option<Box<RangeElement>>,
+    }
+
+    impl RangeElement {
+        pub fn new() -> Self {
+            Self {
+                start: u32::MAX,
+                end: u32::MAX,
+                rangetype: RangeType::Empty,
+                next: None,
+            }
+        }
+
+        pub fn add_single(
+            num: u32,
+            start_of_list: Option<Box<RangeElement>>,
+        ) -> Option<Box<RangeElement>> {
+            assert!(num > 0);
+            match start_of_list {
+                None => Some(Box::new(RangeElement {
+                    start: num,
+                    end: u32::MAX,
+                    rangetype: RangeType::Single,
+                    next: None,
+                })),
+                Some(mut head) => {
+                    let mut ptr = &mut head;
+                    while ptr.next.is_some() {
+                        ptr = ptr.next.as_mut().expect("next exists");
+                    }
+                    ptr.next = Some(Box::new(RangeElement {
+                        start: num,
+                        end: u32::MAX,
+                        rangetype: RangeType::Single,
+                        next: None,
+                    }));
+                    Some(head)
+                }
+            }
+        }
+
+        pub fn add_start_end(
+            start: u32,
+            end: u32,
+            start_of_list: Option<Box<RangeElement>>,
+        ) -> Option<Box<RangeElement>> {
+            assert!(start > 0);
+            assert!(end >= start);
+
+            let rangetype = if start == end {
+                RangeType::Single
+            } else {
+                RangeType::StartEnd
+            };
+
+            match start_of_list {
+                None => Some(Box::new(RangeElement {
+                    start,
+                    end: if start == end { u32::MAX } else { end },
+                    rangetype,
+                    next: None,
+                })),
+                Some(mut head) => {
+                    let mut ptr = &mut head;
+                    while ptr.next.is_some() {
+                        ptr = ptr.next.as_mut().expect("next exists");
+                    }
+                    ptr.next = Some(Box::new(RangeElement {
+                        start,
+                        end: if start == end { u32::MAX } else { end },
+                        rangetype,
+                        next: None,
+                    }));
+                    Some(head)
+                }
+            }
+        }
+
+        pub fn add_greater_equal(
+            num: u32,
+            start_of_list: Option<Box<RangeElement>>,
+        ) -> Option<Box<RangeElement>> {
+            match start_of_list {
+                None => Some(Box::new(RangeElement {
+                    start: num,
+                    end: u32::MAX,
+                    rangetype: RangeType::GreaterEqual,
+                    next: None,
+                })),
+                Some(mut head) => {
+                    let mut ptr = &mut head;
+                    while ptr.next.is_some() {
+                        ptr = ptr.next.as_mut().expect("next exists");
+                    }
+                    ptr.next = Some(Box::new(RangeElement {
+                        start: num,
+                        end: u32::MAX,
+                        rangetype: RangeType::GreaterEqual,
+                        next: None,
+                    }));
+                    Some(head)
+                }
+            }
+        }
+
+        pub fn contains_num(num: u32, start_of_list: &Option<Box<RangeElement>>) -> bool {
+            let mut ptr = start_of_list.as_ref();
+            while let Some(node) = ptr {
+                match node.rangetype {
+                    RangeType::Single => {
+                        if node.start == num {
+                            return true;
+                        }
+                    }
+                    RangeType::GreaterEqual => {
+                        if num >= node.start {
+                            return true;
+                        }
+                    }
+                    RangeType::StartEnd => {
+                        if num >= node.start && num <= node.end {
+                            return true;
+                        }
+                    }
+                    RangeType::Empty => {}
+                }
+                ptr = node.next.as_ref();
+            }
+            false
+        }
+
+        pub fn to_string<'a>(&self, buf: &'a mut String, bufsize: usize) -> &'a str {
+            let s = match self.rangetype {
+                RangeType::Single => format!("[{}]", self.start),
+                RangeType::GreaterEqual => format!("[{}-]", self.start),
+                RangeType::StartEnd => format!("[{}-{}]", self.start, self.end),
+                RangeType::Empty => "[]".to_string(),
+            };
+            buf.clear();
+            if bufsize == 0 {
+                return buf.as_str();
+            }
+            let take_len = s.len().min(bufsize);
+            buf.push_str(&s[..take_len]);
+            buf.as_str()
+        }
+
+        pub fn list_to_string<'a>(
+            buf: &'a mut String,
+            bufsize: usize,
+            start_of_list: &'a Option<Box<RangeElement>>,
+        ) -> &'a str {
+            buf.clear();
+            let mut ptr = start_of_list.as_ref();
+
+            while let Some(node) = ptr {
+                let part = match node.rangetype {
+                    RangeType::Single => format!("[{}]", node.start),
+                    RangeType::GreaterEqual => format!("[{}-]", node.start),
+                    RangeType::StartEnd => format!("[{}-{}]", node.start, node.end),
+                    RangeType::Empty => "[]".to_string(),
+                };
+
+                if buf.len() >= bufsize {
+                    break;
+                }
+                let remaining = bufsize - buf.len();
+                let take_len = part.len().min(remaining);
+                buf.push_str(&part[..take_len]);
+
+                ptr = node.next.as_ref();
+            }
+
+            buf.as_str()
+        }
+
+        pub fn parse_int_ranges(text: &str) -> Option<Box<RangeElement>> {
+            let mut state = 0i32;
+            let flag_dash = 0x01i32;
+            let mut numbuf = String::new();
+            let mut rv: Option<Box<RangeElement>> = None;
+            let mut start = 0u32;
+            let mut end;
+
+            for ch in text.chars() {
+                if ch.is_ascii_digit() {
+                    numbuf.push(ch);
+                } else if ch == '-' {
+                    if (state & flag_dash) != 0 {
+                        panic!("error: too many dashes in range");
+                    }
+                    state |= flag_dash;
+                    if numbuf.is_empty() {
+                        panic!("error: range cannot start with '-'");
+                    }
+                    start = numbuf.parse::<u32>().unwrap_or(0);
+                    if start == 0 {
+                        panic!("error: start range <= 0");
+                    }
+                    numbuf.clear();
+                } else if ch == ',' {
+                    if numbuf.is_empty() {
+                        if (state & flag_dash) != 0 {
+                            rv = RangeElement::add_greater_equal(start, rv);
+                        }
+                    } else if start > 0 {
+                        end = numbuf.parse::<u32>().unwrap_or(0);
+                        if end == 0 || start > end {
+                            panic!("error: illegal start/end ranges");
+                        }
+                        rv = RangeElement::add_start_end(start, end, rv);
+                    } else {
+                        start = numbuf.parse::<u32>().unwrap_or(0);
+                        rv = RangeElement::add_single(start, rv);
+                    }
+                    numbuf.clear();
+                    start = 0;
+                    state = 0;
+                }
+            }
+
+            if numbuf.is_empty() {
+                if (state & flag_dash) != 0 && start > 0 {
+                    rv = RangeElement::add_greater_equal(start, rv);
+                }
+            } else if start > 0 {
+                end = numbuf.parse::<u32>().unwrap_or(0);
+                if end == 0 || start > end {
+                    panic!("error: illegal start/end range {}", text);
+                }
+                rv = RangeElement::add_start_end(start, end, rv);
+            } else {
+                start = numbuf.parse::<u32>().unwrap_or(0);
+                rv = RangeElement::add_single(start, rv);
+            }
+
+            rv
+        }
+    }
+}
+```
+
+{{cissy.rs}}
+```rust
+// Generated Rust Code
+use crate::csvline::CsvLine;
+use crate::range::range::{RangeElement, RangeType};
+use std::io::Write;
+use std::sync::{Mutex, OnceLock};
+
+pub const BUFSIZE: usize = 4096;
+pub const MAXCOL: usize = 1024;
+
+#[derive(Clone)]
+struct CissyState {
+    line_cnt: i32,
+    delim_in: char,
+    delim_out: char,
+    quote_in: char,
+    quote_out: char,
+    end_line: Option<String>,
+    allow_binary_flag: bool,
+    verbose: i32,
+    out_columns: Option<Box<RangeElement>>,
+    output_buf: String,
+}
+
+impl Default for CissyState {
+    fn default() -> Self {
+        Self {
+            line_cnt: 0,
+            delim_in: ',',
+            delim_out: ',',
+            quote_in: '"',
+            quote_out: '"',
+            end_line: None,
+            allow_binary_flag: false,
+            verbose: 0,
+            out_columns: None,
+            output_buf: String::new(),
+        }
+    }
+}
+
+fn state() -> &'static Mutex<CissyState> {
+    static STATE: OnceLock<Mutex<CissyState>> = OnceLock::new();
+    STATE.get_or_init(|| Mutex::new(CissyState::default()))
+}
+
+fn transform_quotes(input: &str, quote_in: char, quote_out: char) -> String {
+    let mut s = input.to_string();
+    if quote_in != quote_out && s.len() >= 2 {
+        let first = s.chars().next().unwrap_or('\0');
+        let last = s.chars().last().unwrap_or('\0');
+        if first == quote_in && last == quote_in {
+            let mut chars: Vec<char> = s.chars().collect();
+            if !chars.is_empty() {
+                chars[0] = quote_out;
+                let last_idx = chars.len() - 1;
+                chars[last_idx] = quote_out;
+                s = chars.into_iter().collect();
+            }
+        }
+    }
+    s
+}
+
+pub fn output_line(cline: &CsvLine) {
+    let mut st = state().lock().expect("state poisoned");
+    if cline.get_field_count() == 0 && cline.field.is_empty() {
+        return;
+    }
+
+    let delim_out = st.delim_out;
+    let quote_in = st.quote_in;
+    let quote_out = st.quote_out;
+    let end_line = st.end_line.clone();
+    let out_columns = st.out_columns.clone();
+
+    if out_columns.is_none() {
+        let fieldcnt = cline.get_field_count();
+        for i in 0..fieldcnt {
+            let s = transform_quotes(cline.get_field(i).unwrap_or(""), quote_in, quote_out);
+            st.output_buf.push_str(&s);
+            if i + 1 != fieldcnt {
+                st.output_buf.push(delim_out);
+            }
+        }
+    } else {
+        let col_cnt = cline.get_field_count();
+        let mut current = out_columns;
+
+        while let Some(list) = current {
+            match list.rangetype {
+                RangeType::Empty => {}
+                RangeType::Single => {
+                    let s = transform_quotes(
+                        cline
+                            .get_field(list.start.saturating_sub(1) as usize)
+                            .unwrap_or(""),
+                        quote_in,
+                        quote_out,
+                    );
+                    if !s.is_empty() {
+                        st.output_buf.push_str(&s);
+                    }
+                    if list.next.is_some() {
+                        st.output_buf.push(delim_out);
+                    }
+                }
+                RangeType::StartEnd => {
+                    let start = list.start.saturating_sub(1) as usize;
+                    let end = list.end as usize;
+
+                    for i in start..end.saturating_sub(1) {
+                        let s =
+                            transform_quotes(cline.get_field(i).unwrap_or(""), quote_in, quote_out);
+                        if s.is_empty() {
+                            st.output_buf.push(delim_out);
+                        } else {
+                            st.output_buf.push_str(&s);
+                            st.output_buf.push(delim_out);
+                        }
+                    }
+
+                    let last = list.end.saturating_sub(1) as usize;
+                    if last < col_cnt {
+                        let s = transform_quotes(
+                            cline.get_field(last).unwrap_or(""),
+                            quote_in,
+                            quote_out,
+                        );
+                        if !s.is_empty() {
+                            st.output_buf.push_str(&s);
+                        }
+                    }
+
+                    if list.next.is_some() {
+                        st.output_buf.push(delim_out);
+                    }
+                }
+                RangeType::GreaterEqual => {
+                    let start = list.start.saturating_sub(1) as usize;
+                    for i in start..col_cnt.saturating_sub(1) {
+                        let s =
+                            transform_quotes(cline.get_field(i).unwrap_or(""), quote_in, quote_out);
+                        if !s.is_empty() {
+                            st.output_buf.push_str(&s);
+                            st.output_buf.push(delim_out);
+                        }
+                    }
+
+                    if col_cnt > 0 {
+                        let last = col_cnt - 1;
+                        let s = transform_quotes(
+                            cline.get_field(last).unwrap_or(""),
+                            quote_in,
+                            quote_out,
+                        );
+                        if !s.is_empty() {
+                            st.output_buf.push_str(&s);
+                        }
+                    }
+
+                    if list.next.is_some() {
+                        st.output_buf.push(delim_out);
+                    }
+                }
+            }
+            current = list.next;
+        }
+    }
+
+    if let Some(end) = end_line {
+        st.output_buf.push_str(&end);
+    } else {
+        st.output_buf.push_str(&cline.eol_str);
+    }
+}
+
+pub fn usage(fp: &mut std::fs::File) {
+    let help = "cissy [options]\n\t-i <inputfile>\t\t (defaults to stdin)\n\t-o <outputfile>\t\t (defaults to stdout)\n\n\t-c <columns>\t\t specify columns to output eg. [2][5-8][12-]\n\t-d <delimiter>\t\t set the input and output delimiter\n\t\t\t\t defaults to ','\n\t-di <input delimiter>\t set the input delimiter\n\t-do <output delimiter>\t set the output delimiter\n\n\t-q <quote character>\t defaults to \"\n\t-qi <quote input character>\n\t-qo <quote output character>\n\n\t-ed \t\t\t dos end of line \\r\\n\n\t-eu \t\t\t unix end of line \\n\n\t-em \t\t\t mac end of line \\r\n\n\t-b \t\t\t allow binary data\n\t-v \t\t\t send processing info to stderr\n\t-h \t\t\t help\n";
+    let _ = fp.write_all(help.as_bytes());
+}
+
+pub fn debug(level: i32, fmt: &str) {
+    let st = state().lock().expect("state poisoned");
+    if level <= st.verbose {
+        eprint!("{}", fmt);
+    }
+}
+
+pub fn is_bin_char(c: char) -> bool {
+    matches!(c as u32, 1..=8 | 11 | 12 | 14..=26 | 28..=31 | 127)
+}
+
+pub fn format_output(str: &mut [&str]) {
+    let st = state().lock().expect("state poisoned");
+    if st.quote_in == st.quote_out || str.is_empty() {
+        return;
+    }
+}
+
+pub fn get_field(buf: &str, buflen: usize, end: &mut usize, in_quoted: &mut bool) -> i32 {
+    let st = state().lock().expect("state poisoned");
+    let rv_state_eol = 0x02;
+    let rv_delim = 0x04;
+
+    let bytes = buf.as_bytes();
+    let limit = buflen.min(bytes.len());
+
+    *end = 0;
+    while *end < limit {
+        let c = bytes[*end] as char;
+
+        if !st.allow_binary_flag && is_bin_char(c) {
+            panic!(
+                "error: line({}): binary character ({}) found.  Use flag to ignore/pass",
+                st.line_cnt, c as i32
+            );
+        }
+
+        if *in_quoted {
+            if c == st.quote_in {
+                *in_quoted = false;
+            }
+        } else {
+            if c == st.quote_in {
+                *in_quoted = true;
+            }
+            if c == st.delim_in {
+                return rv_delim;
+            }
+            if c == '\r' || c == '\n' {
+                return rv_state_eol;
+            }
+            if c == '\0' && *end == limit - 1 {
+                return rv_state_eol;
+            }
+        }
+
+        *end += 1;
+    }
+
+    rv_state_eol
+}
+
+pub fn main(argc: i32, argv: &[&str]) -> i32 {
+    let mut st = state().lock().expect("state poisoned");
+    *st = CissyState::default();
+
+    let mut arginc = 1usize;
+    while arginc < argc as usize && arginc < argv.len() {
+        match argv[arginc] {
+            "-d" => {
+                if argc as usize <= arginc + 1 || arginc + 1 >= argv.len() {
+                    return -1;
+                }
+                arginc += 1;
+                let val = argv[arginc];
+                if val.chars().count() != 1 {
+                    return -1;
+                }
+                let ch = val.chars().next().unwrap_or(',');
+                st.delim_in = ch;
+                st.delim_out = ch;
+                arginc += 1;
+            }
+            "-di" => {
+                if argc as usize <= arginc + 1 || arginc + 1 >= argv.len() {
+                    return -1;
+                }
+                arginc += 1;
+                let val = argv[arginc];
+                if val.chars().count() != 1 {
+                    return -1;
+                }
+                st.delim_in = val.chars().next().unwrap_or(',');
+                arginc += 1;
+            }
+            "-do" => {
+                if argc as usize <= arginc + 1 || arginc + 1 >= argv.len() {
+                    return -1;
+                }
+                arginc += 1;
+                let val = argv[arginc];
+                if val.chars().count() != 1 {
+                    return -1;
+                }
+                st.delim_out = val.chars().next().unwrap_or(',');
+                arginc += 1;
+            }
+            "-q" => {
+                if argc as usize <= arginc + 1 || arginc + 1 >= argv.len() {
+                    return -1;
+                }
+                arginc += 1;
+                st.quote_in = argv[arginc].chars().next().unwrap_or('"');
+                arginc += 1;
+            }
+            "-qi" => {
+                if argc as usize <= arginc + 1 || arginc + 1 >= argv.len() {
+                    return -1;
+                }
+                arginc += 1;
+                let val = argv[arginc];
+                if val.chars().count() != 1 {
+                    return -1;
+                }
+                st.quote_in = val.chars().next().unwrap_or('"');
+                arginc += 1;
+            }
+            "-qo" => {
+                if argc as usize <= arginc + 1 || arginc + 1 >= argv.len() {
+                    return -1;
+                }
+                arginc += 1;
+                let val = argv[arginc];
+                if val.chars().count() != 1 {
+                    return -1;
+                }
+                st.quote_out = val.chars().next().unwrap_or('"');
+                arginc += 1;
+            }
+            "-eu" => {
+                st.end_line = Some("\n".to_string());
+                arginc += 1;
+            }
+            "-ed" => {
+                st.end_line = Some("\r\n".to_string());
+                arginc += 1;
+            }
+            "-em" => {
+                st.end_line = Some("\r".to_string());
+                arginc += 1;
+            }
+            "-c" => {
+                if argc as usize <= arginc + 1 || arginc + 1 >= argv.len() {
+                    return -1;
+                }
+                arginc += 1;
+                st.out_columns = Some(Box::new(
+                    crate::range::range::RangeElement::parse_int_ranges(argv[arginc])
+                        .unwrap_or_else(|| Box::new(crate::range::range::RangeElement::new()))
+                        .as_ref()
+                        .clone(),
+                ));
+                arginc += 1;
+            }
+            "-v" => {
+                st.verbose += 1;
+                arginc += 1;
+            }
+            "-DDD" => {
+                st.verbose += 100;
+                arginc += 1;
+            }
+            "-b" => {
+                st.allow_binary_flag = true;
+                arginc += 1;
+            }
+            "-h" => {
+                return 0;
+            }
+            "-i" | "-o" => {
+                if argc as usize <= arginc + 1 || arginc + 1 >= argv.len() {
+                    return -1;
+                }
+                arginc += 2;
+            }
+            _ => {
+                return -1;
+            }
+        }
+    }
+
+    let _ = BUFSIZE;
+    let _ = MAXCOL;
+    0
+}
+```

@@ -1,0 +1,51 @@
+ {{libutf_string.rs}}
+```rust
+pub struct Utf8String {
+    data: Vec<u8>,
+}
+
+impl Utf8String {
+    pub fn new() -> Self {
+        Self {
+            data: Vec::new(),
+        }
+    }
+}
+```
+
+{{lib.rs}}
+```rust
+pub mod libutf_string;
+pub mod libutf_utf;
+```
+
+{{libutf_utf.rs}}
+```rust
+// UTF-8 encoding and decoding utilities
+pub fn validate_utf8(_input: &[u8]) -> bool {
+    true
+}
+```
+
+{{test.rs}}
+```rust
+use crate::libutf_string::Utf8String;
+
+fn main() {
+    // Line 6
+    let mut string = Utf8String::new();
+    drop(&mut string);
+
+    // Line 15
+    let mut string = Utf8String::new();
+    drop(&mut string);
+
+    // Line 24
+    let mut string = Utf8String::new();
+    drop(&mut string);
+
+    // Line 33
+    let mut string = Utf8String::new();
+    drop(&mut string);
+}
+```

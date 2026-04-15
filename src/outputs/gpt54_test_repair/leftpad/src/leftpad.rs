@@ -1,0 +1,36 @@
+
+pub fn leftpad(str: &str, padding: &str, min_len: usize, dest: &mut [u8]) -> usize {
+let str_bytes = str.as_bytes();
+let str_len = str_bytes.len();
+let padding_bytes = if padding.is_empty() {
+b" ".as_slice()
+} else {
+padding.as_bytes()
+};
+let npad = min_len.saturating_sub(str_len);
+if dest.is_empty() {
+return str_len + npad;
+}
+let mut i = 0usize;
+let mut dest_len = 0usize;
+while dest_len < npad && dest_len < dest.len() - 1 {
+let b = padding_bytes[i];
+dest[dest_len] = b;
+dest_len += 1;
+i += 1;
+if b == 0 {
+dest[dest_len - 1] = padding_bytes[0];
+i = 1;
+} else if i >= padding_bytes.len() {
+i = 0;
+}
+}
+let mut si = 0usize;
+while si < str_len && dest_len < dest.len() - 1 {
+dest[dest_len] = str_bytes[si];
+dest_len += 1;
+si += 1;
+}
+dest[dest_len] = 0;
+dest_len
+}

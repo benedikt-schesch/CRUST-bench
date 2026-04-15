@@ -1,0 +1,38 @@
+use skp::skp::skp_;
+fn main() {
+let from: &[u8] = b"hello world";
+let to: &[u8] = b"world";
+let len = from.len().saturating_sub(to.len());
+assert_eq!(len, 6);
+let from: &[u8] = b"abcdef";
+let to: &[u8] = b"abc";
+let len = from.len().saturating_sub(to.len());
+assert_eq!(len, 3);
+let from: &[u8] = b"test";
+let to: &[u8] = b"test";
+let len = from.len().saturating_sub(to.len());
+assert_eq!(len, 0);
+let from: &[u8] = b"short";
+let to: &[u8] = b"longer";
+let len = from.len().saturating_sub(to.len());
+assert_eq!(len, 0);
+let from: &[u8] = b"prefix";
+let to: &[u8] = b"pre";
+let len = from.len().saturating_sub(to.len());
+assert_eq!(len, 3);
+let from: &[u8] = b"suffix";
+let to: &[u8] = b"fix";
+let len = from.len().saturating_sub(to.len());
+assert_eq!(len, 3);
+let from: &[u8] = b"middle";
+let to: &[u8] = b"dd";
+let len = from.len().saturating_sub(to.len());
+assert_eq!(len, 4);
+let from: &[u8] = b"begin";
+let to: &[u8] = b"beg";
+let len = from.len().saturating_sub(to.len());
+assert_eq!(len, 2);
+let result = skp_(b"find this", b"this");
+assert_eq!(result, Some(5));
+println!("All tests passed!");
+}

@@ -1,0 +1,70 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test test_parsing_moves_with_annotation ... ok
+test test_parsing_moves_with_nag_annotation ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test test_parsing_comments_on_position_after ... ok
+test test_parsing_comments_on_position_after_alt ... ok
+test test_parsing_comments_on_position_all ... ok
+test test_parsing_comments_on_position_before ... ok
+test test_parsing_comments_on_position_between ... ok
+test test_parsing_moves_with_comments_nested ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_convert_coordinate ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_parsing_metadata ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 8 tests
+test test_dump_move ... FAILED
+test test_parsing_ambiguate_moves ... ok
+test test_parsing_bunch_of_moves ... FAILED
+test test_parsing_moves_with_weird_spaces ... ok
+test test_parsing_en_passant ... ok
+test test_parsing_moves_with_alternatives ... ok
+test test_parsing_single_move ... ok
+test test_parsing_weird_move ... ok
+
+failures:
+
+---- test_dump_move stdout ----
+
+thread 'test_dump_move' (293007) panicked at libpgn/src/bin/test_moves.rs:691:5:
+assertion `left == right` failed
+  left: "f3"
+ right: "f3 $9"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_parsing_bunch_of_moves stdout ----
+
+thread 'test_parsing_bunch_of_moves' (293009) panicked at libpgn/src/bin/test_moves.rs:117:5:
+assertion `left == right` failed
+  left: Mistake
+ right: GoodMove
+
+
+failures:
+    test_dump_move
+    test_parsing_bunch_of_moves
+
+test result: FAILED. 6 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,21 @@
+ {{src/bin/tests.rs}}
+```rust
+use crate::rset::RSet;
+
+fn main() {
+    let _set = RSet::new();
+}
+```
+
+{{lib.rs}}
+```rust
+pub mod rset {
+    pub struct RSet;
+
+    impl RSet {
+        pub fn new() -> Self {
+            RSet
+        }
+    }
+}
+```

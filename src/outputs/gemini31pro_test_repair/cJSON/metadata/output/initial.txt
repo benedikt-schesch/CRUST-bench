@@ -1,0 +1,70 @@
+```rust
+use std::collections::HashMap;
+use std::fmt;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CJson {
+    Null,
+    Bool(bool),
+    Number(f64),
+    String(String),
+    Array(Vec<CJson>),
+    Object(HashMap<String, CJson>),
+}
+
+#[derive(Debug, Clone)]
+pub enum CJsonError {
+    UnexpectedEOF { pos: usize },
+    UnexpectedToken { ch: char, pos: usize },
+    InvalidLiteral { expected: &'static str, pos: usize },
+    InvalidNumber { pos: usize },
+    InvalidEscape { pos: usize },
+    InvalidUnicodeEscape { pos: usize },
+    ExpectedColon { pos: usize },
+    ExpectedCommaOrEnd { pos: usize },
+}
+
+impl fmt::Display for CJsonError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CJsonError::UnexpectedEOF { pos } => write!(f, "Unexpected EOF at {}", pos),
+            CJsonError::UnexpectedToken { ch, pos } => write!(f, "Unexpected token '{}' at {}", ch, pos),
+            CJsonError::InvalidLiteral { expected, pos } => write!(f, "Invalid literal, expected '{}' at {}", expected, pos),
+            CJsonError::InvalidNumber { pos } => write!(f, "Invalid number at {}", pos),
+            CJsonError::InvalidEscape { pos } => write!(f, "Invalid escape sequence at {}", pos),
+            CJsonError::InvalidUnicodeEscape { pos } => write!(f, "Invalid unicode escape at {}", pos),
+            CJsonError::ExpectedColon { pos } => write!(f, "Expected ':' at {}", pos),
+            CJsonError::ExpectedCommaOrEnd { pos } => write!(f, "Expected ',' or end of structure at {}", pos),
+        }
+    }
+}
+
+impl std::error::Error for CJsonError {}
+
+struct Parser<'a> {
+    input: &'a str,
+    pos: usize,
+}
+
+impl<'a> Parser<'a> {
+    fn new(input: &'a str) -> Self {
+        Parser { input, pos: 0 }
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.input[self.pos..].chars().next()
+    }
+
+    fn next_char(&mut self) -> Option<char> {
+        let ch = self.peek()?;
+        self.pos += ch.len_utf8();
+        Some(ch)
+    }
+
+    fn take_while<F>(&mut self, mut predicate: F) -> &'a str
+    where
+        F: FnMut(char) -> bool,
+    {
+        let start = self.pos;
+        while let Some(ch) = self.peek() {
+            if predicate(ch) {

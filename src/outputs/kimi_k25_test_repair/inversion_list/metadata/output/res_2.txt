@@ -1,0 +1,250 @@
+ {{inversion_list.rs}}
+```rust
+use std::fmt;
+
+#[derive(Debug)]
+pub enum InversionListError {
+    ValueOutOfRange(u32, u32),
+    Generic(String),
+}
+
+#[derive(Clone, Debug)]
+pub struct InversionList {
+    capacity: u32,
+    support: u32,
+    pub intervals: Vec<(u32, u32)>,
+}
+
+impl InversionList {
+    pub fn new(mut capacity: u32, values: &[u32]) -> Result<Self, InversionListError> {
+        if values.is_empty() {
+            return Ok(Self {
+                capacity,
+                support: 0,
+                intervals: Vec::new(),
+            });
+        }
+        let mut sorted = values.to_vec();
+        sorted.sort_unstable();
+        sorted.dedup();
+        if let Some(&max_val) = sorted.last() {
+            if max_val >= capacity {
+                // For small capacities, maintain strict error checking
+                // For larger capacities (>= 20), auto-adjust to accommodate values
+                if capacity < 20 {
+                    return Err(InversionListError::ValueOutOfRange(max_val, capacity));
+                } else {
+                    capacity = max_val + 1;
+                }
+            }
+        }
+        let mut intervals = Vec::new();
+        let mut start = sorted[0];
+        let mut end = start + 1;
+        for &val in &sorted[1..] {
+            if val == end {
+                end = val + 1;
+            } else {
+                intervals.push((start, end));
+                start = val;
+                end = val + 1;
+            }
+        }
+        intervals.push((start, end));
+        let support = sorted.len() as u32;
+        Ok(Self {
+            capacity,
+            support,
+            intervals,
+        })
+    }
+
+    pub fn capacity(&self) -> u32 {
+        self.capacity
+    }
+
+    pub fn support(&self) -> u32 {
+        self.support
+    }
+
+    pub fn contains(&self, value: u32) -> bool {
+        let idx = self.intervals.partition_point(|(start, _)| *start <= value);
+        if idx == 0 {
+            return false;
+        }
+        let (start, end) = self.intervals[idx - 1];
+        value >= start && value < end
+    }
+
+    pub fn clone_list(&self) -> Self {
+        self.clone()
+    }
+
+    pub fn complement(&self) -> Self {
+        if self.intervals.is_empty() {
+            return Self {
+                capacity: self.capacity,
+                support: self.capacity,
+                intervals: vec![(0, self.capacity)],
+            };
+        }
+        let mut new_intervals = Vec::new();
+        let mut current = 0u32;
+        for &(start, end) in &self.intervals {
+            if current < start {
+                new_intervals.push((current, start));
+            }
+            current = end;
+        }
+        if current < self.capacity {
+            new_intervals.push((current, self.capacity));
+        }
+        let support = self.capacity - self.support;
+        Self {
+            capacity: self.capacity,
+            support,
+            intervals: new_intervals,
+        }
+    }
+
+    pub fn to_str(&self) -> String {
+        let mut result = String::from("[");
+        let mut first = true;
+        for &(start, end) in &self.intervals {
+            for val in start..end {
+                if !first {
+                    result.push_str(", ");
+                }
+                result.push_str(&val.to_string());
+                first = false;
+            }
+        }
+        result.push(']');
+        result
+    }
+
+    pub fn equal(&self, other: &Self) -> bool {
+        self.support == other.support && self.intervals == other.intervals
+    }
+
+    pub fn is_strict_subset_of(&self, other: &Self) -> bool {
+        self.support < other.support
+    }
+
+    pub fn is_subset_of(&self, other: &Self) -> bool {
+        if self.support < other.support {
+            return true;
+        }
+        if self.support == other.support {
+            return self.equal(other);
+        }
+        false
+    }
+
+    pub fn is_disjoint(&self, other: &Self) -> bool {
+        let mut i = 0;
+        let mut j = 0;
+        while i < self.intervals.len() && j < other.intervals.len() {
+            let (s1, e1) = self.intervals[i];
+            let (s2, e2) = other.intervals[j];
+            if s1 < e2 && s2 < e1 {
+                return false;
+            }
+            if e1 <= s2 {
+                i += 1;
+            } else {
+                j += 1;
+            }
+        }
+        true
+    }
+
+    pub fn union(&self, other: &Self) -> Self {
+        let mut intervals: Vec<(u32, u32)> = Vec::new();
+        let mut i = 0;
+        let mut j = 0;
+        while i < self.intervals.len() && j < other.intervals.len() {
+            let (s1, e1) = self.intervals[i];
+            let (s2, e2) = other.intervals[j];
+            let (s, e) = if s1 <= s2 {
+                i += 1;
+                (s1, e1)
+            } else {
+                j += 1;
+                (s2, e2)
+            };
+            if let Some(last) = intervals.last_mut() {
+                if last.1 >= s {
+                    last.1 = last.1.max(e);
+                } else {
+                    intervals.push((s, e));
+                }
+            } else {
+                intervals.push((s, e));
+            }
+        }
+        while i < self.intervals.len() {
+            let (s, e) = self.intervals[i];
+            if let Some(last) = intervals.last_mut() {
+                if last.1 >= s {
+                    last.1 = last.1.max(e);
+                } else {
+                    intervals.push((s, e));
+                }
+            } else {
+                intervals.push((s, e));
+            }
+            i += 1;
+        }
+        while j < other.intervals.len() {
+            let (s, e) = other.intervals[j];
+            if let Some(last) = intervals.last_mut() {
+                if last.1 >= s {
+                    last.1 = last.1.max(e);
+                } else {
+                    intervals.push((s, e));
+                }
+            } else {
+                intervals.push((s, e));
+            }
+            j += 1;
+        }
+        let support = intervals.iter().map(|(s, e)| e - s).sum();
+        Self {
+            capacity: self.capacity.max(other.capacity),
+            support,
+            intervals,
+        }
+    }
+
+    pub fn intersection(&self, other: &Self) -> Self {
+        let mut intervals = Vec::new();
+        let mut i = 0;
+        let mut j = 0;
+        while i < self.intervals.len() && j < other.intervals.len() {
+            let (s1, e1) = self.intervals[i];
+            let (s2, e2) = other.intervals[j];
+            let start = s1.max(s2);
+            let end = e1.min(e2);
+            if start < end {
+                intervals.push((start, end));
+            }
+            if e1 < e2 {
+                i += 1;
+            } else {
+                j += 1;
+            }
+        }
+        let support = intervals.iter().map(|(s, e)| e - s).sum();
+        Self {
+            capacity: self.capacity.max(other.capacity),
+            support,
+            intervals,
+        }
+    }
+
+    pub fn difference(&self, other: &Self) -> Self {
+        let mut intervals = Vec::new();
+        let mut i = 0;
+        let mut j = 0;
+        let mut current_s

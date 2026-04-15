@@ -1,0 +1,65 @@
+```rust
+// Generated Rust Code
+```
+
+{{hash.rs}}
+```rust
+pub struct Hash<T> {
+    buckets: Vec<Vec<T>>,
+    hash_function: Box<dyn Fn(&T) -> u32>,
+    max_key: u32,
+}
+
+impl<T> Hash<T> {
+    /// Create a new hash table with `max_key` buckets.
+    /// The `hash_function` is used to compute a hash for each element.
+    pub fn new(max_key: u32, hash_function: impl Fn(&T) -> u32 + 'static) -> Self {
+        let mut buckets = Vec::with_capacity((max_key + 1) as usize);
+        buckets.resize_with((max_key + 1) as usize, Vec::new);
+        Self {
+            buckets,
+            hash_function: Box::new(hash_function),
+            max_key,
+        }
+    }
+
+    /// Inserts an element if no equal element exists (using the provided compare_equal).
+    /// Returns true if the element was inserted.
+    pub fn insert(&mut self, element: T, compare_equal: impl Fn(&T, &T) -> bool) -> bool {
+        if self.element_exists(&element, &compare_equal) {
+            return false;
+        }
+        let ix = (self.hash_function)(&element) as usize;
+        if ix <= self.max_key as usize {
+            self.buckets[ix].push(element);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Returns true if an element equal (per compare_equal) to `element` exists.
+    pub fn element_exists(&self, element: &T, compare_equal: impl Fn(&T, &T) -> bool) -> bool {
+        let ix = (self.hash_function)(element) as usize;
+        if ix <= self.max_key as usize {
+            for e in &self.buckets[ix] {
+                if compare_equal(e, element) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Deletes an element (using compare_equal) from the hash table.
+    /// Returns true if the element was found and removed.
+    pub fn delete(&mut self, element: &T, compare_equal: impl Fn(&T, &T) -> bool) -> bool {
+        let ix = (self.hash_function)(element) as usize;
+        if ix <= self.max_key as usize {
+            let bucket = &mut self.buckets[ix];
+            if let Some(pos) = bucket.iter().position(|e| compare_equal(e, element)) {
+                bucket.remove(pos);
+                return true;
+            }
+        }
+        false

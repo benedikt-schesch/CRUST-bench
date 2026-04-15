@@ -1,0 +1,5 @@
+```rust
+{{lib.rs}}
+// Generated Rust Code
+pub mod base122;
+```

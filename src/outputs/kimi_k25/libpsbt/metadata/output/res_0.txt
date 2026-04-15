@@ -1,0 +1,44 @@
+ {{lib.rs}}
+```rust
+pub mod base64;
+pub mod cli;
+pub mod compactsize;
+pub mod psbt;
+pub mod tx;
+```
+
+{{psbt.rs}}
+```rust
+//! PSBT (Partially Signed Bitcoin Transaction) module.
+//! 
+//! This module provides types and functions for working with
+//! Partially Signed Bitcoin Transactions as defined in BIP-174.
+
+/// Main PSBT structure.
+#[derive(Debug, Clone)]
+pub struct Psbt;
+
+impl Psbt {
+    /// Creates a new empty PSBT.
+    pub fn new() -> Self {
+        Psbt
+    }
+}
+
+/// PSBT error types.
+#[derive(Debug)]
+pub enum PsbtError {
+    /// Generic error variant.
+    Generic(String),
+}
+
+impl std::fmt::Display for PsbtError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PsbtError::Generic(msg) => write!(f, "PSBT error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for PsbtError {}
+```

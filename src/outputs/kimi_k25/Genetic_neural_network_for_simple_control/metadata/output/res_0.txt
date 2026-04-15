@@ -1,0 +1,775 @@
+ {{lib.rs}}
+```rust
+pub mod fit_functions;
+pub mod genetic_operations;
+pub mod general_math;
+pub mod model_system;
+pub mod neural_network;
+pub mod pid_controller;
+pub mod signal_designer;
+pub mod systems_builder;
+pub mod population;
+pub mod sort;
+pub mod activation_fnc;
+pub mod input_toolbox;
+pub mod matrix_math;
+```
+
+{{activation_fnc.rs}}
+```rust
+//! Activation functions for neural networks
+
+/// Sigmoid activation function
+pub fn sigmoid(x: f64) -> f64 {
+    1.0 / (1.0 + (-x).exp())
+}
+
+/// ReLU activation function
+pub fn relu(x: f64) -> f64 {
+    if x > 0.0 { x } else { 0.0 }
+}
+
+/// Tanh activation function
+pub fn tanh(x: f64) -> f64 {
+    x.tanh()
+}
+
+/// Linear activation function
+pub fn linear(x: f64) -> f64 {
+    x
+}
+
+/// Derivative of sigmoid
+pub fn sigmoid_derivative(x: f64) -> f64 {
+    let s = sigmoid(x);
+    s * (1.0 - s)
+}
+
+/// Derivative of ReLU
+pub fn relu_derivative(x: f64) -> f64 {
+    if x > 0.0 { 1.0 } else { 0.0 }
+}
+```
+
+{{sort.rs}}
+```rust
+//! Sorting utilities
+
+/// Quick sort implementation for slices
+pub fn quickSort<T: Ord>(arr: &mut [T]) {
+    arr.sort_unstable();
+}
+
+/// Sort by fitness values (indices)
+pub fn sort_by_fitness<T: Clone>(population: &[T], fitness: &[f64]) -> Vec<T> {
+    let mut indices: Vec<usize> = (0..population.len()).collect();
+    indices.sort_by(|&a, &b| fitness[a].partial_cmp(&fitness[b]).unwrap());
+    
+    indices.into_iter()
+        .map(|i| population[i].clone())
+        .collect()
+}
+```
+
+{{fit_functions.rs}}
+```rust
+//! Fitness functions for genetic algorithm
+
+/// Calculate mean squared error
+pub fn mse(predicted: &[f64], actual: &[f64]) -> f64 {
+    predicted.iter()
+        .zip(actual.iter())
+        .map(|(p, a)| (p - a).powi(2))
+        .sum::<f64>() / predicted.len() as f64
+}
+
+/// Calculate root mean squared error
+pub fn rmse(predicted: &[f64], actual: &[f64]) -> f64 {
+    mse(predicted, actual).sqrt()
+}
+
+/// Simple fitness function (inverse of error)
+pub fn simple_fitness(error: f64) -> f64 {
+    if error == 0.0 {
+        f64::MAX
+    } else {
+        1.0 / error
+    }
+}
+```
+
+{{genetic_operations.rs}}
+```rust
+//! Genetic operations: selection, crossover, mutation
+
+use rand::Rng;
+
+/// Select best individuals based on fitness
+pub fn selbest<T: Clone>(population: &[T], fitness: &[f64], count: usize) -> Vec<T> {
+    let mut indices: Vec<usize> = (0..population.len()).collect();
+    indices.sort_by(|&a, &b| fitness[b].partial_cmp(&fitness[a]).unwrap());
+    
+    indices.into_iter()
+        .take(count)
+        .map(|i| population[i].clone())
+        .collect()
+}
+
+/// Random selection
+pub fn selrand<T: Clone>(population: &[T], count: usize) -> Vec<T> {
+    let mut rng = rand::thread_rng();
+    (0..count)
+        .map(|_| population[rng.gen_range(0..population.len())].clone())
+        .collect()
+}
+
+/// Tournament selection
+pub fn selturn<T: Clone>(population: &[T], fitness: &[f64], count: usize) -> Vec<T> {
+    let mut rng = rand::thread_rng();
+    let mut selected = Vec::new();
+    
+    for _ in 0..count {
+        let idx1 = rng.gen_range(0..population.len());
+        let idx2 = rng.gen_range(0..population.len());
+        
+        if fitness[idx1] > fitness[idx2] {
+            selected.push(population[idx1].clone());
+        } else {
+            selected.push(population[idx2].clone());
+        }
+    }
+    
+    selected
+}
+
+/// Crossover operation
+pub fn crossover(parent1: &[f64], parent2: &[f64], rate: f64) -> (Vec<f64>, Vec<f64>) {
+    let mut rng = rand::thread_rng();
+    if rng.gen::<f64>() > rate {
+        return (parent1.to_vec(), parent2.to_vec());
+    }
+    
+    let point = rng.gen_range(1..parent1.len());
+    let mut child1 = parent1[..point].to_vec();
+    child1.extend_from_slice(&parent2[point..]);
+    
+    let mut child2 = parent2[..point].to_vec();
+    child2.extend_from_slice(&parent1[point..]);
+    
+    (child1, child2)
+}
+
+/// Mutation operation
+pub fn mutate(individual: &mut [f64], rate: f64, strength: f64) {
+    let mut rng = rand::thread_rng();
+    for gene in individual.iter_mut() {
+        if rng.gen::<f64>() < rate {
+            *gene += rng.gen::<f64>() * strength * 2.0 - strength;
+        }
+    }
+}
+```
+
+{{pid_controller.rs}}
+```rust
+//! PID Controller implementation
+
+/// PID Controller structure
+pub struct PID {
+    pub kp: f64,
+    pub ki: f64,
+    pub kd: f64,
+    pub integral: f64,
+    pub prev_error: f64,
+    pub setpoint: f64,
+}
+
+impl PID {
+    /// Create new PID controller
+    pub fn new(kp: f64, ki: f64, kd: f64) -> Self {
+        PID {
+            kp,
+            ki,
+            kd,
+            integral: 0.0,
+            prev_error: 0.0,
+            setpoint: 0.0,
+        }
+    }
+    
+    /// Update PID controller with current value and dt
+    pub fn update(&mut self, current: f64, dt: f64) -> f64 {
+        let error = self.setpoint - current;
+        self.integral += error * dt;
+        let derivative = (error - self.prev_error) / dt;
+        self.prev_error = error;
+        
+        self.kp * error + self.ki * self.integral + self.kd * derivative
+    }
+    
+    /// Set setpoint
+    pub fn set_setpoint(&mut self, setpoint: f64) {
+        self.setpoint = setpoint;
+    }
+}
+
+/// Create new PID controller (C-style API)
+pub fn createNewPidController(kp: f64, ki: f64, kd: f64) -> PID {
+    PID::new(kp, ki, kd)
+}
+
+/// Delete PID controller (consume it)
+pub fn deletePid(_pid: PID) {
+    // In Rust, ownership system handles cleanup
+}
+```
+
+{{population.rs}}
+```rust
+//! Population management for genetic algorithm
+
+/// Create input population
+pub fn createInputPop(size: usize, input_size: usize) -> Vec<Vec<f64>> {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    (0..size)
+        .map(|_| (0..input_size).map(|_| rng.gen::<f64>()).collect())
+        .collect()
+}
+
+/// Create structure for neural network
+pub fn createStructure(layers: &[usize]) -> Vec<Vec<Vec<f64>>> {
+    layers.windows(2)
+        .map(|w| {
+            let rows = w[1];
+            let cols = w[0] + 1; // +1 for bias
+            createRandomMatrix(rows, cols)
+        })
+        .collect()
+}
+
+/// Create random matrix
+fn createRandomMatrix(rows: usize, cols: usize) -> Vec<Vec<f64>> {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    (0..rows)
+        .map(|_| (0..cols).map(|_| rng.gen::<f64>() * 2.0 - 1.0).collect())
+        .collect()
+}
+
+/// Create population of structures
+pub fn createPopulation(pop_size: usize, structure: &[Vec<Vec<f64>>]) -> Vec<Vec<Vec<Vec<f64>>>> {
+    (0..pop_size)
+        .map(|_| structure.clone())
+        .collect()
+}
+```
+
+{{neural_network.rs}}
+```rust
+//! Neural network implementation
+
+use crate::activation_fnc;
+use crate::matrix_math::{Matrix, matrixMul};
+
+/// Neural Network structure
+pub struct NeuralNetwork {
+    pub layers: Vec<Vec<Vec<f64>>>,
+    pub activations: Vec<fn(f64) -> f64>,
+}
+
+impl NeuralNetwork {
+    /// Forward pass
+    pub fn forward(&self, inputs: &[f64]) -> Vec<f64> {
+        let mut current = inputs.to_vec();
+        
+        for (layer_idx, layer) in self.layers.iter().enumerate() {
+            let mut next = Vec::with_capacity(layer.len());
+            for neuron in layer.iter() {
+                let sum: f64 = neuron.iter().enumerate()
+                    .map(|(i, w)| {
+                        if i < current.len() {
+                            current[i] * w
+                        } else {
+                            *w // bias
+                        }
+                    })
+                    .sum();
+                let activated = if layer_idx < self.activations.len() {
+                    (self.activations[layer_idx])(sum)
+                } else {
+                    sum
+                };
+                next.push(activated);
+            }
+            current = next;
+        }
+        
+        current
+    }
+}
+
+/// Create neural network
+pub fn createNeuralNetwork(layers: &[usize]) -> NeuralNetwork {
+    let structure = crate::population::createStructure(layers);
+    NeuralNetwork {
+        layers: structure,
+        activations: vec![activation_fnc::sigmoid; layers.len() - 1],
+    }
+}
+
+/// Delete neural network
+pub fn deleteNeuralNetwork(_nn: NeuralNetwork) {
+    // Ownership handles cleanup
+}
+```
+
+{{model_system.rs}}
+```rust
+//! Model system for simulation
+
+use crate::neural_network::NeuralNetwork;
+use crate::pid_controller::PID;
+
+/// System model trait
+pub trait SystemModel {
+    fn step(&mut self, input: f64, dt: f64) -> f64;
+    fn get_output(&self) -> f64;
+}
+
+/// Simple first order system
+pub struct FirstOrderSystem {
+    pub gain: f64,
+    pub time_constant: f64,
+    pub output: f64,
+}
+
+impl SystemModel for FirstOrderSystem {
+    fn step(&mut self, input: f64, dt: f64) -> f64 {
+        let derivative = (self.gain * input - self.output) / self.time_constant;
+        self.output += derivative * dt;
+        self.output
+    }
+    
+    fn get_output(&self) -> f64 {
+        self.output
+    }
+}
+
+/// Create first order system
+pub fn createFirstOrderSystem(gain: f64, time_constant: f64) -> FirstOrderSystem {
+    FirstOrderSystem {
+        gain,
+        time_constant,
+        output: 0.0,
+    }
+}
+
+/// Simulate system with controller
+pub fn simulate_system(
+    system: &mut dyn SystemModel,
+    controller: &mut PID,
+    setpoint: f64,
+    duration: f64,
+    dt: f64,
+) -> Vec<f64> {
+    let steps = (duration / dt) as usize;
+    let mut outputs = Vec::with_capacity(steps);
+    
+    controller.set_setpoint(setpoint);
+    
+    for _ in 0..steps {
+        let output = system.get_output();
+        let control = controller.update(output, dt);
+        system.step(control, dt);
+        outputs.push(output);
+    }
+    
+    outputs
+}
+```
+
+{{matrix_math.rs}}
+```rust
+//! Matrix math operations
+
+/// Matrix structure
+pub struct Matrix {
+    pub rows: usize,
+    pub cols: usize,
+    pub data: Vec<f64>,
+}
+
+impl Matrix {
+    /// Create new matrix
+    pub fn new(rows: usize, cols: usize) -> Self {
+        Matrix {
+            rows,
+            cols,
+            data: vec![0.0; rows * cols],
+        }
+    }
+    
+    /// Get value at (row, col)
+    pub fn get(&self, row: usize, col: usize) -> f64 {
+        self.data[row * self.cols + col]
+    }
+    
+    /// Set value at (row, col)
+    pub fn set(&mut self, row: usize, col: usize, val: f64) {
+        self.data[row * self.cols + col] = val;
+    }
+}
+
+/// Matrix multiplication
+pub fn matrixMul(a: &Matrix, b: &Matrix) -> Matrix {
+    assert_eq!(a.cols, b.rows);
+    let mut result = Matrix::new(a.rows, b.cols);
+    
+    for i in 0..a.rows {
+        for j in 0..b.cols {
+            let mut sum = 0.0;
+            for k in 0..a.cols {
+                sum += a.get(i, k) * b.get(k, j);
+            }
+            result.set(i, j, sum);
+        }
+    }
+    
+    result
+}
+
+/// Matrix subtraction and addition (in-place)
+pub fn matrixSubstAdd(a: &mut Matrix, b: &Matrix, subtract: bool) {
+    assert_eq!(a.rows, b.rows);
+    assert_eq!(a.cols, b.cols);
+    
+    for i in 0..a.data.len() {
+        if subtract {
+            a.data[i] -= b.data[i];
+        } else {
+            a.data[i] += b.data[i];
+        }
+    }
+}
+
+/// Element-wise addition
+pub fn matrixAdd(a: &mut Matrix, b: &Matrix) {
+    matrixSubstAdd(a, b, false);
+}
+
+/// Element-wise subtraction
+pub fn matrixSub(a: &mut Matrix, b: &Matrix) {
+    matrixSubstAdd(a, b, true);
+}
+```
+
+{{signal_designer.rs}}
+```rust
+//! Signal generation and design
+
+/// Signal types
+pub enum Signal {
+    Step(f64),
+    Sine(f64, f64), // amplitude, frequency
+    Square(f64, f64),
+    Random,
+}
+
+impl Signal {
+    /// Get value at time t
+    pub fn value(&self, t: f64) -> f64 {
+        match self {
+            Signal::Step(amplitude) => {
+                if t > 0.0 { *amplitude } else { 0.0 }
+            },
+            Signal::Sine(amp, freq) => {
+                amp * (2.0 * std::f64::consts::PI * freq * t).sin()
+            },
+            Signal::Square(amp, freq) => {
+                let period = 1.0 / freq;
+                if (t % period) < (period / 2.0) { *amp } else { -*amp }
+            },
+            Signal::Random => {
+                use rand::Rng;
+                rand::thread_rng().gen::<f64>()
+            },
+        }
+    }
+}
+
+/// CLI signal selector
+pub fn cliSignalSelector() -> Signal {
+    Signal::Step(1.0)
+}
+
+/// Delete signal (consume)
+pub fn deleteSignal(_signal: Signal) {
+    // Ownership handles cleanup
+}
+```
+
+{{systems_builder.rs}}
+```rust
+//! System builder for creating control systems
+
+use crate::pid_controller::PID;
+use crate::signal_designer::Signal;
+
+/// System configuration
+pub struct SystemConfig {
+    pub pid_params: (f64, f64, f64),
+    pub signal_type: Signal,
+}
+
+/// Select system configuration
+pub fn selectSystem() -> SystemConfig {
+    SystemConfig {
+        pid_params: (1.0, 0.1, 0.01),
+        signal_type: Signal::Step(1.0),
+    }
+}
+
+/// Build PID from config
+pub fn build_pid(config: &SystemConfig) -> PID {
+    let (kp, ki, kd) = config.pid_params;
+    PID::new(kp, ki, kd)
+}
+```
+
+{{general_math.rs}}
+```rust
+//! General mathematical utilities
+
+/// Clamp value between min and max
+pub fn clamp(val: f64, min: f64, max: f64) -> f64 {
+    val.max(min).min(max)
+}
+
+/// Map value from one range to another
+pub fn map(val: f64, in_min: f64, in_max: f64, out_min: f64, out_max: f64) -> f64 {
+    (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+}
+
+/// Calculate standard deviation
+pub fn std_dev(values: &[f64]) -> f64 {
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    let variance = values.iter()
+        .map(|v| (v - mean).powi(2))
+        .sum::<f64>() / values.len() as f64;
+    variance.sqrt()
+}
+```
+
+{{input_toolbox.rs}}
+```rust
+//! Input handling utilities
+
+/// Normalize input to [0, 1]
+pub fn normalize(val: f64, min: f64, max: f64) -> f64 {
+    (val - min) / (max - min)
+}
+
+/// Denormalize input from [0, 1]
+pub fn denormalize(val: f64, min: f64, max: f64) -> f64 {
+    val * (max - min) + min
+}
+
+/// Scale input vector
+pub fn scale_vector(vec: &mut [f64], min: f64, max: f64) {
+    for val in vec.iter_mut() {
+        *val = normalize(*val, min, max);
+    }
+}
+```
+
+{{test_neural_network.rs}}
+```rust
+use Genetic_neural_network_for_simple_control::neural_network::*;
+use Genetic_neural_network_for_simple_control::population::*;
+use Genetic_neural_network_for_simple_control::matrix_math::*;
+
+fn main() {
+    // Test neural network creation
+    let nn = createNeuralNetwork(&[2, 3, 1]);
+    
+    // Test forward pass
+    let inputs = vec![0.5, 0.3];
+    let output = nn.forward(&inputs);
+    
+    // Process output with type annotation fix
+    for val in output.iter() {
+        // Fix for E0282: Add explicit type annotation or cast
+        let val_f64: f64 = *val;
+        let rounded = (val_f64 * 10_000.0_f64).round() / 10_000.0_f64;
+        println!("Rounded output: {}", rounded);
+    }
+    
+    // Alternative fix using turbofish if val was generic
+    // let rounded = ((*val as f64) * 10_000.0).round() / 10_000.0;
+    
+    deleteNeuralNetwork(nn);
+}
+```
+
+{{test_activation_func.rs}}
+```rust
+use Genetic_neural_network_for_simple_control::activation_fnc::*;
+
+fn main() {
+    let x = 0.5;
+    println!("Sigmoid({}) = {}", x, sigmoid(x));
+    println!("ReLU({}) = {}", x, relu(x));
+    println!("Tanh({}) = {}", x, tanh(x));
+}
+```
+
+{{test_full_run.rs}}
+```rust
+use Genetic_neural_network_for_simple_control::sort::quickSort;
+use Genetic_neural_network_for_simple_control::fit_functions::*;
+use Genetic_neural_network_for_simple_control::genetic_operations::*;
+use Genetic_neural_network_for_simple_control::pid_controller::*;
+use Genetic_neural_network_for_simple_control::population::*;
+use Genetic_neural_network_for_simple_control::neural_network::*;
+use Genetic_neural_network_for_simple_control::model_system::*;
+
+fn main() {
+    println!("Full system test - all modules loaded successfully");
+}
+```
+
+{{test_genetic_operations.rs}}
+```rust
+use Genetic_neural_network_for_simple_control::genetic_operations::{selbest, selrand, selturn};
+use Genetic_neural_network_for_simple_control::population::{createInputPop, createStructure, createPopulation};
+
+fn main() {
+    let pop = createInputPop(10, 5);
+    let fitness: Vec<f64> = (0..10).map(|i| i as f64).collect();
+    
+    let best = selbest(&pop, &fitness, 3);
+    let random = selrand(&pop, 3);
+    let tournament = selturn(&pop, &fitness, 3);
+    
+    println!("Selection operations completed");
+}
+```
+
+{{test_matrixes.rs}}
+```rust
+use Genetic_neural_network_for_simple_control::matrix_math::{Matrix, matrixSubstAdd, matrixMul};
+use Genetic_neural_network_for_simple_control::activation_fnc::*;
+
+fn main() {
+    let mut m1 = Matrix::new(2, 2);
+    m1.set(0, 0, 1.0);
+    m1.set(1, 1, 1.0);
+    
+    let m2 = Matrix::new(2, 2);
+    
+    let m3 = matrixMul(&m1, &m2);
+    println!("Matrix multiplication completed");
+}
+```
+
+{{test_model_system.rs}}
+```rust
+use Genetic_neural_network_for_simple_control::model_system::{
+    createFirstOrderSystem, simulate_system, SystemModel
+};
+use Genetic_neural_network_for_simple_control::neural_network::{
+    createNeuralNetwork, deleteNeuralNetwork
+};
+use Genetic_neural_network_for_simple_control::population::{
+    createInputPop, createStructure
+};
+use Genetic_neural_network_for_simple_control::pid_controller::{
+    createNewPidController, deletePid
+};
+
+fn main() {
+    let mut system = createFirstOrderSystem(1.0, 0.5);
+    let mut pid = createNewPidController(1.0, 0.1, 0.01);
+    
+    let outputs = simulate_system(&mut system, &mut pid, 1.0, 10.0, 0.01);
+    println!("Simulation completed with {} steps", outputs.len());
+    
+    deletePid(pid);
+}
+```
+
+{{test_pid_controller.rs}}
+```rust
+use Genetic_neural_network_for_simple_control::pid_controller::{
+    createNewPidController, deletePid, PID
+};
+
+fn main() {
+    let mut pid = createNewPidController(1.0, 0.5, 0.1);
+    pid.set_setpoint(10.0);
+    
+    let output = pid.update(5.0, 0.1);
+    println!("PID output: {}", output);
+    
+    deletePid(pid);
+}
+```
+
+{{test_population.rs}}
+```rust
+use Genetic_neural_network_for_simple_control::population::{
+    createInputPop, createStructure, createPopulation
+};
+
+fn main() {
+    let inputs = createInputPop(100, 10);
+    let structure = createStructure(&[10, 5, 1]);
+    let pop = createPopulation(50, &structure);
+    
+    println!("Created population with {} individuals", pop.len());
+}
+```
+
+{{test_signal_designer.rs}}
+```rust
+use Genetic_neural_network_for_simple_control::signal_designer::{
+    Signal, cliSignalSelector, deleteSignal
+};
+
+fn main() {
+    let signal = cliSignalSelector();
+    let val = signal.value(1.0);
+    println!("Signal value at t=1.0: {}", val);
+    
+    let sine = Signal::Sine(1.0, 0.5);
+    println!("Sine value: {}", sine.value(2.0));
+    
+    deleteSignal(signal);
+}
+```
+
+{{test_sort.rs}}
+```rust
+use Genetic_neural_network_for_simple_control::sort::quickSort;
+
+fn main() {
+    let mut data = vec![3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0, 6.0];
+    quickSort(&mut data);
+    println!("Sorted: {:?}", data);
+}
+```
+
+{{test_system_builder.rs}}
+```rust
+use Genetic_neural_network_for_simple_control::systems_builder::selectSystem;
+use Genetic_neural_network_for_simple_control::pid_controller::{deletePid, PID};
+use Genetic_neural_network_for_simple_control::signal_designer::Signal;
+
+fn main() {
+    let config = selectSystem();
+    let pid = PID::new(config.pid_params.0, config.pid_params.1, config.pid_params.2);
+    println!("System selected and PID created");
+    deletePid(pid);
+}
+```

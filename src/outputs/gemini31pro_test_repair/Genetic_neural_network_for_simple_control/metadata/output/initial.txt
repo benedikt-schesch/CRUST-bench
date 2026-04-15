@@ -1,0 +1,55 @@
+de;
+            
+            if sys_output > max_y { max_y = sys_output; }
+            if pre_e > max_e { max_e = pre_e; }
+            if dy > max_dy { max_dy = dy; }
+            if ddy > max_ddy { max_ddy = ddy; }
+            if de > max_de { max_de = de; }
+            if dde > max_dde { max_dde = dde; }
+            
+            iy += sys_output;
+            iu += cur_value;
+            ie += pre_e;
+            
+            if j > sig_length - 1.0 {
+                sum += sys_output;
+                count += 1;
+            }
+            
+            j += sig_dt;
+        }
+        
+        let mut analyzed_value = max_sig - (sum / count as f32) + penalty;
+        if analyzed_value < 0.0 {
+            analyzed_value *= -1.0;
+        }
+        if iy < 0.0 { iy *= -1.0; }
+        if iu < 0.0 { iu *= -1.0; }
+        if ie < 0.0 { ie *= -1.0; }
+        
+        if analyzed_value < min {
+            min = analyzed_value;
+            data[0] = max_e;
+            data[1] = cur_value;
+            data[2] = max_y;
+            data[3] = max_de;
+            data[4] = max_dde;
+            data[5] = ie;
+            data[6] = cur_value / out_dt;
+            data[7] = data[6] / out_dt;
+            data[8] = iu;
+            data[9] = max_dy;
+            data[10] = max_ddy;
+            data[11] = iy;
+        }
+        
+        cur_value += for_values[2];
+    }
+}
+
+pub fn findUForSystemAndSignal(system_nn: &mut SystemNN, data: &mut [f32; 12]) {
+    let for_value_one = [0.0, 10000.0, 1000.0];
+    findUOneRound(system_nn, &for_value_one, data);
+    let for_value_two = [data[1] - 100.0, data[1] + 100.0, 10.0];
+    findUOneRound(system_nn, &for_value_two, data);
+    let for_value_three = [data[1] - 10.0, data[1] + 10.0, 1.0

@@ -1,0 +1,81 @@
+// Generated Rust Code
+```rust
+const MAX_CARDINALITY: usize = 1 << 16;
+const LOW_CUTOFF: usize = 1 << 12;
+const HIGH_CUTOFF: usize = MAX_CARDINALITY - LOW_CUTOFF;
+const MAX_ITEM: u16 = 0xFFFF;
+const MAX_SIZE: u16 = (1 << 16) - 1;
+
+pub struct RSet {
+    pub buffer: Vec<u16>,
+    pub size: usize,
+}
+
+impl RSet {
+    pub fn new() -> Self {
+        let mut set = RSet {
+            buffer: vec![0; 1 + 8],
+            size: 8,
+        };
+        set.truncate();
+        set
+    }
+
+    pub fn free(&mut self) {
+        self.buffer.clear();
+        self.size = 0;
+    }
+
+    fn is_empty(&self) -> bool {
+        self.buffer.len() >= 2 && self.buffer[0] == 2 && self.buffer[1] == MAX_ITEM
+    }
+
+    fn is_full(&self) -> bool {
+        self.buffer.len() >= 1 && self.buffer[0] == 0
+    }
+
+    fn is_bitset(&self) -> bool {
+        let cardinality = self.buffer[0] as usize;
+        cardinality > LOW_CUTOFF && cardinality <= HIGH_CUTOFF
+    }
+
+    fn is_array(&self) -> bool {
+        let cardinality = self.buffer[0] as usize;
+        cardinality <= LOW_CUTOFF
+    }
+
+    fn is_inverted_array(&self) -> bool {
+        let cardinality = self.buffer[0] as usize;
+        cardinality > HIGH_CUTOFF
+    }
+
+    pub fn cardinality(&self) -> usize {
+        if self.is_full() {
+            return MAX_CARDINALITY;
+        }
+        if self.is_empty() {
+            return 0;
+        }
+        self.buffer[0] as usize
+    }
+
+    pub fn truncate(&mut self) -> bool {
+        if self.buffer.len() < 2 {
+            self.buffer.resize(2, 0);
+        }
+        self.buffer[0] = 2;
+        self.buffer[1] = MAX_ITEM;
+        true
+    }
+
+    pub fn fill(&mut self) -> bool {
+        if self.buffer.is_empty() {
+            self.buffer.push(0);
+        }
+        self.buffer[0] = 0;
+        true
+    }
+
+    pub fn import(buffer: &[u8], length: usize) -> Self {
+        let mut size = if length > 0 { length } else { 1 };
+        let c_max

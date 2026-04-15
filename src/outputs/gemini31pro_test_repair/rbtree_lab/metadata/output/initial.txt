@@ -1,0 +1,78 @@
+```rust
+// Generated Rust Code
+use std::cell::RefCell;
+use std::rc::Rc;
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Color {
+    Red,
+    Black,
+}
+
+pub type Key = i32;
+pub type NodeRef = Rc<RefCell<Node>>;
+
+#[derive(Debug, Clone)]
+pub struct Node {
+    pub key: Key,
+    pub color: Color,
+    pub left: Option<NodeRef>,   // None == NIL
+    pub right: Option<NodeRef>,  // None == NIL
+    pub parent: Option<NodeRef>, // None == NIL / root parent
+}
+
+#[derive(Debug, Clone)]
+pub struct RBTree {
+    /// Root of the tree. `None` means the tree is empty (NIL).
+    pub root: Option<NodeRef>,
+}
+
+impl RBTree {
+    pub fn new() -> Self {
+        RBTree { root: None }
+    }
+
+    /// Performs a right rotation around non-NIL node `x`.
+    pub fn right_rotate(&mut self, x: NodeRef) {
+        let y = x.borrow().left.clone().unwrap();
+        
+        x.borrow_mut().left = y.borrow().right.clone();
+        
+        if let Some(y_right) = y.borrow().right.clone() {
+            y_right.borrow_mut().parent = Some(x.clone());
+        }
+        
+        y.borrow_mut().parent = x.borrow().parent.clone();
+        
+        if let Some(x_parent) = x.borrow().parent.clone() {
+            let is_left = {
+                if let Some(ref left) = x_parent.borrow().left {
+                    Rc::ptr_eq(left, &x)
+                } else {
+                    false
+                }
+            };
+            if is_left {
+                x_parent.borrow_mut().left = Some(y.clone());
+            } else {
+                x_parent.borrow_mut().right = Some(y.clone());
+            }
+        } else {
+            self.root = Some(y.clone());
+        }
+        
+        y.borrow_mut().right = Some(x.clone());
+        x.borrow_mut().parent = Some(y.clone());
+    }
+
+    /// Performs a left rotation around non-NIL node `x`.
+    pub fn left_rotate(&mut self, x: NodeRef) {
+        let y = x.borrow().right.clone().unwrap();
+        
+        x.borrow_mut().right = y.borrow().left.clone();
+        
+        if let Some(y_left) = y.borrow().left.clone() {
+            y_left.borrow_mut().parent = Some(x.clone());
+        }
+        
+        y.borrow_mut().parent = x.borrow

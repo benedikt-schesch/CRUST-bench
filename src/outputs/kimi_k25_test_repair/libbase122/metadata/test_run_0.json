@@ -1,0 +1,29 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+test test_bit_reader ... ok
+test test_decode_error_cases ... ok
+test test_bit_writer ... FAILED
+test test_encode_file ... ignored
+test test_decode_success_cases ... ok
+test test_roundtrip ... ok
+test test_encode_all_ones ... ok
+
+failures:
+
+---- test_bit_writer stdout ----
+
+thread 'test_bit_writer' (579995) panicked at libbase122/src/base122.rs:127:14:
+attempt to shift left with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_bit_writer
+
+test result: FAILED. 5 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

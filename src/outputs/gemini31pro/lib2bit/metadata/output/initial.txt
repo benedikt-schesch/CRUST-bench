@@ -1,0 +1,75 @@
+```rust
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom};
+
+#[derive(Debug)]
+pub struct TwoBitMaskedIdx {
+    pub size: Vec<u32>,
+    pub n_block_count: Vec<u32>,
+    pub n_block_start: Vec<Vec<u32>>,
+    pub n_block_sizes: Vec<Vec<u32>>,
+    pub mask_block_count: Vec<u32>,
+    pub mask_block_start: Vec<Vec<u32>>,
+    pub mask_block_sizes: Vec<Vec<u32>>,
+    pub offset: Vec<u64>,
+}
+
+#[derive(Debug)]
+pub struct TwoBitHeader {
+    pub magic: u32,
+    pub version: u32,
+    pub n_chroms: u32,
+}
+
+#[derive(Debug)]
+pub struct TwoBitCL {
+    pub chrom: Vec<String>,
+    pub offset: Vec<u32>,
+}
+
+#[derive(Debug)]
+pub struct TwoBit {
+    pub fp: File,
+    pub sz: u64,
+    pub offset: u64,
+    pub data: Vec<u8>,
+    pub hdr: TwoBitHeader,
+    pub cl: TwoBitCL,
+    pub idx: TwoBitMaskedIdx,
+}
+
+impl TwoBit {
+    pub fn twobit_open(fname: &str, store_masked: bool) -> Self {
+        let mut fp = File::open(fname).expect("Failed to open file");
+        let sz = fp.metadata().expect("Failed to get metadata").len();
+        
+        let mut data = Vec::new();
+        fp.read_to_end(&mut data).expect("Failed to read file");
+        
+        let mut tb = TwoBit {
+            fp,
+            sz,
+            offset: 0,
+            data,
+            hdr: TwoBitHeader { magic: 0, version: 0, n_chroms: 0 },
+            cl: TwoBitCL { chrom: Vec::new(), offset: Vec::new() },
+            idx: TwoBitMaskedIdx {
+                size: Vec::new(),
+                n_block_count: Vec::new(),
+                n_block_start: Vec::new(),
+                n_block_sizes: Vec::new(),
+                mask_block_count: Vec::new(),
+                mask_block_start: Vec::new(),
+                mask_block_sizes: Vec::new(),
+                offset: Vec::new(),
+            },
+        };
+        
+        tb.twobitHdrRead();
+        tb.twobitChromListRead();
+        tb.twoBitIndexRead(if store_masked { 1 } else { 0 });
+        
+        tb
+    }
+
+    pub fn twobit

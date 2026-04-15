@@ -1,0 +1,36 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test test_base64_encode ... ok
+test test_cipher ... FAILED
+test test_inv_cipher ... FAILED
+test test_padding ... ok
+
+failures:
+
+---- test_cipher stdout ----
+
+thread 'test_cipher' (667921) panicked at aes128_SIMD/src/bin/tests.rs:17:5:
+assertion `left == right` failed
+  left: [50, 67, 246, 168, 136, 90, 48, 141, 49, 49, 152, 162, 224, 55, 7, 52]
+ right: [57, 37, 132, 29, 2, 220, 9, 251, 220, 17, 133, 151, 25, 106, 11, 50]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_inv_cipher stdout ----
+
+thread 'test_inv_cipher' (667922) panicked at aes128_SIMD/src/bin/tests.rs:31:5:
+assertion `left == right` failed
+  left: [57, 37, 132, 29, 2, 220, 9, 251, 220, 17, 133, 151, 25, 106, 11, 50]
+ right: [50, 67, 246, 168, 136, 90, 48, 141, 49, 49, 152, 162, 224, 55, 7, 52]
+
+
+failures:
+    test_cipher
+    test_inv_cipher
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

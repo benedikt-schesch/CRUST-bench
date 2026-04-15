@@ -1,0 +1,4 @@
+```rust
+// Generated Rust Code
+pub mod twobit;
+```

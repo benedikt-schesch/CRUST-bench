@@ -1,0 +1,59 @@
+ {{mapper_expr.rs}}
+```rust
+pub struct MapperExpr {
+    expression: String,
+    param1: i32,
+    param2: i32,
+    param3: i32,
+}
+
+pub enum MapperSignalValue {
+    F(f32),
+}
+
+pub fn mapper_expr_new_from_string(expr: &str, p1: i32, p2: i32, p3: i32) -> MapperExpr {
+    MapperExpr {
+        expression: expr.to_string(),
+        param1: p1,
+        param2: p2,
+        param3: p3,
+    }
+}
+
+pub fn mapper_expr_evaluate(e: &mut MapperExpr, val: &MapperSignalValue) -> f32 {
+    match val {
+        MapperSignalValue::F(f) => *f,
+    }
+}
+```
+
+{{lib.rs}}
+```rust
+pub mod mapper_expr;
+```
+
+{{test.rs}}
+```rust
+use crate::mapper_expr;
+
+fn main() {
+    let expr = "x + 1";
+    let x = 5.0f32;
+    let expected = 6.0f32;
+
+    let mut e: mapper_expr::MapperExpr = mapper_expr::mapper_expr_new_from_string(expr, 1, 1, 1);
+    let evaluated = mapper_expr::mapper_expr_evaluate(&mut e, &(mapper_expr::MapperSignalValue::F(x)));
+
+    assert!((evaluated - expected).abs() < f32::EPSILON, "Test 1 failed: expected {}, got {:?}", expected, evaluated);
+
+    {
+        let expr = "x * 2";
+        let x = 10.0f32;
+        let expected = 20.0f32;
+        let mut e: mapper_expr::MapperExpr = mapper_expr::mapper_expr_new_from_string(expr, 0, 0, 1);
+        let evaluated = mapper_expr::mapper_expr_evaluate(&mut e, &(mapper_expr::MapperSignalValue::F(x)));
+
+        assert!((evaluated - expected).abs() < f32::EPSILON, "Test 2 failed for x={}: expected {}, got {:?}", x, expected, evaluated);
+    }
+}
+```

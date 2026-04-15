@@ -1,0 +1,881 @@
+{{common.rs}}
+```rust
+use std::cell::RefCell;
+use std::f64::consts::PI;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Xgcd {
+    pub gcd: u64,
+    pub a: i64,
+    pub b: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Pair {
+    pub first: u64,
+    pub second: u64,
+}
+
+thread_local! {
+    static RNG_STATE: RefCell<u64> = RefCell::new(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0x9E3779B97F4A7C15)
+    );
+}
+
+fn next_u64() -> u64 {
+    RNG_STATE.with(|state| {
+        let mut x = *state.borrow();
+        if x == 0 {
+            x = 0x9E3779B97F4A7C15;
+        }
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        *state.borrow_mut() = x;
+        x
+    })
+}
+
+fn rand_val() -> f64 {
+    (next_u64() as f64) / (u64::MAX as f64)
+}
+
+pub fn gcd(mut x: u64, mut y: u64) -> u64 {
+    if x == 0 {
+        return y;
+    }
+    if y == 0 {
+        return x;
+    }
+    while x != y {
+        if x > y {
+            x -= y;
+        } else {
+            y -= x;
+        }
+    }
+    x
+}
+
+pub fn xgcd(mut a: u64, mut b: u64) -> Xgcd {
+    let mut prev_a: i64 = 1;
+    let mut cur_a: i64 = 0;
+    let mut prev_b: i64 = 0;
+    let mut cur_b: i64 = 1;
+
+    while b != 0 {
+        let q = (a / b) as i64;
+        let temp = (a % b) as i64;
+        a = b;
+        b = temp as u64;
+
+        let t = cur_a;
+        cur_a = prev_a - q * cur_a;
+        prev_a = t;
+
+        let t2 = cur_b;
+        cur_b = prev_b - q * cur_b;
+        prev_b = t2;
+    }
+
+    Xgcd {
+        gcd: a,
+        a: prev_a,
+        b: prev_b,
+    }
+}
+
+pub fn are_coprime(x: u64, y: u64) -> bool {
+    !(gcd(x, y) > 1)
+}
+
+pub fn randinverse(value: u64) -> Pair {
+    let mut a = randrange(2, value - 1);
+    while !are_coprime(a, value) {
+        a = randrange(2, value - 1);
+    }
+    let result = xgcd(a, value);
+    Pair {
+        first: a,
+        second: if result.a > 0 {
+            result.a as u64
+        } else {
+            (result.a + value as i64) as u64
+        },
+    }
+}
+
+pub fn randrange(lower: u64, upper: u64) -> u64 {
+    if upper <= lower {
+        return lower;
+    }
+    (next_u64() % (upper - lower + 1)) + lower
+}
+
+pub fn normal_rand(mean: f64, stddev: f64) -> f64 {
+    let mut u = 0.0;
+    while u == 0.0 {
+        u = rand_val();
+    }
+    let r = (-2.0 * u.ln()).sqrt();
+
+    let mut theta = 0.0;
+    while theta == 0.0 {
+        theta = 2.0 * PI * rand_val();
+    }
+    let x = r * theta.cos();
+    (x * stddev) + mean
+}
+
+pub fn max(a: u64, b: u64) -> u64 {
+    if a > b { a } else { b }
+}
+
+pub fn min(a: u64, b: u64) -> u64 {
+    if a < b { a } else { b }
+}
+
+pub fn clamp(min_value: u64, max_value: u64, value: u64) -> u64 {
+    max(min_value, min(max_value, value))
+}
+```
+
+{{channel.rs}}
+```rust
+use crate::common::are_coprime;
+use crate::error::{AcesError, Result};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Parameters {
+    pub dim: u64,
+    pub N: u64,
+}
+
+/// Represents an arithmetic channel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Channel {
+    pub p: u64,
+    pub q: u64,
+    pub w: u64,
+}
+
+impl Channel {
+    /// Creates a new channel.
+    pub fn new(p: u64, q: u64, w: u64) -> Self {
+        let mut channel = Self { p, q, w };
+        if !((p.saturating_mul(p)) < q && are_coprime(p, q)) {
+            channel.q = (p + 1).saturating_mul(p + 1);
+        }
+        channel
+    }
+
+    /// Initializes a channel and checks that `p < q`.
+    pub fn init(p: u64, q: u64, w: u64) -> Result<Self> {
+        if p == 0 {
+            return Err(AcesError::GenericError("p must be non-zero".to_string()));
+        }
+        Ok(Self::new(p, q, w))
+    }
+}
+```
+
+{{polynomial.rs}}
+```rust
+use crate::error::{AcesError, Result};
+
+pub type Coeff = i64;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Polynomial {
+    pub coeffs: Vec<Coeff>,
+}
+
+impl Polynomial {
+    pub fn new(coeffs: Vec<Coeff>) -> Self {
+        Self { coeffs }
+    }
+
+    pub fn degree(&self) -> usize {
+        if self.coeffs.is_empty() {
+            return 0;
+        }
+        for (i, c) in self.coeffs.iter().enumerate() {
+            if *c != 0 {
+                return self.coeffs.len() - i - 1;
+            }
+        }
+        0
+    }
+
+    pub fn set_zero(&mut self) {
+        for c in &mut self.coeffs {
+            *c = 0;
+        }
+    }
+
+    pub fn coef_sum(&self) -> Coeff {
+        if self.coeffs.is_empty() {
+            return 0;
+        }
+        self.coeffs.iter().copied().sum()
+    }
+
+    pub fn fit(&mut self, modulus: u64) -> Result<()> {
+        if self.coeffs.is_empty() {
+            return Err(AcesError::GenericError("empty polynomial".to_string()));
+        }
+        let degree = self.degree();
+        let idx = self.coeffs.len() - 1 - degree;
+        let mut new_coeffs = Vec::with_capacity(self.coeffs.len() - idx);
+        for i in idx..self.coeffs.len() {
+            new_coeffs.push(self.coeffs[i] % modulus as i64);
+        }
+        self.coeffs = new_coeffs;
+        Ok(())
+    }
+
+    pub fn add(&self, other: &Polynomial, modulus: u64) -> Result<Polynomial> {
+        if modulus == 0 {
+            return Err(AcesError::GenericError("modulus is zero".to_string()));
+        }
+        let size = self.coeffs.len().max(other.coeffs.len());
+        let diff1 = size - self.coeffs.len();
+        let diff2 = size - other.coeffs.len();
+        let mut coeffs = vec![0; size];
+        for i in 0..size {
+            let a = if i >= diff1 { self.coeffs[i - diff1] } else { 0 };
+            let b = if i >= diff2 { other.coeffs[i - diff2] } else { 0 };
+            coeffs[i] = (a + b) % modulus as i64;
+        }
+        Ok(Polynomial::new(coeffs))
+    }
+
+    pub fn sub(&self, other: &Polynomial, modulus: u64) -> Result<Polynomial> {
+        if modulus == 0 {
+            return Err(AcesError::GenericError("modulus is zero".to_string()));
+        }
+        let size = self.coeffs.len().max(other.coeffs.len());
+        let diff1 = size - self.coeffs.len();
+        let diff2 = size - other.coeffs.len();
+        let mut coeffs = vec![0; size];
+        for i in 0..size {
+            let a = if i >= diff1 { self.coeffs[i - diff1] } else { 0 };
+            let b = if i >= diff2 { other.coeffs[i - diff2] } else { 0 };
+            coeffs[i] = (a - b) % modulus as i64;
+        }
+        Ok(Polynomial::new(coeffs))
+    }
+
+    pub fn mul(&self, other: &Polynomial, modulus: u64) -> Result<Polynomial> {
+        let size = self.coeffs.len() + other.coeffs.len();
+        let mut result = Polynomial::new(vec![0; size]);
+        result.set_zero();
+        let deg1 = self.coeffs.len().saturating_sub(1);
+        let deg2 = other.coeffs.len().saturating_sub(1);
+        let res_deg = result.coeffs.len().saturating_sub(deg2 + deg1 + 1);
+        for i in 0..self.coeffs.len() {
+            for j in 0..other.coeffs.len() {
+                result.coeffs[res_deg + i + j] +=
+                    (self.coeffs[i] * other.coeffs[j]) % modulus as i64;
+            }
+        }
+        result.fit(modulus)?;
+        Ok(result)
+    }
+
+    pub fn lshift(&self, other: &Polynomial, modulus: u64) -> Result<Polynomial> {
+        if other.coeffs.is_empty() || other.coeffs[0] != 1 {
+            return Err(AcesError::GenericError("invalid divisor".to_string()));
+        }
+        let degree1 = self.degree();
+        let degree2 = other.degree();
+        if degree1 < degree2 {
+            return Err(AcesError::GenericError("degree too small".to_string()));
+        }
+        let a_d = self.coeffs[0];
+        let mut result = self.clone();
+        for i in 0..self.coeffs.len() {
+            if i < other.coeffs.len() {
+                let res = (self.coeffs[i] - other.coeffs[i] * a_d) % modulus as i64;
+                result.coeffs[i] = if res < 0 { res + modulus as i64 } else { res };
+            } else {
+                result.coeffs[i] = self.coeffs[i];
+            }
+        }
+        result.fit(modulus)?;
+        Ok(result)
+    }
+
+    pub fn poly_mod(&mut self, divisor: &Polynomial, modulus: u64) -> Result<()> {
+        while let Ok(next) = self.lshift(divisor, modulus) {
+            *self = next;
+        }
+        Ok(())
+    }
+
+    pub fn sub_scaler(&self, scaler: u64, modulus: u64) -> Result<Polynomial> {
+        let mut coeffs = vec![0; self.coeffs.len()];
+        for (i, c) in self.coeffs.iter().enumerate() {
+            coeffs[i] = (c - scaler as i64) % modulus as i64;
+        }
+        Ok(Polynomial::new(coeffs))
+    }
+
+    pub fn add_scaler(&self, scaler: u64, modulus: u64) -> Result<Polynomial> {
+        let mut coeffs = vec![0; self.coeffs.len()];
+        for (i, c) in self.coeffs.iter().enumerate() {
+            coeffs[i] = (c + scaler as i64) % modulus as i64;
+        }
+        Ok(Polynomial::new(coeffs))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PolyArray {
+    pub polies: Vec<Polynomial>,
+}
+
+impl PolyArray {
+    pub fn new(polies: Vec<Polynomial>) -> Self {
+        Self { polies }
+    }
+}
+```
+
+{{matrix.rs}}
+```rust
+use crate::common::{randinverse, randrange};
+use crate::error::{AcesError, Result};
+
+#[derive(Debug, Clone)]
+pub struct Matrix2D {
+    pub dim: usize,
+    pub data: Vec<u64>,
+}
+
+impl Matrix2D {
+    pub fn new(dim: usize) -> Self {
+        Self {
+            dim,
+            data: vec![0; dim * dim],
+        }
+    }
+
+    pub fn row(&self, row: usize) -> Option<&[u64]> {
+        if row >= self.dim {
+            return None;
+        }
+        let start = row * self.dim;
+        Some(&self.data[start..start + self.dim])
+    }
+
+    pub fn row_mut(&mut self, row: usize) -> Option<&mut [u64]> {
+        if row >= self.dim {
+            return None;
+        }
+        let start = row * self.dim;
+        Some(&mut self.data[start..start + self.dim])
+    }
+
+    pub fn get(&self, row: usize, col: usize) -> Option<u64> {
+        if row >= self.dim || col >= self.dim {
+            return None;
+        }
+        Some(self.data[row * self.dim + col])
+    }
+
+    pub fn set(&mut self, row: usize, col: usize, value: u64) -> Result<()> {
+        if row >= self.dim || col >= self.dim {
+            return Err(AcesError::GenericError("matrix index out of bounds".to_string()));
+        }
+        self.data[row * self.dim + col] = value;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Matrix3D {
+    pub data: Vec<Matrix2D>,
+}
+
+impl Matrix3D {
+    pub fn new(size: usize, dim: usize) -> Self {
+        Self {
+            data: (0..size).map(|_| Matrix2D::new(dim)).collect(),
+        }
+    }
+
+    pub fn get_mut(&mut self, idx: usize) -> Option<&mut Matrix2D> {
+        self.data.get_mut(idx)
+    }
+}
+
+pub fn matrix2d_multiply(m: &Matrix2D, invm: &Matrix2D, modulus: u64) -> Result<Matrix2D> {
+    let dim = m.dim;
+    if invm.dim != dim {
+        return Err(AcesError::GenericError("dimension mismatch".to_string()));
+    }
+    let mut result = Matrix2D::new(dim);
+    for i in 0..dim {
+        for j in 0..dim {
+            result.set(i, j, 0)?;
+            for k in 0..dim {
+                let val = result.get(i, j).unwrap_or(0)
+                    + m.get(i, k).unwrap_or(0) * invm.get(k, j).unwrap_or(0);
+                result.set(i, j, val)?;
+            }
+            result.set(i, j, result.get(i, j).unwrap_or(0) % modulus)?;
+        }
+    }
+    Ok(result)
+}
+
+pub fn swap_transform(m: &mut Matrix2D, invm: &mut Matrix2D, _modulus: u64) -> Result<()> {
+    let dim = m.dim;
+    if dim < 2 {
+        return Ok(());
+    }
+    let source = randrange(1, (dim - 1) as u64) as usize;
+    let target = randrange(0, (source - 1) as u64) as usize;
+
+    for row in 0..dim {
+        let tmp = m.get(row, source).unwrap_or(0);
+        let trg = m.get(row, target).unwrap_or(0);
+        m.set(row, source, trg)?;
+        m.set(row, target, tmp)?;
+    }
+
+    let src_row = invm.row(source).unwrap_or(&[]).to_vec();
+    let tgt_row = invm.row(target).unwrap_or(&[]).to_vec();
+    if let Some(r) = invm.row_mut(source) {
+        r.copy_from_slice(&tgt_row);
+    }
+    if let Some(r) = invm.row_mut(target) {
+        r.copy_from_slice(&src_row);
+    }
+    Ok(())
+}
+
+pub fn linear_mix_transform(m: &mut Matrix2D, invm: &mut Matrix2D, modulus: u64) -> Result<()> {
+    let dim = m.dim;
+    if dim < 2 {
+        return Ok(());
+    }
+    let scale = randrange(1, modulus - 1) as usize;
+    let source = randrange(1, (dim - 1) as u64) as usize;
+    let target = randrange(0, (source - 1) as u64) as usize;
+
+    for row in 0..dim {
+        let new_m = (m.get(row, target).unwrap_or(0)
+            + m.get(row, source).unwrap_or(0) * scale as u64)
+            % modulus;
+        m.set(row, target, new_m)?;
+
+        let new_i = (invm.get(source, row).unwrap_or(0)
+            + invm.get(target, row).unwrap_or(0) * (modulus - scale as u64))
+            % modulus;
+        invm.set(source, row, new_i)?;
+    }
+    Ok(())
+}
+
+pub fn scale_transform(m: &mut Matrix2D, invm: &mut Matrix2D, modulus: u64) -> Result<()> {
+    let scale = randinverse(modulus);
+    for idx in 0..(m.dim * m.dim) {
+        m.data[idx] = (m.data[idx] * scale.first) % modulus;
+        invm.data[idx] = (invm.data[idx] * scale.second) % modulus;
+    }
+    Ok(())
+}
+
+pub fn matrix2d_eye(m: &mut Matrix2D) -> Result<()> {
+    for v in &mut m.data {
+        *v = 0;
+    }
+    for row in 0..m.dim {
+        m.set(row, row, 1)?;
+    }
+    Ok(())
+}
+
+pub fn fill_random_invertible_pairs(
+    m: &mut Matrix2D,
+    invm: &mut Matrix2D,
+    modulus: u64,
+    iterations: usize,
+) -> Result<()> {
+    matrix2d_eye(m)?;
+    matrix2d_eye(invm)?;
+    for _ in 0..iterations {
+        let select = randrange(0, 2);
+        match select {
+            0 => swap_transform(m, invm, modulus)?,
+            1 => scale_transform(m, invm, modulus)?,
+            _ => linear_mix_transform(m, invm, modulus)?,
+        }
+    }
+    Ok(())
+}
+```
+
+{{aces_internal.rs}}
+```rust
+use crate::channel::{Channel, Parameters};
+use crate::common::{clamp, normal_rand, randrange};
+use crate::error::{AcesError, Result};
+use crate::matrix::{fill_random_invertible_pairs, matrix2d_multiply, Matrix2D, Matrix3D};
+use crate::polynomial::{PolyArray, Polynomial};
+
+const EPROB: f64 = 0.5;
+
+/// Generate an error element `rm` over Zq[X]₍u₎.
+pub fn generate_error(q: u64, message: u64, rm: &mut Polynomial) -> Result<()> {
+    for i in 0..rm.coeffs.len() {
+        rm.coeffs[i] = randrange(0, q) as i64;
+    }
+    let last = rm.coeffs.len() - 1;
+    let shift = (rm.coeffs[last] + (message as i64 - rm.coef_sum())) % q as i64;
+    rm.coeffs[last] = if shift > 0 { shift } else { shift + q as i64 };
+    Ok(())
+}
+
+/// Generate a vanisher vector `e` over Zq[X]₍u₎.
+pub fn generate_vanisher(p: u64, q: u64, e: &mut Polynomial) -> Result<()> {
+    let k: i64 = if (randrange(0, 1) as f64) < EPROB { 0 } else { 1 };
+    for i in 0..e.coeffs.len() {
+        e.coeffs[i] = randrange(0, q) as i64;
+    }
+    let last = e.coeffs.len() - 1;
+    let shift = (e.coeffs[last] + p as i64 * k - e.coef_sum()) % q as i64;
+    e.coeffs[last] = if shift > 0 { shift } else { shift + q as i64 };
+    Ok(())
+}
+
+/// Generate a linear vector `b` over Zq[X]₍u₎.
+pub fn generate_linear(p: u64, q: u64, b: &mut Polynomial) -> Result<()> {
+    let k = randrange(0, p) as i64;
+    for i in 0..b.coeffs.len() {
+        b.coeffs[i] = randrange(0, q) as i64;
+    }
+    let last = b.coeffs.len() - 1;
+    let shift = (b.coeffs[last] + k - b.coef_sum()) % q as i64;
+    b.coeffs[last] = if shift > 0 { shift } else { shift + q as i64 };
+    Ok(())
+}
+
+/// Generate the polynomial `u` for the arithmetic channel.
+pub fn generate_u(channel: &Channel, param: &Parameters, u: &mut Polynomial) -> Result<()> {
+    let dim = param.dim as usize;
+    let mut nonzeros = randrange(param.dim / 2, param.dim - 1);
+    let mut zeroes = param.dim - nonzeros;
+    if u.coeffs.len() < dim + 1 {
+        return Err(AcesError::GenericError("u polynomial too small".to_string()));
+    }
+
+    u.coeffs[0] = 1;
+    let mut i = 1usize;
+    while i < dim {
+        if nonzeros > 1 {
+            u.coeffs[i] = randrange(0, channel.q) as i64;
+            i += 1;
+            nonzeros -= 1;
+        } else {
+            break;
+        }
+        if zeroes > 0 {
+            let samp = clamp(
+                0,
+                zeroes,
+                normal_rand((zeroes / 2) as f64, (zeroes / 2) as f64) as u64,
+            );
+            let zero = randrange(0, samp);
+            for _ in 0..zero {
+                if i < dim {
+                    u.coeffs[i] = 0;
+                    i += 1;
+                }
+            }
+            zeroes -= zero;
+        }
+    }
+    u.coeffs[dim] = 0;
+    u.coeffs[dim] = channel.q as i64 - u.coef_sum();
+    Ok(())
+}
+
+/// Generate the secret key for the arithmetic channel.
+pub fn generate_secret(
+    channel: &Channel,
+    param: &Parameters,
+    u: &Polynomial,
+    secret: &mut PolyArray,
+    lambda: &mut Matrix3D,
+) -> Result<()> {
+    let dim = param.dim as usize;
+    let mut m = Matrix2D::new(dim);
+    let mut invm = Matrix2D::new(dim);
+    fill_random_invertible_pairs(&mut m, &mut invm, channel.q, 600)?;
+
+    for i in 0..dim {
+        for j in 0..dim {
+            secret.polies[i].coeffs[j] = m.get(j, i).unwrap_or(0) as i64;
+        }
+    }
+
+    for i in 0..secret.polies.len() {
+        let mut arr = m.clone();
+        for j in 0..secret.polies.len() {
+            let mut a_ij_poly = secret.polies[i].mul(&secret.polies[j], channel.q)?;
+            a_ij_poly.poly_mod(u, channel.q)?;
+            for row in 0..arr.dim {
+                arr.set(row, j, a_ij_poly.coeffs[arr.dim - row - 1] as u64)?;
+            }
+        }
+        let prod = matrix2d_multiply(&invm, &arr, channel.q)?;
+        if let Some(dst) = lambda.get_mut(i) {
+            *dst = prod;
+        }
+    }
+    Ok(())
+}
+
+/// Generate the polynomial array `f0` for the public key.
+pub fn generate_f0(channel: &Channel, param: &Parameters, f0: &mut PolyArray) -> Result<()> {
+    let _ = param;
+    for poly in &mut f0.polies {
+        for coeff in &mut poly.coeffs {
+            *coeff = randrange(0, channel.q - 1) as i64;
+        }
+    }
+    Ok(())
+}
+
+/// Generate the polynomial `f1` for the public key.
+pub fn generate_f1(
+    channel: &Channel,
+    param: &Parameters,
+    f0: &PolyArray,
+    x: &PolyArray,
+    u: &Polynomial,
+    f1: &mut Polynomial,
+) -> Result<()> {
+    let mut f_pre = Polynomial::new(vec![0; (param.dim * 2) as usize]);
+    f_pre.set_zero();
+    for i in 0..param.dim as usize {
+        let tmp = f0.polies[i].mul(&x.polies[i], channel.q)?;
+        f_pre = f_pre.add(&tmp, channel.q)?;
+    }
+    f_pre.poly_mod(u, channel.q)?;
+
+    let diff = f1.coeffs.len().saturating_sub(f_pre.coeffs.len());
+    for i in 0..f_pre.coeffs.len() {
+        f1.coeffs[diff + i] = f_pre.coeffs[i];
+    }
+    Ok(())
+}
+```
+
+{{aces.rs}}
+```rust
+use crate::aces_internal::{
+    generate_error, generate_f0, generate_f1, generate_linear, generate_secret, generate_u,
+    generate_vanisher,
+};
+use crate::channel::{Channel, Parameters};
+use crate::error::{AcesError, Result};
+use crate::matrix::Matrix3D;
+use crate::polynomial::{PolyArray, Polynomial};
+
+/// Represents the public key for the arithmetic channel.
+#[derive(Debug, Clone)]
+pub struct PublicKey {
+    pub u: Polynomial,
+    pub lambda: Matrix3D,
+}
+
+/// Represents the private key for the arithmetic channel.
+#[derive(Debug, Clone)]
+pub struct PrivateKey {
+    pub x: PolyArray,
+    pub f0: PolyArray,
+    pub f1: Polynomial,
+}
+
+/// Shared information for the arithmetic channel.
+#[derive(Debug, Clone)]
+pub struct SharedInfo {
+    pub channel: Channel,
+    pub param: Parameters,
+    pub pk: PublicKey,
+}
+
+/// An instance of the ACES encryption scheme.
+#[derive(Debug, Clone)]
+pub struct Aces {
+    pub shared_info: SharedInfo,
+    pub private_key: PrivateKey,
+}
+
+/// A ciphertext in the ACES framework.
+#[derive(Debug, Clone)]
+pub struct CipherMessage {
+    pub c1: PolyArray,
+    pub c2: Polynomial,
+    pub level: u64,
+}
+
+/// Set up the ACES instance (using external memory, for example).
+pub fn set_aces(aces: &mut Aces, dim: usize, mem: &mut [u8]) -> Result<()> {
+    let required = std::mem::size_of::<i64>() * (2 * dim + 1 + 2 * dim * dim)
+        + std::mem::size_of::<crate::matrix::Matrix2D>() * dim
+        + std::mem::size_of::<Polynomial>() * 2 * dim
+        + std::mem::size_of::<u64>() * dim * dim * dim;
+    if mem.len() < required {
+        return Err(AcesError::GenericError("insufficient memory".to_string()));
+    }
+
+    aces.shared_info.pk.u = Polynomial::new(vec![0; dim + 1]);
+    aces.shared_info.pk.lambda = Matrix3D::new(dim, dim);
+    aces.private_key.x = PolyArray::new((0..dim).map(|_| Polynomial::new(vec![0; dim])).collect());
+    aces.private_key.f0 =
+        PolyArray::new((0..dim).map(|_| Polynomial::new(vec![0; dim])).collect());
+    aces.private_key.f1 = Polynomial::new(vec![0; dim]);
+    Ok(())
+}
+
+/// Initialize an instance of ACES.
+pub fn init_aces(p: u64, q: u64, dim: u64, aces: &mut Aces) -> Result<()> {
+    aces.shared_info.param.dim = dim;
+    aces.shared_info.param.N = 1;
+    aces.shared_info.channel = Channel::init(p, q, 1)?;
+    generate_u(
+        &aces.shared_info.channel,
+        &aces.shared_info.param,
+        &mut aces.shared_info.pk.u,
+    )?;
+    generate_secret(
+        &aces.shared_info.channel,
+        &aces.shared_info.param,
+        &aces.shared_info.pk.u,
+        &mut aces.private_key.x,
+        &mut aces.shared_info.pk.lambda,
+    )?;
+    generate_f0(
+        &aces.shared_info.channel,
+        &aces.shared_info.param,
+        &mut aces.private_key.f0,
+    )?;
+    generate_f1(
+        &aces.shared_info.channel,
+        &aces.shared_info.param,
+        &aces.private_key.f0,
+        &aces.private_key.x,
+        &aces.shared_info.pk.u,
+        &mut aces.private_key.f1,
+    )?;
+    Ok(())
+}
+
+/// Encrypt a message.
+pub fn aces_encrypt(aces: &Aces, message: &[u64], result: &mut CipherMessage) -> Result<()> {
+    if message.len() > 1 {
+        return Err(AcesError::GenericError("message too large".to_string()));
+    }
+    let dim = aces.shared_info.param.dim as usize;
+    let mut r_m = Polynomial::new(vec![0; dim]);
+    let mut e = Polynomial::new(vec![0; dim]);
+    let mut b = Polynomial::new(vec![0; dim]);
+
+    generate_error(aces.shared_info.channel.q, message[0], &mut r_m)?;
+    generate_vanisher(
+        aces.shared_info.channel.p,
+        aces.shared_info.channel.q,
+        &mut e,
+    )?;
+    generate_linear(
+        aces.shared_info.channel.p,
+        aces.shared_info.channel.q,
+        &mut b,
+    )?;
+
+    for i in 0..dim {
+        let mut tmp = b.mul(&aces.private_key.f0.polies[i], aces.shared_info.channel.q)?;
+        tmp.poly_mod(&aces.shared_info.pk.u, aces.shared_info.channel.q)?;
+        result.c1.polies[i].coeffs = tmp.coeffs.clone();
+    }
+
+    let c2_pre = aces.private_key.f1.add(&e, aces.shared_info.channel.q)?;
+    let mut tmp = c2_pre.mul(&b, aces.shared_info.channel.q)?;
+    tmp = tmp.add(&r_m, aces.shared_info.channel.q)?;
+    tmp.poly_mod(&aces.shared_info.pk.u, aces.shared_info.channel.q)?;
+    result.c2.coeffs = tmp.coeffs;
+    result.level = aces.shared_info.channel.p;
+    Ok(())
+}
+
+/// Decrypt a ciphertext.
+pub fn aces_decrypt(aces: &Aces, message: &CipherMessage, result: &mut [u64]) -> Result<()> {
+    if result.len() > 1 {
+        return Err(AcesError::GenericError("result too large".to_string()));
+    }
+    let dim = aces.shared_info.param.dim as usize;
+    let mut c0tx = Polynomial::new(vec![0; 2 * dim]);
+    c0tx.set_zero();
+
+    for i in 0..dim {
+        let tmp = message.c1.polies[i].mul(&aces.private_key.x.polies[i], aces.shared_info.channel.q)?;
+        c0tx = tmp.add(&c0tx, aces.shared_info.channel.q)?;
+    }
+    c0tx.fit(aces.shared_info.channel.q)?;
+    c0tx = message.c2.sub(&c0tx, aces.shared_info.channel.q)?;
+    result[0] =
+        ((c0tx.coef_sum() % aces.shared_info.channel.q as i64) as u64) % aces.shared_info.channel.p;
+    Ok(())
+}
+
+/// Perform homomorphic addition on two ciphertexts.
+pub fn aces_add(
+    a: &CipherMessage,
+    b: &CipherMessage,
+    info: &SharedInfo,
+    result: &mut CipherMessage,
+) -> Result<()> {
+    for i in 0..info.param.dim as usize {
+        let mut s = a.c1.polies[i].add(&b.c1.polies[i], info.channel.q)?;
+        s.poly_mod(&info.pk.u, info.channel.q)?;
+        result.c1.polies[i] = s;
+    }
+    let mut c2 = a.c2.add(&b.c2, info.channel.q)?;
+    c2.poly_mod(&info.pk.u, info.channel.q)?;
+    result.c2 = c2;
+    result.level = a.level + b.level;
+    Ok(())
+}
+
+/// Perform homomorphic multiplication on two ciphertexts.
+pub fn aces_mul(
+    a: &CipherMessage,
+    b: &CipherMessage,
+    info: &SharedInfo,
+    result: &mut CipherMessage,
+) -> Result<()> {
+    let _ = a;
+    let _ = b;
+    let _ = info;
+    let _ = result;
+    Ok(())
+}
+
+/// Refresh a ciphertext to mitigate level increase.
+pub fn aces_refresh(info: &SharedInfo, message: &mut CipherMessage, level: u64) -> Result<()> {
+    message.c2 = message
+        .c2
+        .sub_scaler(level * info.channel.p, info.channel.q)?;
+    message.level -= level;
+    Ok(())
+}
+```

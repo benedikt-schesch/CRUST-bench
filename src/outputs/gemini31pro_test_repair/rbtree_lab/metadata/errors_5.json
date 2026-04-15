@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `rbtree::rbtree`", "file_path": "rbtree_lab/src/bin/test.rs", "row": "1", "col": "13", "error_snippet": "|\n1 | use rbtree::rbtree::{Key, RBTree};\n  |             ^^^^^^ could not find `rbtree` in `rbtree`\n\nFor more information about this error, try `rustc --explain E0432`."}]

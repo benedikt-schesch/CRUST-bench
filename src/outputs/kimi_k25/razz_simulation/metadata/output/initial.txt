@@ -1,0 +1,374 @@
+ {{card.rs}}
+```rust
+pub mod card {
+    use std::cell::RefCell;
+    
+    // Constants from C code
+    pub const CLUB_BITS: u32 = 4 << 5;
+    pub const ACE_BITS: u32 = 1;
+    pub const J_BITS: u32 = 11;
+    pub const R8_BITS: u32 = 8;
+    pub const R10_BITS: u32 = 10;
+    pub const HEART_BITS: u32 = 2 << 5;
+    pub const R4_BITS: u32 = 4;
+    pub const SPADE_BITS: u32 = 1 << 5;
+    pub const Q_BITS: u32 = 12;
+    pub const R7_BITS: u32 = 7;
+    pub const R5_BITS: u32 = 5;
+    pub const K_BITS: u32 = 13;
+    pub const R3_BITS: u32 = 3;
+    pub const RANK_BITS: u32 = 0x1F;
+    pub const R9_BITS: u32 = 9;
+    pub const SUIT_BITS: u32 = 0x7 << 5;
+    pub const R6_BITS: u32 = 6;
+    pub const INVALID_CARD_BITS: u32 = 0;
+    pub const DIAMOND_BITS: u32 = 3 << 5;
+    pub const R2_BITS: u32 = 2;
+
+    // Simple LCG RNG to replace lrand48/srand48
+    thread_local! {
+        static RNG_STATE: RefCell<u64> = RefCell::new(1);
+    }
+    
+    pub fn srand48(seed: u64) {
+        RNG_STATE.with(|s| *s.borrow_mut() = seed);
+    }
+    
+    pub fn lrand48() -> u64 {
+        RNG_STATE.with(|s| {
+            let mut state = s.borrow_mut();
+            // LCG parameters for lrand48
+            *state = (25214903917u64.wrapping_mul(*state).wrapping_add(11)) & 0xFFFFFFFFFFFF;
+            (*state >> 16) & 0x7FFFFFFF
+        })
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+    pub enum CardSuitRank {
+        SpadeAce, Spade2, Spade3, Spade4, Spade5, Spade6, Spade7, Spade8,
+        Spade9, Spade10, SpadeJ, SpadeQ, SpadeK,
+        HeartAce, Heart2, Heart3, Heart4, Heart5, Heart6, Heart7, Heart8,
+        Heart9, Heart10, HeartJ, HeartQ, HeartK,
+        DiamondAce, Diamond2, Diamond3, Diamond4, Diamond5, Diamond6,
+        Diamond7, Diamond8, Diamond9, Diamond10, DiamondJ, DiamondQ, DiamondK,
+        ClubAce, Club2, Club3, Club4, Club5, Club6, Club7, Club8, Club9,
+        Club10, ClubJ, ClubQ, ClubK,
+        CardCount,
+        InvalidCard,
+    }
+    
+    impl CardSuitRank {
+        pub fn cardtostr(&self) -> Option<String> {
+            let table = [
+                "SA", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "SJ", "SQ", "SK",
+                "HA", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10", "HJ", "HQ", "HK",
+                "DA", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10", "DJ", "DQ", "DK",
+                "CA", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "CJ", "CQ", "CK",
+            ];
+            let idx = *self as usize;
+            if idx < table.len() {
+                Some(table[idx].to_string())
+            } else {
+                None
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+    pub enum CardRank {
+        Ace, R2, R3, R4, R5, R6, R7, R8, R9, R10, J, Q, K,
+        RankCount,
+        InvalidRank,
+    }
+    
+    impl CardRank {
+        pub fn ranktostr(&self) -> Option<String> {
+            let table = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+            let idx = *self as usize;
+            if idx < table.len() {
+                Some(table[idx].to_string())
+            } else {
+                None
+            }
+        }
+        
+        pub fn strtorank(s: &str) -> CardRank {
+            if s.is_empty() {
+                return CardRank::InvalidRank;
+            }
+            let first = s.chars().next().unwrap();
+            if first >= '2' && first <= '9' {
+                let val = first as u8 - b'2';
+                return match val {
+                    0 => CardRank::R2,
+                    1 => CardRank::R3,
+                    2 => CardRank::R4,
+                    3 => CardRank::R5,
+                    4 => CardRank::R6,
+                    5 => CardRank::R7,
+                    6 => CardRank::R8,
+                    7 => CardRank::R9,
+                    _ => CardRank::InvalidRank,
+                };
+            }
+            match first.to_ascii_uppercase() {
+                'A' => CardRank::Ace,
+                '1' => {
+                    if s.len() >= 2 && s.chars().nth(1) == Some('0') {
+                        CardRank::R10
+                    } else {
+                        CardRank::InvalidRank
+                    }
+                }
+                'J' => CardRank::J,
+                'Q' => CardRank::Q,
+                'K' => CardRank::K,
+                _ => CardRank::InvalidRank,
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+    pub enum CardSuit {
+        Spade, Heart, Diamond, Club,
+        SuitCount,
+        InvalidSuit,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct Card {
+        card: u8
+    }
+    
+    impl Card {
+        pub fn write_card(csr: CardSuitRank) -> Self {
+            let mut c = Card { card: INVALID_CARD_BITS as u8 };
+            let csr_val = csr as u8;
+            
+            // Determine suit
+            if csr_val >= CardSuitRank::SpadeAce as u8 && csr_val <= CardSuitRank::SpadeK as u8 {
+                c.card |= SPADE_BITS as u8;
+            } else if csr_val >= CardSuitRank::HeartAce as u8 && csr_val <= CardSuitRank::HeartK as u8 {
+                c.card |= HEART_BITS as u8;
+            } else if csr_val >= CardSuitRank::DiamondAce as u8 && csr_val <= CardSuitRank::DiamondK as u8 {
+                c.card |= DIAMOND_BITS as u8;
+            } else if csr_val >= CardSuitRank::ClubAce as u8 && csr_val <= CardSuitRank::ClubK as u8 {
+                c.card |= CLUB_BITS as u8;
+            }
+            
+            // Determine rank
+            let rank_val = match csr {
+                CardSuitRank::SpadeAce | CardSuitRank::HeartAce | CardSuitRank::DiamondAce | CardSuitRank::ClubAce => ACE_BITS,
+                CardSuitRank::Spade2 | CardSuitRank::Heart2 | CardSuitRank::Diamond2 | CardSuitRank::Club2 => R2_BITS,
+                CardSuitRank::Spade3 | CardSuitRank::Heart3 | CardSuitRank::Diamond3 | CardSuitRank::Club3 => R3_BITS,
+                CardSuitRank::Spade4 | CardSuitRank::Heart4 | CardSuitRank::Diamond4 | CardSuitRank::Club4 => R4_BITS,
+                CardSuitRank::Spade5 | CardSuitRank::Heart5 | CardSuitRank::Diamond5 | CardSuitRank::Club5 => R5_BITS,
+                CardSuitRank::Spade6 | CardSuitRank::Heart6 | CardSuitRank::Diamond6 | CardSuitRank::Club6 => R6_BITS,
+                CardSuitRank::Spade7 | CardSuitRank::Heart7 | CardSuitRank::Diamond7 | CardSuitRank::Club7 => R7_BITS,
+                CardSuitRank::Spade8 | CardSuitRank::Heart8 | CardSuitRank::Diamond8 | CardSuitRank::Club8 => R8_BITS,
+                CardSuitRank::Spade9 | CardSuitRank::Heart9 | CardSuitRank::Diamond9 | CardSuitRank::Club9 => R9_BITS,
+                CardSuitRank::Spade10 | CardSuitRank::Heart10 | CardSuitRank::Diamond10 | CardSuitRank::Club10 => R10_BITS,
+                CardSuitRank::SpadeJ | CardSuitRank::HeartJ | CardSuitRank::DiamondJ | CardSuitRank::ClubJ => J_BITS,
+                CardSuitRank::SpadeQ | CardSuitRank::HeartQ | CardSuitRank::DiamondQ | CardSuitRank::ClubQ => Q_BITS,
+                CardSuitRank::SpadeK | CardSuitRank::HeartK | CardSuitRank::DiamondK | CardSuitRank::ClubK => K_BITS,
+                _ => INVALID_CARD_BITS,
+            };
+            
+            c.card |= rank_val as u8;
+            c
+        }
+
+        pub fn get_card_suit_rank(&self) -> CardSuitRank {
+            let suit = self.get_card_suit();
+            let rank = self.get_card_rank();
+            
+            if suit == CardSuit::InvalidSuit || rank == CardRank::InvalidRank {
+                return CardSuitRank::InvalidCard;
+            }
+            
+            let base = match suit {
+                CardSuit::Spade => CardSuitRank::SpadeAce,
+                CardSuit::Heart => CardSuitRank::HeartAce,
+                CardSuit::Diamond => CardSuitRank::DiamondAce,
+                CardSuit::Club => CardSuitRank::ClubAce,
+                _ => return CardSuitRank::InvalidCard,
+            };
+            
+            let offset = rank as u8;
+            let result = base as u8 + offset;
+            if result < CardSuitRank::CardCount as u8 {
+                unsafe { std::mem::transmute(result) }
+            } else {
+                CardSuitRank::InvalidCard
+            }
+        }
+
+        pub fn get_card_rank(&self) -> CardRank {
+            let r = self.card & (RANK_BITS as u8);
+            if r < (ACE_BITS as u8) || r > (K_BITS as u8) {
+                return CardRank::InvalidRank;
+            }
+            let idx = r - 1;
+            if idx < CardRank::RankCount as u8 {
+                unsafe { std::mem::transmute(idx) }
+            } else {
+                CardRank::InvalidRank
+            }
+        }
+
+        pub fn get_card_suit(&self) -> CardSuit {
+            let s = self.card & (SUIT_BITS as u8);
+            if s < (SPADE_BITS as u8) || s > (CLUB_BITS as u8) {
+                return CardSuit::InvalidSuit;
+            }
+            let idx = (s >> 5) - 1;
+            if idx < CardSuit::SuitCount as u8 {
+                unsafe { std::mem::transmute(idx) }
+            } else {
+                CardSuit::InvalidSuit
+            }
+        }
+
+        pub fn create_card(csr: CardSuitRank) -> Option<Self> {
+            if csr == CardSuitRank::InvalidCard || csr == CardSuitRank::CardCount {
+                return None;
+            }
+            let c = Card::write_card(csr);
+            if c.card == (INVALID_CARD_BITS as u8) {
+                return None;
+            }
+            Some(c)
+        }
+
+        pub fn strtocard(s: &str) -> Option<Self> {
+            if s.len() < 2 {
+                return None;
+            }
+            let suit_char = s.chars().next()?.to_ascii_uppercase();
+            let rank_str = &s[1..];
+            
+            let base = match suit_char {
+                'S' => CardSuitRank::SpadeAce,
+                'H' => CardSuitRank::HeartAce,
+                'D' => CardSuitRank::DiamondAce,
+                'C' => CardSuitRank::ClubAce,
+                _ => return None,
+            };
+            
+            let offset = if rank_str.len() == 1 {
+                let c = rank_str.chars().next()?;
+                match c {
+                    'A' => 0,
+                    '2' => 1,
+                    '3' => 2,
+                    '4' => 3,
+                    '5' => 4,
+                    '6' => 5,
+                    '7' => 6,
+                    '8' => 7,
+                    '9' => 8,
+                    'J' => 10,
+                    'Q' => 11,
+                    'K' => 12,
+                    _ => return None,
+                }
+            } else if rank_str == "10" {
+                9
+            } else {
+                return None;
+            };
+            
+            let csr_idx = base as u8 + offset;
+            if csr_idx < CardSuitRank::CardCount as u8 {
+                let csr: CardSuitRank = unsafe { std::mem::transmute(csr_idx) };
+                Card::create_card(csr)
+            } else {
+                None
+            }
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct CardCollection {
+        prev: Option<Box<CardCollection>>, 
+        next: Option<Box<CardCollection>>, 
+        c: Option<Card>,
+    }
+    
+    impl CardCollection {
+        // Helper to extract all cards into a vector for processing
+        fn into_vec(self) -> Vec<Card> {
+            let mut cards = Vec::new();
+            if let Some(c) = self.c {
+                cards.push(c);
+            }
+            let mut curr = self.next;
+            while let Some(node) = curr {
+                if let Some(c) = node.c {
+                    cards.push(c);
+                }
+                curr = node.next;
+            }
+            cards
+        }
+        
+        fn from_vec(mut cards: Vec<Card>, sorter: CardSorter) -> Self {
+            if cards.is_empty() {
+                return CardCollection { prev: None, next: None, c: None };
+            }
+            
+            // Sort the cards using the sorter
+            // Use insertion sort since the list is typically small
+            for i in 1..cards.len() {
+                let mut j = i;
+                while j > 0 {
+                    let before = if j > 1 { Some(&cards[j-2]) } else { None };
+                    let new = &cards[j-1];
+                    let after = &cards[j];
+                    if sorter(&before.cloned(), &Some(new.clone()), &Some(after.clone())) == 1 {
+                        cards.swap(j-1, j);
+                        j -= 1;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            
+            // Build linked list from sorted cards
+            let mut head = CardCollection { prev: None, next: None, c: None };
+            if let Some(first) = cards.into_iter().next() {
+                head.c = Some(first);
+                let mut curr = &mut head;
+                for card in cards.into_iter().skip(1) {
+                    let new_node = CardCollection {
+                        prev: None, // Simplified - not maintaining prev for this implementation
+                        next: None,
+                        c: Some(card),
+                    };
+                    curr.next = Some(Box::new(new_node));
+                    curr = curr.next.as_mut().unwrap();
+                }
+            }
+            head
+        }
+
+        pub fn insert_into_collection(self, c: Option<Card>, sorter: CardSorter) -> Self {
+            if c.is_none() {
+                return self;
+            }
+            let mut cards = self.into_vec();
+            cards.push(c.unwrap());
+            Self::from_vec(cards, sorter)
+        }
+
+        pub fn iterate_collection(&self) -> &Self {
+            self
+        }
+
+        pub fn append_into_collection(self, new: Self) -> Self {
+            let mut cards = self.into_vec();
+            cards.extend(new.into_vec());
+            Self::from_vec(cards, sort_card_after)
+        }
+
+        pub fn detach_from_collection(&

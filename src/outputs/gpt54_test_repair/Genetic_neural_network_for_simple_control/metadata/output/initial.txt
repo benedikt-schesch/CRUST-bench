@@ -1,0 +1,1479 @@
+{{activation_fnc.rs}}
+```rust
+// activation_fnc.rs
+use std::io::{self, Write};
+
+/// Hyperbolic tangent activation function (scaled).
+pub fn tangenth(x: f32) -> f32 {
+    (5.0 * x).tanh()
+}
+/// Sigmoid activation function.
+pub fn sigmoid(x: f32) -> f32 {
+    1.0 / (1.0 + (-x).exp())
+}
+/// Sets the function pointer to the tanh activation function.
+pub fn selectTangActivationFunction(func_ptr: &mut Option<fn(f32) -> f32>) {
+    *func_ptr = Some(tangenth);
+}
+/// Sets the function pointer to the sigmoid activation function.
+pub fn selectSigmActivationFunction(func_ptr: &mut Option<fn(f32) -> f32>) {
+    *func_ptr = Some(sigmoid);
+}
+/// Asks the user to select an activation function via CLI and sets it accordingly.
+pub fn selectActivationFunction(func_ptr: &mut Option<fn(f32) -> f32>) {
+    print!("Please select the AF:\n1 - tanh\n2 - sigmoid\nSelect: ");
+    let _ = io::stdout().flush();
+
+    let mut input = String::new();
+    let user_choice = if io::stdin().read_line(&mut input).is_ok() {
+        input.trim().parse::<i32>().unwrap_or(0)
+    } else {
+        0
+    };
+
+    if user_choice == 1 {
+        *func_ptr = Some(tangenth);
+    } else if user_choice == 2 {
+        *func_ptr = Some(sigmoid);
+    }
+}
+```
+
+{{fit_functions.rs}}
+```rust
+use crate::fit_functions;
+use crate::population;
+use crate::pid_controller;
+use crate::signal_designer;
+use crate::model_system;
+use crate::neural_network;
+use std::fs::File;
+
+pub fn pidFitFunction(population: &mut population::Pop, fit: &mut Vec<f32>, pid: &mut pid_controller::PID) {
+    let csv = 0;
+    let path = std::env::temp_dir().join("pid_fit_function_trash.csv");
+    let mut trash = File::create(path).unwrap();
+
+    if fit.len() < population.rows {
+        fit.resize(population.rows, 0.0);
+    }
+
+    for i in 0..population.rows {
+        if let Some(data) = pid.dataSystem.as_mut() {
+            for v in data.iter_mut() {
+                *v = 0.0;
+            }
+        }
+
+        pid.Kp = population.pop[i][0];
+        pid.Ki = population.pop[i][1];
+        pid.Kd = population.pop[i][2];
+        pid.tauD = population.pop[i][3];
+
+        pid_controller::makeSimulationOfSignal(pid, &mut trash, csv);
+        fit[i] = pid.fit;
+    }
+}
+
+pub fn nnFitFunction(population: &mut population::Pop, fit: &mut Vec<f32>, nn: &mut model_system::SystemNN){
+    let path = std::env::temp_dir().join("nn_fit_function_trash.csv");
+    let mut trash = std::io::BufWriter::new(std::fs::File::create(path).unwrap());
+
+    if fit.len() < population.rows {
+        fit.resize(population.rows, 0.0);
+    }
+
+    for i in 0..population.rows {
+        for v in nn.data_system.iter_mut() {
+            *v = 0.0;
+        }
+
+        neural_network::fillMatrixesNN(&mut nn.neural_network, &population.pop[i]);
+        model_system::makeSimulationOfSignalNN(nn, &mut trash, false);
+        fit[i] = nn.fit;
+    }
+}
+```
+
+{{general_math.rs}}
+```rust
+use rand::Rng;
+
+pub fn createRandomFloat(min: f32, max: f32) -> f32 {
+    let mut rng = rand::thread_rng();
+    let random: f32 = rng.gen();
+    let diff = max - min;
+    let r = random * diff;
+    min + r
+}
+```
+
+{{genetic_operations.rs}}
+```rust
+// genetic_operations.rs
+use crate::population::{Pop, InputPop};
+use crate::sort::quickSort;
+use crate::general_math::createRandomFloat;
+use rand::Rng;
+
+/// Creates a new input population structure from a given population.
+/// Used internally by other selection functions.
+fn create_input_pop_custom(input_pop: &mut InputPop, rows: i32, population: &Pop) {
+    input_pop.cols = population.cols;
+    input_pop.rows = rows as usize;
+    input_pop.s[0] = population.s[0].clone();
+    input_pop.s[1] = population.s[1].clone();
+}
+
+/// Selects the best individuals based on fitness.
+pub fn selbest(
+    fit: &[f32],
+    population: &Pop,
+    new_population: &mut Pop,
+    selects: &[i32],
+    way: i32,
+) {
+    let rows: usize = selects.iter().map(|v| *v as usize).sum();
+
+    let mut fit_vec = fit.to_vec();
+    let mut result: Vec<i32> = (0..fit.len() as i32).collect();
+    quickSort(&mut fit_vec, &mut result, fit.len() as i32);
+
+    let mut result_index: isize = if way == 0 {
+        fit.len() as isize - 1
+    } else if way == 1 {
+        0
+    } else {
+        panic!("Error: way should be 0 or 1");
+    };
+
+    let mut input_pop = InputPop::default();
+    create_input_pop_custom(&mut input_pop, rows as i32, population);
+    crate::population::createStructure(&mut input_pop, new_population);
+
+    let mut global_index = 0usize;
+    for num in selects.iter().copied() {
+        for _ in 0..num {
+            let src = result[result_index as usize] as usize;
+            new_population.pop[global_index] = population.pop[src].clone();
+            global_index += 1;
+        }
+        if way == 0 {
+            result_index -= 1;
+        } else {
+            result_index += 1;
+        }
+    }
+}
+
+/// Selects individuals randomly from the population.
+pub fn selrand(population: &mut Pop, new_population: &mut Pop, rows: i32) {
+    let mut input_pop = InputPop::default();
+    create_input_pop_custom(&mut input_pop, rows, population);
+    crate::population::createStructure(&mut input_pop, new_population);
+
+    let mut rng = rand::thread_rng();
+    for i in 0..rows as usize {
+        let index = rng.gen_range(0..population.rows);
+        new_population.pop[i] = population.pop[index].clone();
+    }
+}
+
+/// Tournament selection between two randomly chosen individuals.
+pub fn selturn(population: &Pop, fit: &[f32], new_population: &mut Pop, rows: i32) {
+    let mut input_pop = InputPop::default();
+    create_input_pop_custom(&mut input_pop, rows, population);
+    crate::population::createStructure(&mut input_pop, new_population);
+
+    let mut rng = rand::thread_rng();
+    for i in 0..rows as usize {
+        let j = rng.gen_range(0..population.rows);
+        let k = rng.gen_range(0..population.rows);
+
+        if j == k || fit[j] <= fit[k] {
+            new_population.pop[i] = population.pop[j].clone();
+        } else {
+            new_population.pop[i] = population.pop[k].clone();
+        }
+    }
+}
+
+/// Crossover operation exchanging genes between adjacent individuals.
+pub fn crosov(population: &mut Pop, selects: &mut Vec<i32>, selects_length: i32) {
+    let mut local_selects = selects.clone();
+    let mut local_len = selects_length;
+
+    if local_len % 2 != 0 {
+        local_selects.push(population.cols as i32);
+        local_len += 1;
+    }
+
+    for index in (0..population.rows.saturating_sub(1)).step_by(2) {
+        for i in (0..local_len as usize).step_by(2) {
+            let start = local_selects[i] as usize;
+            let end = local_selects[i + 1] as usize;
+            let saved = population.pop[index][start..end].to_vec();
+
+            for x in start..end {
+                population.pop[index][x] = population.pop[index + 1][x];
+            }
+            for (offset, x) in (start..end).enumerate() {
+                population.pop[index + 1][x] = saved[offset];
+            }
+        }
+    }
+}
+
+/// Mutation function that randomly alters values with a given probability.
+pub fn mutx(population: &mut Pop, chance: f32) {
+    let mut rng = rand::thread_rng();
+
+    for x in 0..population.rows {
+        for y in 0..population.cols {
+            let random_float: f32 = rng.gen();
+            if random_float < chance {
+                let value = createRandomFloat(population.s[1][y], population.s[0][y]);
+                population.pop[x][y] = value;
+            }
+        }
+    }
+}
+```
+
+{{input_toolbox.rs}}
+```rust
+// input_toolbox.rs
+use crate::model_system::SystemNN;
+use std::io::{self, Write};
+
+/// Input preparation for NN type one.
+pub fn typeOne(data: &mut [f32]) {
+    data[4] = (data[1] - data[9]) / data[0];
+    data[5] += data[1];
+    data[9] = data[1];
+
+    data[8] = (data[2] - data[10]) / data[0];
+    data[10] = data[2];
+
+    data[6] = (data[3] - data[11]) / data[0];
+    data[7] = (data[6] - data[12]) / data[0];
+    data[11] = data[3];
+    data[12] = data[6];
+}
+/// Input preparation for NN type two.
+pub fn typeTwo(_data: &mut [f32]) {
+}
+/// Constructs input arrays for type one networks.
+fn makeInputDataSystem(system_nn: &mut SystemNN, size: usize, full: usize) {
+    system_nn.input_data = vec![0.0; full];
+    system_nn.input_data_size = vec![full as i32, 1, (size + 1) as i32];
+    system_nn.input_types = vec![0, 1, 2, 4, 5, 9, 10, 6];
+}
+/// Constructs input arrays for type two networks.
+fn makeInputDataSystemTwo(system_nn: &mut SystemNN, size: usize, full: usize) {
+    system_nn.input_data = vec![0.0; full];
+    system_nn.input_data_size = vec![full as i32, 1, (size + 1) as i32];
+    system_nn.input_types = vec![0, 1, 2];
+}
+/// Lets the user select an input-preparation function and sets up the corresponding system config.
+pub fn selectInputNNFunction(func_ptr: &mut Option<fn(&mut [f32])>, system_nn: &mut SystemNN) {
+    print!("Please select the AF:\n1 - typeOne\n2 - typeTwo (SD)\nSelect: ");
+    let _ = io::stdout().flush();
+
+    let mut input = String::new();
+    let user_choice = if io::stdin().read_line(&mut input).is_ok() {
+        input.trim().parse::<i32>().unwrap_or(0)
+    } else {
+        0
+    };
+
+    if user_choice == 1 {
+        *func_ptr = Some(typeOne);
+        makeInputDataSystem(system_nn, 8, 13);
+    } else if user_choice == 2 {
+        *func_ptr = Some(typeTwo);
+        makeInputDataSystemTwo(system_nn, 3, 4);
+    }
+}
+```
+
+{{matrix_math.rs}}
+```rust
+use crate::population;
+
+#[derive(Debug, Clone, Default)]
+pub struct Matrix {
+    pub matrix: Vec<Vec<f32>>,
+    pub sizes: Vec<usize>,
+}
+
+impl Matrix{
+    pub fn createMatrix(_matrix: Matrix, sizes: Vec<usize>) -> Matrix{
+        let rows = sizes[0];
+        let cols = sizes[1];
+        Matrix {
+            matrix: vec![vec![0.0; cols]; rows],
+            sizes: vec![rows, cols],
+        }
+    }
+
+    pub fn createMatrixFromPointer(input: &[f32], sizes: Vec<usize>) -> Matrix{
+        let rows = sizes[0];
+        let cols = sizes[1];
+        let mut matrix = vec![vec![0.0; cols]; rows];
+        let mut global_index = 0usize;
+        for i in 0..rows {
+            for j in 0..cols {
+                matrix[i][j] = input[global_index];
+                global_index += 1;
+            }
+        }
+        Matrix { matrix, sizes: vec![rows, cols] }
+    }
+
+    pub fn matrixDelete(&mut self){
+        self.matrix.clear();
+        self.sizes.clear();
+    }
+
+    pub fn matrixDeleteOnlyData(&mut self){
+        self.matrix.clear();
+        self.sizes.clear();
+    }
+}
+
+pub fn matrixMultiply(a: &Matrix, b: &Matrix) -> Matrix{
+    if a.sizes[1] != b.sizes[0] {
+        panic!("Error: Sizes of matrixes are incorect");
+    }
+
+    let rows = a.sizes[0];
+    let cols = b.sizes[1];
+    let mut output = Matrix::createMatrix(Matrix::default(), vec![rows, cols]);
+
+    for i in 0..b.sizes[1] {
+        for y in 0..a.sizes[0] {
+            output.matrix[y][i] = 0.0;
+            for x in 0..a.sizes[1] {
+                output.matrix[y][i] += a.matrix[y][x] * b.matrix[x][i];
+            }
+        }
+    }
+
+    output
+}
+
+pub fn fullCopyMatrix(a: &Matrix) -> Matrix{
+    a.clone()
+}
+
+pub fn matrixSubstAdd(a: &Matrix, b: &Matrix, operation: i32) -> Matrix{
+    let mut output = Matrix::createMatrix(Matrix::default(), vec![a.sizes[0], b.sizes[1]]);
+    for i in 0..output.sizes[0] {
+        for y in 0..output.sizes[1] {
+            if operation == 0 {
+                output.matrix[i][y] = a.matrix[i][y] - b.matrix[i][y];
+            } else {
+                output.matrix[i][y] = a.matrix[i][y] + b.matrix[i][y];
+            }
+        }
+    }
+    output
+}
+
+pub fn matrixAllValuesFormula(a: &mut Matrix, formula: fn(f32)->f32) -> Matrix{
+    for i in 0..a.sizes[0] {
+        for y in 0..a.sizes[1] {
+            a.matrix[i][y] = formula(a.matrix[i][y]);
+        }
+    }
+    a.clone()
+}
+```
+
+{{model_system.rs}}
+```rust
+// model_system.rs
+use crate::neural_network::{NN, NNInput};
+use crate::signal_designer::Signal;
+use std::io::Write;
+
+#[derive(Default)]
+/// Represents a neural network-based system with simulation data and signal processing.
+pub struct SystemNN {
+    pub input_sys: Option<fn(&mut [f32])>,
+    pub input_data: Vec<f32>,
+    pub input_data_size: Vec<i32>,
+    pub input_types: Vec<usize>,
+    pub signal: Option<Box<Signal>>,
+    pub output: Option<Box<Signal>>,
+    pub data_system: Vec<f32>,
+    pub size_data_system: usize,
+    pub fit: f32,
+    pub max_counter: i32,
+    pub steady_rise_check: i32,
+    pub neural_network: Box<NN>,
+    pub func_system: Option<fn(&mut [f32]) -> f32>,
+    pub max_sys: f32,
+    pub min_sys: f32,
+}
+
+/// Creates and initializes a SystemNN and its neural network.
+pub fn createNNSystem(system_nn: &mut SystemNN, input: &mut NNInput) {
+    crate::input_toolbox::selectInputNNFunction(&mut system_nn.input_sys, system_nn);
+
+    input.neuronsSize[0] = (system_nn.input_data_size[2] - 1) as usize;
+
+    input.normalizationMatrix = [
+        vec![0.0; input.neuronsSize[0]],
+        vec![0.0; input.neuronsSize[0]],
+    ];
+    input.denormalizationMatrix = [vec![0.0; 1], vec![0.0; 1]];
+
+    let mut nn = NN::default();
+    crate::neural_network::createNeuralNetwork(std::mem::take(input), &mut nn);
+    system_nn.neural_network = Box::new(nn);
+
+    let mut signal = Signal::default();
+    crate::signal_designer::cliSignalSelector(&mut signal);
+    system_nn.signal = Some(Box::new(signal));
+
+    let size = crate::systems_builder::selectSystem(&mut system_nn.func_system) as usize;
+    system_nn.data_system = vec![0.0; size];
+    system_nn.size_data_system = size;
+
+    let sig = system_nn.signal.as_ref().unwrap();
+    system_nn.output = Some(Box::new(Signal {
+        length: sig.length,
+        dt: sig.dt,
+        signal: vec![0.0; sig.signal.len()],
+    }));
+}
+
+/// Frees memory associated with a SystemNN.
+pub fn clearNNSystem(system_nn: &mut SystemNN) {
+    let nn = std::mem::take(&mut system_nn.neural_network);
+    crate::neural_network::clearNeuralNetwork(*nn);
+
+    if let Some(mut s) = system_nn.signal.take() {
+        crate::signal_designer::deleteSignal(&mut s);
+    }
+    if let Some(mut o) = system_nn.output.take() {
+        crate::signal_designer::deleteSignal(&mut o);
+    }
+
+    system_nn.data_system.clear();
+    system_nn.input_data.clear();
+    system_nn.input_data_size.clear();
+}
+
+/// Resets system simulation state for a clean run.
+pub fn cleanNNSystem(system_nn: &mut SystemNN) {
+    if let Some(output) = system_nn.output.as_mut() {
+        for v in output.signal.iter_mut() {
+            *v = 0.0;
+        }
+    }
+
+    for v in system_nn.data_system.iter_mut() {
+        *v = 0.0;
+    }
+    if system_nn.data_system.len() > 1 {
+        let dt = system_nn.signal.as_ref().unwrap().dt;
+        system_nn.data_system[1] = dt;
+    }
+
+    for v in system_nn.input_data.iter_mut() {
+        *v = 0.0;
+    }
+    if !system_nn.input_data.is_empty() {
+        system_nn.input_data[0] = system_nn.signal.as_ref().unwrap().dt;
+    }
+
+    system_nn.steady_rise_check = 0;
+    system_nn.max_counter = 0;
+    system_nn.fit = 0.0;
+}
+
+/// Analyzes signal to find its maximum and minimum values.
+pub fn getMaxMinSignalValues(signal: &Signal, max: &mut f32, min: &mut f32) {
+    *max = 0.0;
+    *min = 0.0;
+    for &v in signal.signal.iter() {
+        if v > *max {
+            *max = v;
+        } else if v < *min {
+            *min = v;
+        }
+    }
+}
+
+/// Executes one optimization round to find best U input for the system.
+pub fn findUOneRound(system_nn: &mut SystemNN, for_values: &[f32; 3], data: &mut [f32; 12]) {
+    let mut min = f32::MAX;
+    let mut max_sig = 0.0;
+    let mut min_sig = 0.0;
+    getMaxMinSignalValues(system_nn.signal.as_ref().unwrap(), &mut max_sig, &mut min_sig);
+    let _ = min_sig;
+
+    let mut cur_value = for_values[0];
+    while cur_value < for_values[1] {
+        let mut max_y = 0.0;
+        let mut max_dy = 0.0;
+        let mut max_ddy = 0.0;
+        let mut max_e = 0.0;
+        let mut max_de = 0.0;
+        let mut max_dde = 0.0;
+
+        let mut count = 0;
+        let mut pre_y = 0.0;
+        let mut pre_dy = 0.0;
+        let mut iy = 0.0;
+        let mut pre_u = 0.0;
+        let mut pre_du = 0.0;
+        let mut iu = 0.0;
+        let mut pre_e = 0.0;
+        let mut pre_de = 0.0;
+        let mut ie = 0.0;
+        let mut penalty = 0.0;
+        let mut sum = 0.0;
+
+        for v in system_nn.data_system.iter_mut() {
+            *v = 0.0;
+        }
+        system_nn.data_system[1] = system_nn.signal.as_ref().unwrap().dt;
+
+        let dt = system_nn.output.as_ref().unwrap().dt;
+        let len = system_nn.signal.as_ref().unwrap().length as f32;
+        let func = system_nn.func_system.unwrap();
+
+        let mut j = 0.0;
+        while j < len {
+            if j < 1.0 {
+                system_nn.data_system[0] = 0.0;
+            } else {
+                system_nn.data_system[0] = cur_value;
+            }
+
+            let sys_output = func(&mut system_nn.data_system);
+            if sys_output > system_nn.max_sys || sys_output < system_nn.min_sys {
+                penalty = 50000.0;
+            }
+
+            let dy = (sys_output - pre_y) / dt;
+            let ddy = (dy - pre_dy) / dt;
+            let de = (max_sig - sys_output - pre_e) / dt;
+            let dde = (de - pre_de) / dt;
+
+            pre_y = sys_output;
+            pre_dy = dy;
+            pre_e = max_sig - sys_output;
+            pre_de = de;
+
+            if sys_output > max_y { max_y = sys_output; }
+            if pre_e > max_e { max_e = pre_e; }
+            if dy > max_dy { max_dy = dy; }
+            if ddy > max_ddy { max_ddy = ddy; }
+            if de > max_de { max_de = de; }
+            if dde > max_dde { max_dde = dde; }
+
+            iy += sys_output;
+            iu += cur_value;
+            ie += pre_e;
+
+            if j > len - 1.0 {
+                sum += sys_output;
+                count += 1;
+            }
+
+            let _du = cur_value - pre_u;
+            let _ddu = _du - pre_du;
+            pre_u = cur_value;
+            pre_du = _du;
+
+            j += dt;
+        }
+
+        let mut analyzed_value = max_sig - (sum / count as f32) + penalty;
+        if analyzed_value < 0.0 { analyzed_value *= -1.0; }
+        if iy < 0.0 { iy *= -1.0; }
+        if iu < 0.0 { iu *= -1.0; }
+        if ie < 0.0 { ie *= -1.0; }
+
+        if analyzed_value < min {
+            min = analyzed_value;
+            data[0] = max_e;
+            data[1] = cur_value;
+            data[2] = max_y;
+            data[3] = max_de;
+            data[4] = max_dde;
+            data[5] = ie;
+            data[6] = cur_value / dt;
+            data[7] = data[7] / dt;
+            data[8] = iu;
+            data[9] = max_dy;
+            data[10] = max_ddy;
+            data[11] = iy;
+        }
+
+        cur_value += for_values[2];
+    }
+}
+
+/// Calls multiple search passes to fine-tune U for the system and signal.
+pub fn findUForSystemAndSignal(system_nn: &mut SystemNN, data: &mut [f32; 12]) {
+    let for_value_one = [0.0, 10000.0, 1000.0];
+    findUOneRound(system_nn, &for_value_one, data);
+
+    let for_value_two = [data[1] - 100.0, data[1] + 100.0, 10.0];
+    findUOneRound(system_nn, &for_value_two, data);
+
+    let for_value_three = [data[1] - 10.0, data[1] + 10.0, 1.0];
+    findUOneRound(system_nn, &for_value_three, data);
+}
+
+/// Calculates a simple numerical derivative.
+pub fn makeDerivation(x: f32, x_t: f32, dt: f32) -> f32 {
+    (x - x_t) / dt
+}
+
+/// Prepares and applies normalization matrices for the SystemNN based on system signal properties.
+pub fn createDeNormalization(system_nn: &mut SystemNN) {
+    let mut normalization = [vec![0.0; 12], vec![0.0; 12]];
+    let mut data = [0.0f32; 12];
+
+    findUForSystemAndSignal(system_nn, &mut data);
+
+    for i in 0..12 {
+        normalization[0][i] = data[i];
+        normalization[1][i] = data[i] * -1.0;
+    }
+
+    normalization[0][1] *= 10.0;
+    normalization[1][1] *= 10.0;
+
+    let input_count = system_nn.input_data_size[2] as usize - 1;
+    for i in 0..input_count {
+        let t = system_nn.input_types[i];
+        system_nn.neural_network.normalizationMatrix[0][i] = normalization[0][t];
+        system_nn.neural_network.normalizationMatrix[1][i] = normalization[1][t];
+    }
+
+    system_nn.neural_network.denormalizationMatrix[0][0] = normalization[0][1];
+    system_nn.neural_network.denormalizationMatrix[1][0] = normalization[1][1];
+
+    system_nn.input_types.clear();
+}
+
+/// Simulates the system using its neural network and updates fit/error metrics.
+pub fn makeSimulationOfSignalNN<W: Write>(system: &mut SystemNN, writer: &mut W, csv: bool){
+    cleanNNSystem(system);
+    crate::neural_network::clearSDMemory(&mut system.neural_network);
+
+    let mut neural_output = 0.0f32;
+    let mut system_output = 0.0f32;
+    let mut max = 0.0f32;
+
+    let signal_len = system.signal.as_ref().unwrap().length as usize;
+
+    for i in 1..signal_len {
+        let prev_output = system.output.as_ref().unwrap().signal[i - 1];
+        let desired = system.signal.as_ref().unwrap().signal[i];
+        let error = desired - prev_output;
+
+        system.input_data[1] = error;
+        system.input_data[2] = neural_output;
+        system.input_data[3] = system_output;
+
+        if let Some(f) = system.input_sys {
+            f(&mut system.input_data);
+        }
+
+        let rows = system.neural_network.neuronsSize[0];
+        let mut input_matrix = crate::matrix_math::Matrix::createMatrix(crate::matrix_math::Matrix::default(), vec![rows, 1]);
+        let mut output_matrix = crate::matrix_math::Matrix::default();
+
+        let mut matrix_index = 0usize;
+        for j in system.input_data_size[1] as usize..system.input_data_size[2] as usize {
+            input_matrix.matrix[matrix_index][0] = system.input_data[j];
+            matrix_index += 1;
+        }
+
+        crate::neural_network::oneCalculation(&mut system.neural_network, &mut input_matrix, &mut output_matrix);
+
+        if output_matrix.matrix[0][0] > max {
+            max = output_matrix.matrix[0][0];
+        }
+
+        system.data_system[0] = output_matrix.matrix[0][0];
+        neural_output = system.data_system[0];
+
+        let func = system.func_system.unwrap();
+        let mut out_val = func(&mut system.data_system);
+        if out_val > system.max_sys {
+            out_val = system.max_sys;
+            system.max_counter += 1;
+        } else if out_val < system.min_sys {
+            out_val = system.min_sys;
+            system.max_counter += 1;
+        }
+
+        if let Some(output) = system.output.as_mut() {
+            output.signal[i] = out_val;
+        }
+
+        system_output = out_val;
+
+        if csv {
+            let _ = writeln!(
+                writer,
+                "{},{},{},{}",
+                system.output.as_ref().unwrap().signal[i],
+                system.signal.as_ref().unwrap().signal[i],
+                output_matrix.matrix[0][0],
+                system.output.as_ref().unwrap().signal[i]
+            );
+        }
+
+        let diff = (system.signal.as_ref().unwrap().signal[i] - system.output.as_ref().unwrap().signal[i]).abs();
+        system.fit += diff;
+
+        if system.output.as_ref().unwrap().signal[i - 1] > system.output.as_ref().unwrap().signal[i] {
+            system.steady_rise_check += 1;
+        }
+    }
+
+    if csv {
+        let _ = writeln!(writer, "{}", max);
+    }
+}
+```
+
+{{neural_network.rs}}
+```rust
+// neural_network.rs
+use crate::population::Pop;
+use crate::matrix_math::Matrix;
+
+#[derive(Default)]
+/// Structure representing the neural network definition.
+pub struct NN {
+    pub AW: Vec<Matrix>,
+    pub BW: Vec<Matrix>,
+    pub neuronsSize: Vec<usize>,
+    pub layerNumber: usize,
+    pub countOfValues: usize,
+    pub normalizationMatrix: [Vec<f32>; 2],
+    pub denormalizationMatrix: [Vec<f32>; 2],
+    pub func_ptr: Option<fn(f32) -> f32>,
+    pub layerType: Vec<i32>,
+    pub sdNeuronsTypes: Vec<Vec<u8>>,
+    pub SDMemory: Vec<Matrix>,
+}
+
+#[derive(Default)]
+/// Input structure used to create an NN instance.
+pub struct NNInput {
+    pub neuronsSize: Vec<usize>,
+    pub layerNumber: usize,
+    pub normalizationMatrix: [Vec<f32>; 2],
+    pub denormalizationMatrix: [Vec<f32>; 2],
+    pub layerType: Vec<i32>,
+    pub sdNumber: usize,
+}
+
+fn clearNNInput(_input: NNInput) {
+}
+
+pub fn createNeuralNetwork(input: NNInput, neural_network: &mut NN) {
+    neural_network.layerNumber = input.layerNumber;
+    neural_network.neuronsSize = input.neuronsSize.clone();
+    neural_network.layerType = input.layerType.clone();
+    neural_network.sdNeuronsTypes = Vec::with_capacity(input.sdNumber);
+    neural_network.SDMemory = Vec::with_capacity(input.sdNumber);
+
+    let mut global_index_sd = 0usize;
+    for i in 0..neural_network.layerNumber {
+        if neural_network.layerType[i] == 1 {
+            let size = neural_network.neuronsSize[i];
+            let mut sd_types = vec![0u8; size];
+
+            for j in 0..(size / 2) {
+                sd_types[j] = 0;
+            }
+            let mid_index_slice = size / 2 + (size - size / 2) / 2;
+            for j in (size / 2)..mid_index_slice {
+                sd_types[j] = 1;
+            }
+            for j in mid_index_slice..size {
+                sd_types[j] = 2;
+            }
+
+            neural_network.sdNeuronsTypes.push(sd_types);
+
+            let mut sd_matrix = Matrix::createMatrix(Matrix::default(), vec![size, 1]);
+            for j in 0..size {
+                sd_matrix.matrix[j][0] = 0.0;
+            }
+            neural_network.SDMemory.push(sd_matrix);
+            global_index_sd += 1;
+        }
+    }
+
+    neural_network.normalizationMatrix = [
+        vec![0.0; neural_network.neuronsSize[0]],
+        vec![0.0; neural_network.neuronsSize[0]],
+    ];
+    neural_network.denormalizationMatrix = [
+        vec![0.0; neural_network.neuronsSize[neural_network.layerNumber - 1]],
+        vec![0.0; neural_network.neuronsSize[neural_network.layerNumber - 1]],
+    ];
+
+    for i in 0..2 {
+        neural_network.normalizationMatrix[i] = input.normalizationMatrix[i].clone();
+        neural_network.denormalizationMatrix[i] = input.denormalizationMatrix[i].clone();
+    }
+
+    crate::activation_fnc::selectActivationFunction(&mut neural_network.func_ptr);
+
+    clearNNInput(input);
+
+    neural_network.AW = Vec::with_capacity(neural_network.layerNumber - 1);
+    neural_network.BW = Vec::with_capacity(neural_network.layerNumber - 1);
+
+    let mut layer_index = 0usize;
+    neural_network.countOfValues = 0;
+    for _i in 0..neural_network.layerNumber - 1 {
+        let sizes_aw = vec![
+            neural_network.neuronsSize[layer_index + 1],
+            neural_network.neuronsSize[layer_index],
+        ];
+        let sizes_bw = vec![neural_network.neuronsSize[layer_index + 1], 1];
+
+        neural_network.countOfValues += neural_network.neuronsSize[layer_index + 1]
+            * neural_network.neuronsSize[layer_index]
+            + neural_network.neuronsSize[layer_index + 1];
+
+        neural_network.AW.push(Matrix::createMatrix(Matrix::default(), sizes_aw));
+        neural_network.BW.push(Matrix::createMatrix(Matrix::default(), sizes_bw));
+        layer_index += 1;
+    }
+    neural_network.countOfValues -= neural_network.neuronsSize[layer_index];
+
+    let index_bw_last = neural_network.layerNumber - 2;
+    for i in 0..neural_network.BW[index_bw_last].sizes[0] {
+        for j in 0..neural_network.BW[index_bw_last].sizes[0] {
+            if j < neural_network.BW[index_bw_last].matrix[i].len() {
+                neural_network.BW[index_bw_last].matrix[i][j] = 0.0;
+            }
+        }
+    }
+}
+
+pub fn clearNeuralNetwork(_neural_network: NN) {
+}
+
+pub fn fillMatrixesNN(neural_network: &mut NN, population: &[f32]) {
+    let mut global_index = 0usize;
+
+    for i in 0..neural_network.layerNumber - 1 {
+        for x in 0..neural_network.AW[i].sizes[0] {
+            for y in 0..neural_network.AW[i].sizes[1] {
+                neural_network.AW[i].matrix[x][y] = population[global_index];
+                global_index += 1;
+            }
+        }
+
+        if i < neural_network.layerNumber - 2 {
+            for x in 0..neural_network.BW[i].sizes[0] {
+                for y in 0..neural_network.BW[i].sizes[1] {
+                    neural_network.BW[i].matrix[x][y] = population[global_index];
+                    global_index += 1;
+                }
+            }
+        }
+    }
+}
+
+pub fn clearSDMemory(neural_network: &mut NN) {
+    let mut global_index = 0usize;
+
+    for i in 0..neural_network.layerNumber {
+        if neural_network.layerType[i] == 1 {
+            for j in 0..neural_network.neuronsSize[i] {
+                neural_network.SDMemory[global_index].matrix[j][0] = 0.0;
+            }
+            global_index += 1;
+        }
+    }
+}
+
+pub fn deNormalizationProcess(neural_network: &mut NN, input: &mut Matrix, way: i32) {
+    for i in 0..input.sizes[0] {
+        let (r_min, r_max, t_min, t_max) = if way == 0 {
+            (
+                neural_network.normalizationMatrix[1][i],
+                neural_network.normalizationMatrix[0][i],
+                -1.0,
+                1.0,
+            )
+        } else {
+            (
+                -1.0,
+                1.0,
+                neural_network.denormalizationMatrix[1][i],
+                neural_network.denormalizationMatrix[0][i],
+            )
+        };
+
+        input.matrix[i][0] =
+            ((input.matrix[i][0] - r_min) / (r_max - r_min)) * (t_max - t_min) + t_min;
+
+        if way == 0 {
+            if input.matrix[i][0] > 1.0 {
+                input.matrix[i][0] = 1.0;
+            } else if input.matrix[i][0] < -1.0 {
+                input.matrix[i][0] = -1.0;
+            }
+        } else if way == 1 {
+            if input.matrix[i][0] > neural_network.denormalizationMatrix[0][i] {
+                input.matrix[i][0] = neural_network.denormalizationMatrix[0][i];
+            } else if input.matrix[i][0] < neural_network.denormalizationMatrix[1][i] {
+                input.matrix[i][0] = neural_network.denormalizationMatrix[1][i];
+            }
+        }
+    }
+}
+
+fn makeSDLayerAction(neural_network: &mut NN, input: &mut Matrix, sd_index: usize, layer_index: usize) {
+    let mut dsd_memory: Vec<f32> = Vec::new();
+
+    for i in 0..neural_network.neuronsSize[layer_index] {
+        if neural_network.sdNeuronsTypes[sd_index][i] == 2 {
+            dsd_memory.push(-input.matrix[i][0]);
+        }
+    }
+
+    let output = crate::matrix_math::matrixSubstAdd(input, &neural_network.SDMemory[sd_index], 1);
+
+    let mut index_d = 0usize;
+    for i in 0..neural_network.neuronsSize[layer_index] {
+        if neural_network.sdNeuronsTypes[sd_index][i] == 2 {
+            neural_network.SDMemory[sd_index].matrix[i][0] = dsd_memory[index_d];
+            index_d += 1;
+        }
+    }
+
+    for i in 0..neural_network.neuronsSize[layer_index] {
+        if neural_network.sdNeuronsTypes[sd_index][i] == 1 {
+            neural_network.SDMemory[sd_index].matrix[i][0] = output.matrix[i][0];
+        }
+    }
+
+    *input = crate::matrix_math::fullCopyMatrix(&output);
+}
+
+pub fn oneCalculation(neural_network: &mut NN, input: &mut Matrix, output: &mut Matrix) {
+    let mut sd_index = 0usize;
+
+    deNormalizationProcess(neural_network, input, 0);
+
+    for i in 0..neural_network.layerNumber - 1 {
+        let temp_output = crate::matrix_math::matrixMultiply(&neural_network.AW[i], input);
+        *output = temp_output;
+
+        let temp_input = crate::matrix_math::matrixSubstAdd(output, &neural_network.BW[i], 0);
+        *input = temp_input;
+
+        let func = neural_network.func_ptr.unwrap();
+        crate::matrix_math::matrixAllValuesFormula(input, func);
+
+        if neural_network.layerType[i + 1] == 1 {
+            let layer_index = i + 1;
+            makeSDLayerAction(neural_network, input, sd_index, layer_index);
+            sd_index += 1;
+        }
+    }
+
+    *output = crate::matrix_math::fullCopyMatrix(input);
+    deNormalizationProcess(neural_network, output, 1);
+}
+```
+
+{{pid_controller.rs}}
+```rust
+use crate::systems_builder;
+// pid_controller.rs
+use std::fs::File;
+use std::io::Write;
+use crate::signal_designer::Signal;
+
+#[derive(Default)]
+pub struct PID {
+    pub Kp: f32,
+    pub Ki: f32,
+    pub Kd: f32,
+    pub tauI: f32,
+    pub tauD: f32,
+    pub prevError: f32,
+    pub proportiError: f32,
+    pub integralError: f32,
+    pub differenError: f32,
+    pub signal: Option<Box<Signal>>,
+    pub func_system: Option<fn(&mut [f32]) -> f32>,
+    pub output: Option<Box<Signal>>,
+    pub dataSystem: Option<Box<[f32]>>,
+    pub sizeDataSystem: i32,
+    pub limMaxInt: f32,
+    pub limMinInt: f32,
+    pub limMax: f32,
+    pub limMin: f32,
+    pub fit: f32,
+    pub steadyRiseCheck: i32,
+    pub maxCounter: i32,
+}
+
+pub fn createNewPidController(pid: &mut PID) {
+    pid.Kp = 0.0;
+    pid.Ki = 0.0;
+    pid.Kd = 0.0;
+
+    pid.tauD = 1.0;
+    pid.tauI = 1.0;
+
+    let mut signal = Signal::default();
+    crate::signal_designer::cliSignalSelector(&mut signal);
+    pid.signal = Some(Box::new(signal));
+
+    let size = systems_builder::selectSystem(&mut pid.func_system);
+    pid.dataSystem = Some(vec![0.0; size as usize].into_boxed_slice());
+    pid.sizeDataSystem = size;
+
+    let sig = pid.signal.as_ref().unwrap();
+    pid.output = Some(Box::new(Signal {
+        length: sig.length,
+        dt: sig.dt,
+        signal: vec![0.0; sig.signal.len()],
+    }));
+
+    pid.prevError = 0.0;
+    pid.integralError = 0.0;
+}
+
+pub fn deletePid(pid: &mut PID) {
+    if let Some(mut s) = pid.signal.take() {
+        crate::signal_designer::deleteSignal(&mut s);
+    }
+    if let Some(mut o) = pid.output.take() {
+        crate::signal_designer::deleteSignal(&mut o);
+    }
+    pid.dataSystem = None;
+}
+
+pub fn resetOutputMemoryPid(pid: &mut PID) {
+    if let Some(output) = pid.output.as_mut() {
+        for v in output.signal.iter_mut() {
+            *v = 0.0;
+        }
+    }
+    if let Some(data) = pid.dataSystem.as_mut() {
+        for v in data.iter_mut() {
+            *v = 0.0;
+        }
+        if data.len() > 1 {
+            data[1] = pid.signal.as_ref().unwrap().dt;
+        }
+    }
+
+    pid.proportiError = 0.0;
+    pid.integralError = 0.0;
+    pid.differenError = 0.0;
+    pid.prevError = 0.0;
+    pid.steadyRiseCheck = 1;
+    pid.maxCounter = 0;
+}
+
+pub fn makeSimulationOfSignal(pid: &mut PID, csv_file: &mut File, csv: i32) {
+    resetOutputMemoryPid(pid);
+    pid.fit = 0.0;
+
+    if csv == 1 {
+        let _ = writeln!(
+            csv_file,
+            "{},{},{},{},{}",
+            pid.proportiError,
+            pid.integralError,
+            pid.differenError,
+            pid.output.as_ref().unwrap().signal[0],
+            pid.signal.as_ref().unwrap().signal[0]
+        );
+    }
+
+    let len = pid.signal.as_ref().unwrap().length as usize;
+    let dt = pid.signal.as_ref().unwrap().dt;
+    let func = pid.func_system.unwrap();
+
+    for i in 2..len {
+        let error = pid.signal.as_ref().unwrap().signal[i] - pid.output.as_ref().unwrap().signal[i - 1];
+
+        pid.proportiError = pid.Kp * error;
+
+        pid.integralError =
+            pid.integralError + 0.5f32 * pid.Ki * (error - pid.prevError) * dt;
+
+        pid.differenError = -(2.0f32 * pid.Kd
+            * (pid.output.as_ref().unwrap().signal[i - 1] - pid.output.as_ref().unwrap().signal[i - 2])
+            + (2.0f32 * pid.tauD - dt) * pid.differenError)
+            / (2.0f32 * pid.tauD + dt);
+
+        if pid.integralError > pid.limMaxInt {
+            pid.integralError = pid.limMaxInt;
+        } else if pid.integralError < pid.limMinInt {
+            pid.integralError = pid.limMinInt;
+        }
+
+        if let Some(data) = pid.dataSystem.as_mut() {
+            data[0] = pid.proportiError + pid.integralError + pid.differenError;
+            let mut out = func(data);
+
+            if out > pid.limMax {
+                out = pid.limMax;
+                pid.maxCounter += 1;
+            } else if out < pid.limMin {
+                out = pid.limMin;
+                pid.maxCounter += 1;
+            }
+
+            if let Some(output) = pid.output.as_mut() {
+                output.signal[i] = out;
+            }
+        }
+
+        if csv == 1 {
+            let _ = writeln!(
+                csv_file,
+                "{},{},{},{},{}",
+                pid.proportiError,
+                pid.integralError,
+                pid.differenError,
+                pid.output.as_ref().unwrap().signal[i],
+                pid.signal.as_ref().unwrap().signal[i]
+            );
+        }
+
+        pid.prevError = error;
+        let diff = pid.signal.as_ref().unwrap().signal[i] - pid.output.as_ref().unwrap().signal[i];
+        pid.fit += if diff > 0.0 { diff } else { diff * -1.0 };
+
+        if pid.output.as_ref().unwrap().signal[i - 1] > pid.output.as_ref().unwrap().signal[i] {
+            pid.steadyRiseCheck = 0;
+        }
+    }
+
+    if pid.steadyRiseCheck == 1 {
+        pid.fit = f32::MAX;
+    } else if pid.maxCounter > pid.signal.as_ref().unwrap().length * 1 / 100 {
+        pid.fit = f32::MAX;
+    }
+}
+```
+
+{{population.rs}}
+```rust
+// population.rs
+use crate::general_math::createRandomFloat;
+
+#[derive(Default)]
+/// Structure representing the input to create a population.
+pub struct InputPop {
+    pub rows: usize,
+    pub cols: usize,
+    pub s: [Vec<f32>; 2],
+}
+
+#[derive(Default)]
+/// Structure representing the population.
+pub struct Pop {
+    pub rows: usize,
+    pub cols: usize,
+    pub pop: Vec<Vec<f32>>,
+    pub s: [Vec<f32>; 2],
+}
+
+/// Clear/deallocate InputPop (in Rust usually handled by `Drop`, but shown for parity).
+fn clearInputPop(input: &mut InputPop) {
+    input.s[0].clear();
+    input.s[1].clear();
+    input.rows = 0;
+    input.cols = 0;
+}
+
+/// Creates an InputPop structure using max/min bounds and a size array.
+pub fn createInputPop(input_pop: &mut InputPop, max: &[f32], min: &[f32], size: &[i32]) {
+    input_pop.cols = size[1] as usize;
+    input_pop.rows = size[0] as usize;
+    input_pop.s[0] = max[..input_pop.cols].to_vec();
+    input_pop.s[1] = min[..input_pop.cols].to_vec();
+}
+
+/// Allocates a population from an InputPop definition.
+fn alocatePopulation(input: &mut InputPop, population: &mut Pop) {
+    population.cols = input.cols;
+    population.rows = input.rows;
+    population.pop = vec![vec![0.0; population.cols]; population.rows];
+    population.s[0] = input.s[0].clone();
+    population.s[1] = input.s[1].clone();
+
+    clearInputPop(input);
+}
+
+/// Deallocates the memory held by a Pop structure.
+pub fn clearPopulation(population: &mut Pop) {
+    population.pop.clear();
+    population.s[0].clear();
+    population.s[1].clear();
+    population.cols = 0;
+    population.rows = 0;
+}
+
+/// Creates a random population from the given input constraints.
+pub fn createStructure(input: &mut InputPop, population: &mut Pop) {
+    alocatePopulation(input, population);
+    generateRandomPopulation(population);
+}
+
+/// Fills the population with random values within the constraints in `s`.
+pub fn generateRandomPopulation(population: &mut Pop) {
+    for y in 0..population.rows {
+        for i in 0..population.cols {
+            let new_value = createRandomFloat(population.s[1][i], population.s[0][i]);
+            population.pop[y][i] = new_value;
+        }
+    }
+}
+
+/// Places a part of the source population into the target population using the index range.
+pub fn placePartOfPop(pop: &mut Pop, source: &Pop, indexes: &[usize; 2]) {
+    let mut global_index = 0usize;
+    for i in indexes[0]..indexes[1] {
+        pop.pop[i] = source.pop[global_index].clone();
+        global_index += 1;
+    }
+}
+```
+
+{{signal_designer.rs}}
+```rust
+// signal_designer.rs
+use std::io::{self, Write};
+
+#[derive(Default)]
+pub struct Signal {
+    pub signal: Vec<f32>,
+    pub dt: f32,
+    pub length: i32,
+}
+
+pub fn deleteSignal(signal: &mut Signal) {
+    signal.signal.clear();
+    signal.dt = 0.0;
+    signal.length = 0;
+}
+
+pub fn cliSignalSelector(signal: &mut Signal) {
+    print!("Please select the Signal:\n1 - step\n2 - customa\nSelect: ");
+    let _ = io::stdout().flush();
+
+    let mut input = String::new();
+    let user_choice = if io::stdin().read_line(&mut input).is_ok() {
+        input.trim().parse::<i32>().unwrap_or(0)
+    } else {
+        0
+    };
+
+    if user_choice == 1 {
+        selectStepSignal(signal);
+    } else if user_choice == 2 {
+        selectCustomASignal(signal);
+    }
+}
+
+fn selectStepSignal(signal: &mut Signal) {
+    signal.length = 1000;
+    signal.dt = 0.01;
+    signal.signal = vec![0.0; signal.length as usize];
+
+    let mut global_index = 0usize;
+    let mut i = 0.0f32;
+    while i < 0.3 {
+        signal.signal[global_index] = 0.0;
+        global_index += 1;
+        i += signal.dt;
+    }
+
+    let mut i2 = 0.3 + signal.dt;
+    while i2 < 10.0 {
+        if global_index >= signal.signal.len() {
+            break;
+        }
+        signal.signal[global_index] = 1.0;
+        global_index += 1;
+        i2 += signal.dt;
+    }
+
+    signal.length = global_index as i32;
+    signal.signal.truncate(global_index);
+}
+
+fn selectCustomASignal(signal: &mut Signal) {
+    signal.length = 1002;
+    signal.dt = 0.01;
+    signal.signal = vec![0.0; signal.length as usize];
+
+    let mut global_index = 0usize;
+
+    let mut i = 0.0f32;
+    while i < 1.0 {
+        signal.signal[global_index] = 0.0;
+        global_index += 1;
+        i += signal.dt;
+    }
+
+    let mut i = 1.0f32;
+    while i < 3.0 {
+        signal.signal[global_index] = 30.0;
+        global_index += 1;
+        i += signal.dt;
+    }
+
+    let mut i = 3.0f32;
+    while i < 5.0 {
+        signal.signal[global_index] = 15.0;
+        global_index += 1;
+        i += signal.dt;
+    }
+
+    let mut i = 5.0f32;
+    while i < 8.0 {
+        signal.signal[global_index] = 5.0;
+        global_index += 1;
+        i += signal.dt;
+    }
+
+    let mut i = 8.0f32;
+    while i < 9.0 {
+        signal.signal[global_index] = 25.0;
+        global_index += 1;
+        i += signal.dt;
+    }
+
+    let mut i = 9.0f32;
+    while i < 10.0 {
+        signal.signal[global_index] = 0.0;
+        global_index += 1;
+        i += signal.dt;
+    }
+
+    signal.length = global_index as i32;
+    signal.signal.truncate(global_index);
+}
+```
+
+{{sort.rs}}
+```rust
+pub fn quickSort(fit:&mut Vec<f32>, input:&mut Vec<i32>, length:i32){
+    let len = length as usize;
+    if len <= 1 {
+        return;
+    }
+
+    let index = len / 2;
+    let pivot = input[index];
+    let pivot_fit = fit[pivot as usize];
+
+    let mut array_more: Vec<i32> = Vec::new();
+    let mut array_less: Vec<i32> = Vec::new();
+
+    for i in 0..len {
+        if i != index {
+            if fit[input[i] as usize] >= pivot_fit {
+                array_more.push(input[i]);
+            } else {
+                array_less.push(input[i]);
+            }
+        }
+    }
+
+    if array_more.len() > 1 {
+        let more_len = array_more.len() as i32;
+        quickSort(fit, &mut array_more, more_len);
+    }
+    if array_less.len() > 1 {
+        let less_len = array_less.len() as i32;
+        quickSort(fit, &mut array_less, less_len);
+    }
+
+    let mut index_global = 0usize;
+    for v in array_less {
+        input[index_global] = v;
+        index_global += 1;
+    }
+
+    input[index_global] = pivot;
+    index_global += 1;
+
+    for v in array_more {
+        input[index_global] = v;
+        index_global += 1;
+    }
+}
+```
+
+{{systems_builder.rs}}
+```rust
+// systems_builder.rs
+use crate::pid_controller;
+use std::io::{self, Write};
+
+pub fn linear(data: &mut [f32]) -> f32 {
+    data[0]
+}
+
+pub fn complexYDot(data: &mut [f32]) -> f32 {
+    data[2] = data[2] + data[0] * data[1];
+    data[2]
+}
+
+pub fn complexYDddot(data: &mut [f32]) -> f32 {
+    data[5] = data[0] - 2.0 * data[2] - 3.0 * data[3] - 4.0 * data[4];
+    data[2] = data[2] + data[5] * data[1];
+    data[3] = data[3] + data[2] * data[1];
+    data[4] = data[4] + data[3] * data[1];
+    data[4]
+}
+
+pub fn selectSystem(func_ptr: &mut Option<fn(&mut [f32]) -> f32>) -> i32 {
+    print!("Please select the system:\n1 - linear\n2 - complexYDddot\n3 - complexYDot\nSelect: ");
+    let _ = io::stdout().flush();
+
+    let mut input = String::new();
+    let user_choice = if io::stdin().read_line(&mut input).is_ok() {
+        input.trim().parse::<i32>().unwrap_or(0)
+    } else {
+        0
+    };
+
+    if user_choice == 1 {
+        *func_ptr = Some(linear);
+        2
+    } else if user_choice == 2 {
+        *func_ptr = Some(complexYDddot);
+        6
+    } else if user_choice == 3 {
+        *func_ptr = Some(complexYDot);
+        4
+    } else {
+        std::process::exit(0);
+    }
+}
+```

@@ -1,0 +1,60 @@
+ {{libwecan.rs}}
+```rust
+pub const FALSE: u8 = 0;
+pub const TRUE: u8 = 1;
+pub const UNSIGNED: u8 = 2;
+pub const SIGNED: u8 = 3;
+pub const INTEL: u8 = 4;
+pub const MOTOROLA: u8 = 5;
+
+fn compute_indexes(startbit: u16, len: u8, endianness: u8) -> (u16, u16, u16) {
+    let offset_lsb: u16;
+    let byte_idx_lsb: u16;
+    let byte_idx_msb: u16;
+    if endianness == MOTOROLA {
+        let msb = startbit;
+        let mut current_bit_nr = startbit;
+        for _ in 0..len.saturating_sub(1) {
+            if current_bit_nr % 8 == 0 {
+                current_bit_nr = current_bit_nr + 15;
+            } else {
+                current_bit_nr -= 1;
+            }
+        }
+        let lsb = current_bit_nr;
+        byte_idx_lsb = lsb / 8;
+        byte_idx_msb = msb / 8;
+        offset_lsb = lsb % 8;
+    } else {
+        let lsb = startbit;
+        let msb = lsb + (len as u16) - 1;
+        byte_idx_msb = msb / 8;
+        byte_idx_lsb = lsb / 8;
+        offset_lsb = lsb % 8;
+    }
+    (offset_lsb, byte_idx_lsb, byte_idx_msb)
+}
+
+fn frame_to_local(frame: &[u8], byte_idx_lsb: u16, byte_idx_msb: u16, endianness: u8) -> u64 {
+    let mut target: u64 = frame[byte_idx_lsb as usize] as u64;
+    if endianness == MOTOROLA {
+        let mut dest = 1;
+        for i in (byte_idx_msb..byte_idx_lsb).rev() {
+            target |= (frame[i as usize] as u64) << (dest * 8);
+            dest += 1;
+        }
+    } else {
+        let mut dest = 1;
+        for i in (byte_idx_lsb + 1)..=byte_idx_msb {
+            target |= (frame[i as usize] as u64) << (dest * 8);
+            dest += 1;
+        }
+    }
+    target
+}
+
+pub fn extract(frame: &[u8], startbit: u16, len: u8, signedness: u8, endianness: u8) -> u64 {
+    let (offset_lsb, byte_idx_lsb, byte_idx_msb) = compute_indexes(startbit, len, endianness);
+    let mut target = frame_to_local(frame, byte_idx_lsb, byte_idx_msb, endianness);
+    target = target >> offset_lsb;
+    let mask = if len == 64 {

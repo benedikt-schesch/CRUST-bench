@@ -1,0 +1,75 @@
+ {{gap.rs}}
+```rust
+//! Gap buffer data structure implementation
+
+pub struct GapBuffer {
+    buffer: Vec<char>,
+    gap_start: usize,
+    gap_end: usize,
+}
+
+impl GapBuffer {
+    pub fn new() -> Self {
+        GapBuffer {
+            buffer: Vec::new(),
+            gap_start: 0,
+            gap_end: 0,
+        }
+    }
+    
+    /// Create a new GapBuffer with an initial gap of the specified size.
+    /// The buffer is initialized with the gap at the beginning.
+    pub fn create(gap_size: usize) -> Self {
+        GapBuffer {
+            buffer: vec!['\0'; gap_size],
+            gap_start: 0,
+            gap_end: gap_size,
+        }
+    }
+    
+    /// Create a new GapBuffer from a string slice with an additional gap 
+    /// of the specified size placed at the end of the text.
+    pub fn create_from_string(s: &str, gap_size: usize) -> Self {
+        let chars: Vec<char> = s.chars().collect();
+        let text_len = chars.len();
+        let total_len = text_len + gap_size;
+        let mut buffer = Vec::with_capacity(total_len);
+        buffer.extend(chars);
+        buffer.resize(total_len, '\0');
+        
+        GapBuffer {
+            buffer,
+            gap_start: text_len,
+            gap_end: total_len,
+        }
+    }
+}
+```
+
+{{buffer.rs}}
+```rust
+//! Text buffer implementation
+
+pub struct TextBuffer {
+    content: String,
+}
+
+impl TextBuffer {
+    pub fn new() -> Self {
+        TextBuffer {
+            content: String::new(),
+        }
+    }
+    
+    /// Create a new TextBuffer with specified dimensions (rows x cols).
+    /// Returns Ok if the dimensions are valid, Err otherwise.
+    pub fn create(rows: usize, cols: usize) -> Result<Self, &'static str> {
+        if rows == 0 || cols == 0 {
+            return Err("Rows and columns must be greater than zero");
+        }
+        Ok(TextBuffer {
+            content: String::with_capacity(rows * cols),
+        })
+    }
+}
+```

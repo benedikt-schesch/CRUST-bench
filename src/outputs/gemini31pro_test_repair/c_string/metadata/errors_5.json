@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `c_string::string_t`", "file_path": "c_string/src/bin/test_string_t.rs", "row": "1", "col": "15", "error_snippet": "|\n1 | use c_string::string_t::*;\n  |               ^^^^^^^^ could not find `string_t` in `c_string`"}]

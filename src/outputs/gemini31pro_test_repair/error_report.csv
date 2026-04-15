@@ -1,0 +1,421 @@
+project,error_code,error_message,file_path,row,col
+proj_2DPartInt,E0432,unresolved import `twoDPartInt::data`,proj_2DPartInt/src/bin/test.rs,1,18
+proj_2DPartInt,E0432,unresolved import `twoDPartInt::functions`,proj_2DPartInt/src/bin/test.rs,2,18
+proj_42_Kocaeli_Printf,E0432,unresolved import `proj_42_Kocaeli_Printf::ft_printf`,proj_42_Kocaeli_Printf/src/bin/writenumber_test.rs,1,29
+proj_42_Kocaeli_Printf,E0432,unresolved import `proj_42_Kocaeli_Printf::ft_printf`,proj_42_Kocaeli_Printf/src/bin/writestring_test.rs,1,29
+aes128_SIMD,E0432,unresolved import `aes128_SIMD::keys`,aes128_SIMD/src/bin/tests.rs,1,18
+aes128_SIMD,E0432,unresolved import `aes128_SIMD::cipher`,aes128_SIMD/src/bin/tests.rs,2,18
+aes128_SIMD,E0432,unresolved import `aes128_SIMD::base64`,aes128_SIMD/src/bin/tests.rs,3,18
+aes128_SIMD,E0432,unresolved import `aes128_SIMD::padding`,aes128_SIMD/src/bin/tests.rs,4,18
+amp,E0432,unresolved import `amp::amp`,amp/src/bin/test.rs,1,10
+approxidate,E0432,unresolved import `approxidate::approxidate`,approxidate/src/bin/test.rs,1,5
+avalanche,No errors,No errors,No errors,No errors,No errors
+bhshell,No errors,No errors,No errors,No errors,No errors
+bigint,E0432,unresolved import `bigint::bigint`,bigint/src/bin/test1.rs,1,13
+bigint,E0432,unresolved import `bigint::bigint`,bigint/src/bin/test2.rs,1,13
+bigint,E0432,unresolved import `bigint::bigint`,bigint/src/bin/test3.rs,1,13
+bitset,E0432,unresolved import `bitset::bitset`,bitset/src/bin/test_bitset.rs,1,13
+blt,E0432,unresolved import `blt::blt`,blt/src/bin/blt_test.rs,1,10
+bostree,E0432,unresolved import `Bostree::bostree`,bostree/src/bin/remove_bug.rs,6,14
+bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug.rs,7,5
+bostree,E0432,unresolved import `Bostree::bostree`,bostree/src/bin/remove_bug_2.rs,6,14
+bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug_2.rs,7,5
+bostree,E0432,unresolved import `Bostree::bostree`,bostree/src/bin/timing.rs,6,14
+bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/timing.rs,7,5
+btree_map,E0432,unresolved import `btree_map::btree`,btree_map/src/bin/test_btree.rs,1,5
+c_aces,E0432,unresolved import `c_aces::aces_internal`,c_aces/src/bin/aces_internal_test.rs,1,5
+c_aces,E0432,unresolved import `c_aces::channel`,c_aces/src/bin/aces_internal_test.rs,2,13
+c_aces,E0432,unresolved import `c_aces::matrix`,c_aces/src/bin/aces_internal_test.rs,3,13
+c_aces,E0432,unresolved import `c_aces::polynomial`,c_aces/src/bin/aces_internal_test.rs,4,13
+c_aces,E0432,unresolved import `c_aces::common`,c_aces/src/bin/common_test.rs,1,13
+c_aces,E0432,unresolved import `c_aces::common`,c_aces/src/bin/matrix_test.rs,1,13
+c_aces,E0432,unresolved import `c_aces::matrix`,c_aces/src/bin/matrix_test.rs,2,13
+c_aces,E0432,unresolved import `c_aces::common`,c_aces/src/bin/polynomial_test.rs,1,13
+c_aces,E0432,unresolved import `c_aces::polynomial`,c_aces/src/bin/polynomial_test.rs,2,13
+carrays,E0432,unresolved import `carrays::carrays`,carrays/src/bin/runtests.rs,1,5
+c_blind_rsa_signatures,E0432,unresolved import `c_blind_rsa_signatures::blind_rsa`,c_blind_rsa_signatures/src/bin/test.rs,1,29
+cfsm,No errors,No errors,No errors,No errors,No errors
+chtrie,E0432,unresolved import `chtrie::chtrie`,chtrie/src/bin/test.rs,2,13
+CircularBuffer,E0432,unresolved import `CircularBuffer::circular_buffer`,CircularBuffer/src/bin/test_circular_buffer.rs,1,5
+cissy,E0432,unresolved import `cissy::csvfield`,cissy/src/bin/test_csvfield.rs,1,12
+cissy,E0432,unresolved import `cissy::csvline`,cissy/src/bin/test_csvline.rs,1,12
+cissy,E0433,failed to resolve: could not find `range` in `cissy`,cissy/src/bin/test_range.rs,1,12
+cJSON,E0282,type annotations needed,cJSON/src/bin/test_main.rs,13,23
+cJSON,E0432,unresolved import `cJSON::cjson`,cJSON/src/bin/test_example.rs,1,12
+cJSON,E0432,unresolved import `cJSON::cjson`,cJSON/src/bin/test_main.rs,5,12
+clhash,E0432,unresolved import `clhash::clhash`,clhash/src/bin/example.rs,1,13
+clhash,E0432,unresolved import `clhash::clhash`,clhash/src/bin/unit.rs,1,13
+clog,No errors,No errors,No errors,No errors,No errors
+coroutine,E0432,unresolved import `coroutine::coroutine`,coroutine/src/bin/test.rs,3,16
+cset,E0432,unresolved import `cset::cset`,cset/src/bin/test.rs,1,5
+c_string,E0432,unresolved import `c_string::string_t`,c_string/src/bin/test_string_t.rs,1,15
+csyncmers,,"`<` is interpreted as a start of generic arguments for `i32`, not a comparison",csyncmers/src/closed_syncmers_naive.rs,14,19
+dict,E0282,type annotations needed,dict/src/bin/test0.rs,11,9
+dict,E0282,type annotations needed,dict/src/bin/test0.rs,11,30
+dict,E0282,type annotations needed,dict/src/bin/test1.rs,22,9
+dict,E0282,type annotations needed,dict/src/bin/test1.rs,22,30
+dict,E0282,type annotations needed,dict/src/bin/test3.rs,13,9
+dict,E0282,type annotations needed,dict/src/bin/test3.rs,13,30
+dict,E0282,type annotations needed,dict/src/bin/test4.rs,12,9
+dict,E0282,type annotations needed,dict/src/bin/test4.rs,12,30
+dict,E0282,type annotations needed,dict/src/bin/test5.rs,14,13
+dict,E0282,type annotations needed,dict/src/bin/test5.rs,14,34
+dict,E0432,unresolved import `dict::dict`,dict/src/bin/test0.rs,1,11
+dict,E0432,unresolved import `dict::dict`,dict/src/bin/test1.rs,1,11
+dict,E0432,unresolved import `dict::dict`,dict/src/bin/test2.rs,1,11
+dict,E0432,unresolved import `dict::dict`,dict/src/bin/test3.rs,1,11
+dict,E0432,unresolved import `dict::dict`,dict/src/bin/test4.rs,1,11
+dict,E0432,unresolved import `dict::dict`,dict/src/bin/test5.rs,1,11
+emlang,E0432,unresolved import `emlang::env`,emlang/src/bin/tests.rs,1,13
+emlang,E0432,unresolved import `emlang::parser`,emlang/src/bin/tests.rs,2,13
+emlang,E0432,unresolved import `emlang::stack`,emlang/src/bin/tests.rs,3,13
+expr,E0432,unresolved import `expr::mapper_expr`,expr/src/bin/test.rs,1,5
+FastHamming,E0432,unresolved import `FastHamming::fast_hamming`,FastHamming/src/bin/test_coding.rs,1,18
+FastHamming,E0432,unresolved import `FastHamming::fast_hamming`,FastHamming/src/bin/tests_log.rs,1,18
+fft,No errors,No errors,No errors,No errors,No errors
+file2str,E0432,unresolved import `file2str::file2str`,file2str/src/bin/test_file2str.rs,1,15
+fleur,E0432,unresolved import `fleur::fleur`,fleur/src/bin/test_fleur.rs,2,12
+fleur,E0432,unresolved import `fleur::fleur`,fleur/src/bin/test_fleur.rs,3,12
+fleur,E0432,"unresolved imports `fleur::fnv`, `fleur::fnv`",fleur/src/bin/test_vectors.rs,1,12
+fs_c,E0432,unresolved import `fs_c::fs`,fs_c/src/bin/test_fs.rs,1,11
+fslib,E0432,unresolved import `fslib::bitset`,fslib/src/bin/test_bitset.rs,1,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_compile.rs,1,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_compose.rs,1,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_fst.rs,1,12
+fslib,E0432,unresolved import `fslib::hash`,fslib/src/bin/test_hash.rs,1,12
+fslib,E0432,unresolved import `fslib::heap`,fslib/src/bin/test_heap.rs,1,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_io.rs,1,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_iter.rs,1,12
+fslib,E0432,unresolved import `fslib::iter`,fslib/src/bin/test_iter.rs,2,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_print.rs,1,12
+fslib,E0432,unresolved import `fslib::queue`,fslib/src/bin/test_queue.rs,1,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_shortest.rs,1,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_sort.rs,1,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_stack.rs,1,12
+fslib,E0432,unresolved import `fslib::symt`,fslib/src/bin/test_symt.rs,1,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_trim.rs,1,12
+fslib,E0432,unresolved import `fslib::bitset`,fslib/src/bin/test_trim.rs,2,12
+fslib,E0432,unresolved import `fslib::trim`,fslib/src/bin/test_trim.rs,3,5
+fslib,E0432,unresolved import `fslib::trim`,fslib/src/bin/test_trim.rs,4,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_trim.rs,5,12
+fslib,E0432,unresolved import `fslib::fst`,fslib/src/bin/test_union.rs,1,12
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::activation_fnc`,Genetic_neural_network_for_simple_control/src/bin/test_activation_func.rs,2,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::sort`,Genetic_neural_network_for_simple_control/src/bin/test_full_run.rs,1,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::fit_functions`,Genetic_neural_network_for_simple_control/src/bin/test_full_run.rs,2,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::genetic_operations`,Genetic_neural_network_for_simple_control/src/bin/test_full_run.rs,3,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::pid_controller`,Genetic_neural_network_for_simple_control/src/bin/test_full_run.rs,4,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::population`,Genetic_neural_network_for_simple_control/src/bin/test_full_run.rs,5,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::neural_network`,Genetic_neural_network_for_simple_control/src/bin/test_full_run.rs,6,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::model_system`,Genetic_neural_network_for_simple_control/src/bin/test_full_run.rs,7,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::genetic_operations`,Genetic_neural_network_for_simple_control/src/bin/test_genetic_operations.rs,1,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::population`,Genetic_neural_network_for_simple_control/src/bin/test_genetic_operations.rs,2,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::matrix_math`,Genetic_neural_network_for_simple_control/src/bin/test_matrixes.rs,1,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::activation_fnc`,Genetic_neural_network_for_simple_control/src/bin/test_matrixes.rs,2,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::model_system`,Genetic_neural_network_for_simple_control/src/bin/test_model_system.rs,1,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::neural_network`,Genetic_neural_network_for_simple_control/src/bin/test_model_system.rs,7,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::population`,Genetic_neural_network_for_simple_control/src/bin/test_model_system.rs,11,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::model_system`,Genetic_neural_network_for_simple_control/src/bin/test_model_system.rs,18,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::neural_network`,Genetic_neural_network_for_simple_control/src/bin/test_neural_network.rs,4,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::population`,Genetic_neural_network_for_simple_control/src/bin/test_neural_network.rs,5,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::matrix_math`,Genetic_neural_network_for_simple_control/src/bin/test_neural_network.rs,6,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::pid_controller`,Genetic_neural_network_for_simple_control/src/bin/test_pid_controller.rs,1,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::population`,Genetic_neural_network_for_simple_control/src/bin/test_population.rs,1,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::signal_designer`,Genetic_neural_network_for_simple_control/src/bin/test_signal_designer.rs,1,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::sort`,Genetic_neural_network_for_simple_control/src/bin/test_sort.rs,1,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::systems_builder`,Genetic_neural_network_for_simple_control/src/bin/test_system_builder.rs,1,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::pid_controller`,Genetic_neural_network_for_simple_control/src/bin/test_system_builder.rs,2,48
+Genetic_neural_network_for_simple_control,E0432,unresolved import `Genetic_neural_network_for_simple_control::signal_designer`,Genetic_neural_network_for_simple_control/src/bin/test_system_builder.rs,3,48
+geofence,No errors,No errors,No errors,No errors,No errors
+gfc,E0432,unresolved import `gfc::gfc`,gfc/src/bin/bench.rs,1,10
+gfc,E0432,unresolved import `gfc::gfc`,gfc/src/bin/test.rs,1,10
+gorilla_paper_encode,E0432,unresolved import `gorilla_paper_encode::gorilla`,gorilla_paper_encode/src/bin/test.rs,1,27
+Graph_recogniser,E0432,unresolved import `Graph_recogniser::cuckoohash`,Graph_recogniser/src/bin/test_cuckoohash.rs,2,23
+Graph_recogniser,E0432,unresolved import `Graph_recogniser::openhash`,Graph_recogniser/src/bin/test_openhash.rs,2,23
+hamta,E0432,unresolved import `hamta::hamta`,hamta/src/bin/test.rs,1,12
+Holdem_Odds,E0432,unresolved import `Holdem_Odds::bucket`,Holdem_Odds/src/bin/test_bucket.rs,1,18
+Holdem_Odds,E0432,unresolved import `Holdem_Odds::cards`,Holdem_Odds/src/bin/test_bucket.rs,2,18
+Holdem_Odds,E0432,unresolved import `Holdem_Odds::cards`,Holdem_Odds/src/bin/test_cards.rs,1,18
+Holdem_Odds,E0432,unresolved import `Holdem_Odds::cards`,Holdem_Odds/src/bin/test_deck.rs,1,18
+Holdem_Odds,E0432,unresolved import `Holdem_Odds::deck`,Holdem_Odds/src/bin/test_deck.rs,2,18
+Holdem_Odds,E0432,unresolved import `Holdem_Odds::cards`,Holdem_Odds/src/bin/test_hands.rs,1,18
+Holdem_Odds,E0432,unresolved import `Holdem_Odds::hands`,Holdem_Odds/src/bin/test_hands.rs,2,18
+Holdem_Odds,E0432,unresolved import `Holdem_Odds::deck`,Holdem_Odds/src/bin/test_hands.rs,3,18
+hydra,E0432,unresolved import `hydra::hydra`,hydra/src/bin/test.rs,1,12
+impcheck,E0425,cannot find function `trusted_utils_read_int` in this scope,impcheck/src/bin/test.rs,178,15
+impcheck,E0425,cannot find function `trusted_utils_read_int` in this scope,impcheck/src/bin/test.rs,179,1
+impcheck,E0425,cannot find value `SIG_SIZE_BYTES` in this scope,impcheck/src/bin/test.rs,190,31
+impcheck,E0425,cannot find value `SIG_SIZE_BYTES` in this scope,impcheck/src/bin/test.rs,192,30
+impcheck,E0425,cannot find function `trusted_utils_write_char` in this scope,impcheck/src/bin/test.rs,214,1
+impcheck,E0425,cannot find value `TRUSTED_CHK_INIT` in this scope,impcheck/src/bin/test.rs,214,26
+impcheck,E0425,cannot find function `trusted_utils_write_int` in this scope,impcheck/src/bin/test.rs,215,1
+impcheck,E0425,cannot find function `trusted_utils_write_sig` in this scope,impcheck/src/bin/test.rs,216,1
+impcheck,E0425,cannot find function `trusted_utils_write_char` in this scope,impcheck/src/bin/test.rs,219,1
+impcheck,E0425,cannot find value `TRUSTED_CHK_LOAD` in this scope,impcheck/src/bin/test.rs,219,26
+impcheck,E0425,cannot find function `trusted_utils_write_int` in this scope,impcheck/src/bin/test.rs,220,1
+impcheck,E0425,cannot find function `trusted_utils_write_ints` in this scope,impcheck/src/bin/test.rs,221,1
+impcheck,E0425,cannot find function `trusted_utils_write_char` in this scope,impcheck/src/bin/test.rs,223,1
+impcheck,E0425,cannot find value `TRUSTED_CHK_END_LOAD` in this scope,impcheck/src/bin/test.rs,223,26
+impcheck,E0425,cannot find function `trusted_utils_write_char` in this scope,impcheck/src/bin/test.rs,241,1
+impcheck,E0425,cannot find value `TRUSTED_CHK_TERMINATE` in this scope,impcheck/src/bin/test.rs,241,26
+impcheck,E0425,cannot find function `trusted_utils_write_char` in this scope,impcheck/src/bin/test.rs,267,1
+impcheck,E0425,cannot find value `TRUSTED_CHK_CLS_PRODUCE` in this scope,impcheck/src/bin/test.rs,267,26
+impcheck,E0425,cannot find function `trusted_utils_write_ul` in this scope,impcheck/src/bin/test.rs,268,1
+impcheck,E0425,cannot find function `trusted_utils_write_int` in this scope,impcheck/src/bin/test.rs,269,1
+impcheck,E0425,cannot find function `trusted_utils_write_ints` in this scope,impcheck/src/bin/test.rs,270,1
+impcheck,E0425,cannot find function `trusted_utils_write_int` in this scope,impcheck/src/bin/test.rs,271,1
+impcheck,E0425,cannot find function `trusted_utils_write_uls` in this scope,impcheck/src/bin/test.rs,272,1
+impcheck,E0425,cannot find function `trusted_utils_write_bool` in this scope,impcheck/src/bin/test.rs,273,1
+impcheck,E0425,cannot find function `trusted_utils_read_sig` in this scope,impcheck/src/bin/test.rs,276,1
+impcheck,E0425,cannot find function `trusted_utils_write_char` in this scope,impcheck/src/bin/test.rs,288,1
+impcheck,E0425,cannot find value `TRUSTED_CHK_CLS_IMPORT` in this scope,impcheck/src/bin/test.rs,288,26
+impcheck,E0425,cannot find function `trusted_utils_write_ul` in this scope,impcheck/src/bin/test.rs,289,1
+impcheck,E0425,cannot find function `trusted_utils_write_int` in this scope,impcheck/src/bin/test.rs,290,1
+impcheck,E0425,cannot find function `trusted_utils_write_ints` in this scope,impcheck/src/bin/test.rs,291,1
+impcheck,E0425,cannot find function `trusted_utils_write_sig` in this scope,impcheck/src/bin/test.rs,292,1
+impcheck,E0425,cannot find function `trusted_utils_write_char` in this scope,impcheck/src/bin/test.rs,297,1
+impcheck,E0425,cannot find value `TRUSTED_CHK_CLS_DELETE` in this scope,impcheck/src/bin/test.rs,297,26
+impcheck,E0425,cannot find function `trusted_utils_write_int` in this scope,impcheck/src/bin/test.rs,298,1
+impcheck,E0425,cannot find function `trusted_utils_write_uls` in this scope,impcheck/src/bin/test.rs,299,1
+impcheck,E0432,unresolved import `impcheck::writer`,impcheck/src/bin/test.rs,1,5
+impcheck,E0432,unresolved import `impcheck::vec`,impcheck/src/bin/test.rs,2,5
+impcheck,E0432,unresolved import `impcheck::hash`,impcheck/src/bin/test.rs,3,5
+impcheck,E0432,unresolved import `impcheck::trusted_utils`,impcheck/src/bin/test.rs,4,5
+impcheck,E0432,unresolved import `impcheck::checker_interface`,impcheck/src/bin/test.rs,5,5
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_clone.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_complement.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_couple_iterator.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_create_destroy_2.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_create_destroy_3.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_create_destroy_4.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_difference.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_equals.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_getters.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_intersection.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_iterator.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_member.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_to_string.rs,1,21
+inversion_list,E0432,unresolved import `inversion_list::inversion_list`,inversion_list/src/bin/test_union.rs,1,21
+jccc,E0432,unresolved import `jccc::codegen`,jccc/src/bin/test_main.rs,51,5
+jccc,E0432,unresolved import `jccc::lex`,jccc/src/bin/test_main.rs,52,11
+jccc,E0432,unresolved import `jccc::token`,jccc/src/bin/test_main.rs,53,11
+jccc,E0432,unresolved import `jccc::list`,jccc/src/bin/test_main.rs,54,5
+jccc,E0432,unresolved import `jccc::hashmap`,jccc/src/bin/test_main.rs,55,5
+kairoCompiler,E0432,unresolved import `kairoCompiler::buffer`,kairoCompiler/src/bin/test.rs,3,5
+kairoCompiler,E0432,unresolved import `kairoCompiler::vector`,kairoCompiler/src/bin/test.rs,4,5
+kairoCompiler,E0432,unresolved import `kairoCompiler::compiler`,kairoCompiler/src/bin/test.rs,5,5
+kairoCompiler,E0432,unresolved import `kairoCompiler::buffer`,kairoCompiler/src/bin/test2.rs,3,5
+kairoCompiler,E0432,unresolved import `kairoCompiler::vector`,kairoCompiler/src/bin/test2.rs,4,5
+kairoCompiler,E0432,unresolved import `kairoCompiler::compiler`,kairoCompiler/src/bin/test2.rs,5,5
+kd3,E0432,unresolved import `kd3::kdtree`,kd3/src/bin/test.rs,1,5
+lambda_calculus_eval,E0432,unresolved import `lambda_calculus_eval::common`,lambda_calculus_eval/src/bin/test.rs,1,5
+lambda_calculus_eval,E0432,unresolved import `lambda_calculus_eval::config`,lambda_calculus_eval/src/bin/test.rs,2,5
+lambda_calculus_eval,E0432,unresolved import `lambda_calculus_eval::io`,lambda_calculus_eval/src/bin/test.rs,3,5
+lambda_calculus_eval,E0432,unresolved import `lambda_calculus_eval::parser`,lambda_calculus_eval/src/bin/test.rs,4,5
+lambda_calculus_eval,E0432,unresolved import `lambda_calculus_eval::reducer`,lambda_calculus_eval/src/bin/test.rs,5,5
+lambda_calculus_eval,E0432,unresolved import `lambda_calculus_eval::typechecker`,lambda_calculus_eval/src/bin/test.rs,6,5
+lambda_calculus_eval,E0432,unresolved import `lambda_calculus_eval::hash_table`,lambda_calculus_eval/src/bin/test.rs,7,27
+lambda_calculus_eval,E0432,unresolved import `lambda_calculus_eval::common`,lambda_calculus_eval/src/bin/test.rs,8,27
+leftpad,E0432,unresolved import `leftpad::leftpad`,leftpad/src/bin/tests.rs,2,14
+lib2bit,E0432,unresolved import `lib2bit::twobit`,lib2bit/src/bin/test.rs,1,14
+libbase122,E0432,unresolved import `libbase122::base122`,libbase122/src/bin/tests.rs,1,17
+libbeaufort,No errors,No errors,No errors,No errors,No errors
+libfor,E0432,unresolved import `libfor::forLib`,libfor/src/bin/test.rs,1,5
+libfor,E0432,unresolved import `libfor::for_gen`,libfor/src/bin/test.rs,2,5
+libm17,E0432,unresolved import `libm17::encode`,libm17/src/bin/unit_tests.rs,1,13
+libm17,E0432,unresolved import `libm17::math`,libm17/src/bin/unit_tests.rs,2,13
+libpgn,E0432,unresolved import `libpgn::annotation`,libpgn/src/bin/test_annotation.rs,1,13
+libpgn,E0432,unresolved import `libpgn::moves`,libpgn/src/bin/test_annotation.rs,2,13
+libpgn,E0432,unresolved import `libpgn::comments`,libpgn/src/bin/test_comments.rs,1,13
+libpgn,E0432,unresolved import `libpgn::moves`,libpgn/src/bin/test_comments.rs,2,13
+libpgn,E0432,unresolved import `libpgn::coordinate`,libpgn/src/bin/test_coordinate.rs,1,13
+libpgn,E0432,unresolved import `libpgn::metadata`,libpgn/src/bin/test_metadata.rs,1,13
+libpgn,E0432,unresolved import `libpgn::pgn`,libpgn/src/bin/test_metadata.rs,2,13
+libpgn,E0432,unresolved import `libpgn::score`,libpgn/src/bin/test_metadata.rs,3,13
+libpgn,E0432,unresolved import `libpgn::annotation`,libpgn/src/bin/test_moves.rs,1,13
+libpgn,E0432,unresolved import `libpgn::check`,libpgn/src/bin/test_moves.rs,2,13
+libpgn,E0432,unresolved import `libpgn::comments`,libpgn/src/bin/test_moves.rs,3,13
+libpgn,E0432,unresolved import `libpgn::coordinate`,libpgn/src/bin/test_moves.rs,4,13
+libpgn,E0432,unresolved import `libpgn::moves`,libpgn/src/bin/test_moves.rs,5,13
+libpgn,E0432,unresolved import `libpgn::piece`,libpgn/src/bin/test_moves.rs,6,13
+libpgn,E0432,unresolved import `libpgn::annotation`,libpgn/src/bin/test_pgn.rs,1,13
+libpgn,E0432,unresolved import `libpgn::metadata`,libpgn/src/bin/test_pgn.rs,2,13
+libpgn,E0432,unresolved import `libpgn::moves`,libpgn/src/bin/test_pgn.rs,3,13
+libpgn,E0432,unresolved import `libpgn::pgn`,libpgn/src/bin/test_pgn.rs,4,13
+libpgn,E0432,unresolved import `libpgn::piece`,libpgn/src/bin/test_pgn.rs,5,13
+libpgn,E0432,unresolved import `libpgn::score`,libpgn/src/bin/test_pgn.rs,6,13
+libpgn,E0432,unresolved import `libpgn::score`,libpgn/src/bin/test_score.rs,1,13
+libpgn,E0433,failed to resolve: could not find `score` in `libpgn`,libpgn/src/bin/test_metadata.rs,3,13
+libpsbt,E0432,unresolved import `libpsbt::psbt`,libpsbt/src/bin/test.rs,1,14
+libqueue,E0432,unresolved import `libqueue::queue`,libqueue/src/bin/test.rs,1,5
+libtinyfseq,E0432,unresolved import `libtinyfseq::tinyfseq`,libtinyfseq/src/bin/TFError_string_test.rs,1,18
+libtinyfseq,E0432,unresolved import `libtinyfseq::tinyfseq`,libtinyfseq/src/bin/build_test.rs,1,18
+libutf,E0432,unresolved import `libutf::libutf_utf`,libutf/src/bin/test.rs,1,5
+libutf,E0432,unresolved import `libutf::libutf_string`,libutf/src/bin/test.rs,2,5
+libvcd,E0282,type annotations needed,libvcd/src/bin/test_vcd.rs,113,34
+libvcd,E0432,unresolved import `libvcd::vcd`,libvcd/src/bin/test_vcd.rs,3,13
+libwecan,E0432,unresolved import `libwecan::libwecan`,libwecan/src/bin/tests.rs,1,15
+Linear_Algebra_C,E0432,unresolved import `Linear_Algebra_C::linear_algebra`,Linear_Algebra_C/src/bin/test.rs,1,23
+Linear_Algebra_C,E0432,unresolved import `Linear_Algebra_C::utils`,Linear_Algebra_C/src/bin/test.rs,2,23
+ljmm,E0432,unresolved import `ljmm::ljmm`,ljmm/src/bin/test_001.rs,1,11
+ljmm,E0432,unresolved import `ljmm::ljmm`,ljmm/src/bin/test_002.rs,4,11
+LTRE,E0432,unresolved import `LTRE::ltre`,LTRE/src/bin/test.rs,1,11
+Math_Library_in_C,E0432,unresolved import `Math_Library_in_C::castom_math`,Math_Library_in_C/src/bin/tests.rs,1,5
+matrix_multiplication,E0432,unresolved import `crate::matrix`,matrix_multiplication/src/main.rs,2,12
+mdb,E0432,unresolved import `mdb::mdb`,mdb/src/bin/tests.rs,4,10
+Megalania,E0432,unresolved import `Megalania::max_heap`,Megalania/src/bin/max_heap_test.rs,1,16
+Megalania,E0432,unresolved import `Megalania::lzma_packet`,Megalania/src/bin/packet_slab_undo_stack_test.rs,1,5
+Megalania,E0432,unresolved import `Megalania::lzma_packet`,Megalania/src/bin/packet_slab_undo_stack_test.rs,2,16
+Megalania,E0432,"unresolved imports `Megalania::packet_slab`, `Megalania::packet_slab_undo_stack`",Megalania/src/bin/packet_slab_undo_stack_test.rs,4,5
+Megalania,E0432,unresolved import `Megalania::substring_enumerator`,Megalania/src/bin/substring_enumerator_test.rs,1,16
+merkle_tree_c,E0432,unresolved import `merkle_tree_c::merkle_tree`,merkle_tree_c/src/bin/test_merkle_tree.rs,1,20
+morton,No errors,No errors,No errors,No errors,No errors
+murmurhash_c,No errors,No errors,No errors,No errors,No errors
+mvptree,E0432,unresolved import `mvptree::mvptree`,mvptree/src/bin/testmvp.rs,8,14
+mvptree,E0432,unresolved import `mvptree::mvptree`,mvptree/src/bin/testmvp.rs,9,14
+NandC,E0432,unresolved import `NandC::nand`,NandC/src/bin/tests.rs,1,5
+Phills_DHT,E0433,failed to resolve: could not find `dht` in `Phills_DHT`,Phills_DHT/src/bin/test.rs,1,17
+quadtree,E0425,cannot find type `QuadtreeNode` in this scope,quadtree/src/bin/test.rs,4,42
+quadtree,E0425,cannot find type `QuadtreeNode` in this scope,quadtree/src/bin/test.rs,5,41
+quadtree,E0433,failed to resolve: could not find `quadtree` in `quadtree`,quadtree/src/bin/test.rs,1,15
+razz_simulation,E0425,cannot find type `CardSuitRank` in this scope,razz_simulation/src/bin/test.rs,2,30
+razz_simulation,E0425,cannot find type `Card` in this scope,razz_simulation/src/bin/test.rs,17,60
+razz_simulation,E0425,cannot find type `ItrAction` in this scope,razz_simulation/src/bin/test.rs,17,70
+razz_simulation,E0425,cannot find type `Card` in this scope,razz_simulation/src/bin/test.rs,26,60
+razz_simulation,E0425,cannot find type `ItrAction` in this scope,razz_simulation/src/bin/test.rs,26,70
+razz_simulation,E0425,cannot find type `Card` in this scope,razz_simulation/src/bin/test.rs,34,60
+razz_simulation,E0425,cannot find type `ItrAction` in this scope,razz_simulation/src/bin/test.rs,34,70
+razz_simulation,E0425,cannot find type `Card` in this scope,razz_simulation/src/bin/test.rs,42,60
+razz_simulation,E0425,cannot find type `ItrAction` in this scope,razz_simulation/src/bin/test.rs,42,70
+razz_simulation,E0425,cannot find type `Card` in this scope,razz_simulation/src/bin/test.rs,49,51
+razz_simulation,E0425,cannot find type `ItrAction` in this scope,razz_simulation/src/bin/test.rs,49,61
+razz_simulation,E0433,failed to resolve: could not find `card` in `razz_simulation`,razz_simulation/src/bin/test.rs,1,22
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,3,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,3,27
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,3,51
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,3,74
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,4,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,4,29
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,4,51
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,4,75
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,5,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,5,27
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,5,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,5,70
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,6,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,6,26
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,6,48
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,6,70
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,7,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,7,30
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,7,51
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,7,73
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,8,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,8,27
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,8,51
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,8,73
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,9,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,9,26
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,9,50
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,9,71
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,10,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,10,27
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,10,48
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,10,72
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,11,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,11,29
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,11,51
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,11,73
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,12,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,12,27
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,12,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,12,71
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,13,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,13,29
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,13,51
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,13,73
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,14,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,14,26
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,14,50
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,14,71
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,15,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,15,27
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,15,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,15,72
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,19,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,19,33
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,19,57
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,20,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,20,33
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,20,55
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,21,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/bin/test.rs,24,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,28,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,28,33
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,28,57
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,29,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,29,31
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,29,54
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/bin/test.rs,32,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,36,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,36,33
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,36,57
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,37,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,37,31
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/bin/test.rs,40,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,44,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/bin/test.rs,44,31
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/bin/test.rs,47,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/bin/test.rs,51,5
+rbtree_lab,E0432,unresolved import `rbtree::rbtree`,rbtree_lab/src/bin/test.rs,1,13
+recordManager,E0432,unresolved import `recordManager::buffer_mgr`,recordManager/src/bin/test.rs,1,5
+recordManager,E0432,unresolved import `recordManager::buffer_mgr_stat`,recordManager/src/bin/test.rs,2,5
+recordManager,E0432,unresolved import `recordManager::dberror`,recordManager/src/bin/test.rs,3,5
+recordManager,E0432,unresolved import `recordManager::dt`,recordManager/src/bin/test.rs,4,5
+recordManager,E0432,unresolved import `recordManager::expr`,recordManager/src/bin/test.rs,5,5
+recordManager,E0432,unresolved import `recordManager::record_mgr`,recordManager/src/bin/test.rs,6,5
+recordManager,E0432,unresolved import `recordManager::rm_serializer`,recordManager/src/bin/test.rs,7,5
+recordManager,E0432,unresolved import `recordManager::storage_mgr`,recordManager/src/bin/test.rs,8,5
+recordManager,E0432,unresolved import `recordManager::tables`,recordManager/src/bin/test.rs,9,5
+rect_pack_h,E0432,unresolved import `rect_pack_h::rect_pack`,rect_pack_h/src/bin/test.rs,1,18
+Remimu,E0432,unresolved import `Remimu::my_regex`,Remimu/src/bin/my_regex_test.rs,2,13
+rhbloom,E0432,unresolved import `rhbloom::rhbloom`,rhbloom/src/bin/test.rs,1,14
+roaring_bitmap,E0432,unresolved import `roaring_bitmap::rset`,roaring_bitmap/src/bin/tests.rs,1,21
+rubiksolver,E0432,unresolved import `rubiksolver::hash`,rubiksolver/src/bin/hash_tests.rs,1,18
+rubiksolver,E0432,unresolved import `rubiksolver::heap`,rubiksolver/src/bin/heap_tests.rs,1,18
+rubiksolver,E0432,unresolved import `rubiksolver::rubik_model`,rubiksolver/src/bin/rubik_model_tests.rs,1,18
+satc,E0432,unresolved import `satc::satc`,satc/src/bin/satc_test.rs,1,5
+Simple_Config,E0432,unresolved import `Simple_Config::simple_config`,Simple_Config/src/bin/test_get.rs,1,20
+Simple_Config,E0432,unresolved import `Simple_Config::simple_config`,Simple_Config/src/bin/test_load_print.rs,1,20
+Simple_Config,E0432,unresolved import `Simple_Config::simple_config`,Simple_Config/src/bin/test_parse.rs,1,20
+simple_lang,E0432,unresolved import `simple_lang::compiler`,simple_lang/src/bin/test_compile.rs,1,18
+simple_lang,E0432,unresolved import `simple_lang::vm`,simple_lang/src/bin/test_compile.rs,2,18
+simple_lang,E0432,unresolved import `simple_lang::lexer`,simple_lang/src/bin/test_parser.rs,1,18
+simple_lang,E0432,unresolved import `simple_lang::parser`,simple_lang/src/bin/test_parser.rs,2,18
+simple_lang,E0432,unresolved import `simple_lang::token`,simple_lang/src/bin/test_parser.rs,3,18
+simple_lang,E0432,unresolved import `simple_lang::lexer`,simple_lang/src/bin/test_tokenize.rs,2,18
+simple_lang,E0432,unresolved import `simple_lang::token`,simple_lang/src/bin/test_tokenize.rs,3,18
+Simple_Sparsehash,E0432,unresolved import `Simple_Sparsehash::simple_sparsehash`,Simple_Sparsehash/src/bin/test.rs,1,5
+SimpleXML,E0432,unresolved import `SimpleXML::simple_vector`,SimpleXML/src/bin/tests.rs,6,16
+SimpleXML,E0432,unresolved import `SimpleXML::simple_xml`,SimpleXML/src/bin/tests.rs,7,16
+skp,E0432,unresolved import `skp::skp`,skp/src/bin/ut_test1.rs,1,10
+skp,E0432,unresolved import `skp::skp`,skp/src/bin/ut_test2.rs,1,10
+skp,E0432,unresolved import `skp::skp`,skp/src/bin/ut_test3.rs,1,10
+SlothLang,No errors,No errors,No errors,No errors,No errors
+ted,E0432,unresolved import `ted::gap`,ted/src/bin/runtests.rs,1,10
+ted,E0432,unresolved import `ted::buffer`,ted/src/bin/runtests.rs,2,10
+tisp,E0432,unresolved import `tisp_proj::tisp`,tisp/src/bin/test.rs,1,5
+tisp,E0432,unresolved import `tisp_proj::string`,tisp/src/bin/test.rs,2,5
+tisp,E0432,unresolved import `tisp_proj::core`,tisp/src/bin/test.rs,3,5
+tisp,E0432,unresolved import `tisp_proj::os`,tisp/src/bin/test.rs,4,5
+tisp,E0432,unresolved import `tisp_proj::math`,tisp/src/bin/test.rs,5,5
+totp,E0432,unresolved import `totp::totp`,totp/src/bin/test.rs,1,11
+totp,E0432,unresolved import `totp::std`,totp/src/bin/test.rs,2,11
+ulidgen,No errors,No errors,No errors,No errors,No errors
+utf8,E0432,unresolved import `utf8::utf8`,utf8/src/bin/test_utf8.rs,1,11
+utf8,E0432,unresolved import `utf8::utf8`,utf8/src/bin/test_utf8.rs,2,11
+VaultSync,E0432,unresolved import `VaultSync::vm`,VaultSync/src/bin/main_test.rs,5,16
+vec,E0432,unresolved import `vec::vec`,vec/src/bin/test_vec.rs,1,5
+worsp,E0432,unresolved import `worsp::worsp`,worsp/src/bin/test.rs,1,12
+worsp,E0432,unresolved import `worsp::worsp`,worsp/src/bin/test.rs,2,12
+worsp,E0432,unresolved import `worsp::worsp`,worsp/src/bin/test.rs,3,12
+XOpt,E0432,unresolved import `XOpt::xopt`,XOpt/src/bin/test.rs,1,11

@@ -1,0 +1,61 @@
+```rust
+// Generated Rust Code
+```
+
+{{collisions.rs}}
+```rust
+use crate::data;
+use crate::functions::compute_overlap;
+
+pub fn fill_grid(
+    num_particles: usize,
+    x_squares: i32,
+    y_squares: i32,
+    square_length: f64,
+    particles: &[data::Particle],
+    _grid: &Vec<&mut Vec<&data::Particle>>,
+    _grid_lasts: &Vec<&mut Vec<&mut data::Particle>>,
+) {
+    for i in 0..num_particles {
+        let p = &particles[i];
+        let square_ind = find_square(p.x_coordinate, p.y_coordinate, x_squares, y_squares, square_length);
+        if square_ind < 0 {
+            continue;
+        }
+        // Note: Cannot mutate `grid` and `grid_lasts` due to immutable references in the provided signature.
+    }
+}
+
+pub fn compute_contacts(
+    grid: &Vec<&Vec<&data::Particle>>,
+    x_squares: i32,
+    y_squares: i32,
+    square_length: f64,
+    contacts: &mut [data::Contact],
+) -> usize {
+    let mut k = 0;
+    for row in 0..y_squares {
+        for col in 0..x_squares {
+            let square_idx = (row * x_squares + col) as usize;
+            if grid.len() <= square_idx || grid[square_idx].is_empty() {
+                continue;
+            }
+            let square_particles = &grid[square_idx];
+            for p in square_particles.iter() {
+                for other in square_particles.iter() {
+                    if p.idx != other.idx {
+                        let overlap = compute_overlap(*p, *other);
+                        if overlap > 0.0 {
+                            contacts[k].p1_idx = p.idx as usize;
+                            contacts[k].p2_idx = other.idx as usize;
+                            contacts[k].overlap = overlap;
+                            k += 1;
+                        }
+                    }
+                }
+
+                let mut left_col = find_col(p.x_coordinate - p.radius * 2.0, x_squares, square_length);
+                if left_col == -2 { left_col = 0; }
+                let mut right_col = find_col(p.x_coordinate + p.radius * 2.0, x_squares, square_length);
+                if right_col == -1 { right_col = x_squares - 1; }
+                let mut bottom_row = find_row(p.y_coordinate - p.radius * 2.0, y_squares, square_length

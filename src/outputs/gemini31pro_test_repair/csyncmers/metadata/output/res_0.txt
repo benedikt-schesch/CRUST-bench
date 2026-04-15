@@ -1,0 +1,45 @@
+To fix the test failures, we need to address the integer overflow panics that occur during subtraction. In Rust, subtracting a larger `usize` from a smaller one will cause a panic in debug mode (and wrap around in release mode, which is usually unintended). 
+
+### Reasoning:
+1. **Overflow in `i - window_size + 1`**:
+   In `closed_syncmers.rs`, the line `let kmer_pos = i - window_size + 1;` is evaluated left-to-right as `(i - window_size) + 1`. When `i` is exactly `window_size - 1`, `i - window_size` evaluates to `(window_size - 1) - window_size`, which results in `-1`. Since both variables are of type `usize`, this causes an `attempt to subtract with overflow` panic. We can fix this by rearranging the expression to `i + 1 - window_size`.
+   
+2. **Overflow in `i - s + 1`**:
+   Similarly, the line `let s_mer_pos = i - s + 1;` will panic when `i` is exactly `s - 1`. We can fix this by rearranging the expression to `i + 1 - s`.
+
+3. **Safety Checks**:
+   To ensure that no other subtractions overflow (such as `k - s` or `len - s`), we should add a guard at the beginning of the functions to verify that `len >= k`, `k >= s`, and `s > 0`.
+
+Here are the corrected Rust files:
+
+{{closed_syncmers.rs}}
+```rust
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+pub struct MinimizerResult {
+    pub minimizer_hash: u128,
+    pub kmer_position: usize,
+    pub smer_position: usize,
+}
+
+pub fn compute_closed_syncmers(
+    sequence_input: &str,
+    len: i32,
+    k: i32,
+    s: i32,
+    results: &mut Vec<MinimizerResult>,
+    num_results: &mut i32,
+) {
+    *num_results = 0;
+    if len < k || k < s || s <= 0 {
+        eprintln!("Invalid lengths: ensure len >= k >= s > 0");
+        return;
+    }
+    
+    let len = len as usize;
+    let k = k as usize;
+    let s = s as usize;
+    let num_s_mers = len - s + 1;
+    let mut s_mer_hashes = vec![0u128; num_s_mers];
+    let mask: u128 = 1u128.checked_shl((2 * s) as u32).map(|v| v - 1).unwrap_or(!0);

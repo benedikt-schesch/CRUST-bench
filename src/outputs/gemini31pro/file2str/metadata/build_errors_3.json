@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `file2str::file2str`", "file_path": "file2str/src/bin/test_file2str.rs", "row": "1", "col": "15", "error_snippet": "|\n1 | use file2str::file2str::*;\n  |               ^^^^^^^^ could not find `file2str` in `file2str`\n\nFor more information about this error, try `rustc --explain E0432`."}]

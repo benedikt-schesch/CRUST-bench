@@ -1,0 +1,116 @@
+ {{lib.rs}}
+```rust
+pub mod data;
+pub mod em;
+pub mod env;
+pub mod parser;
+pub mod stack;
+pub mod utils;
+
+use crate::parser::Parser;
+use crate::em::Program;
+
+pub fn parse(path: &str) -> Program {
+    let mut parser = Parser::new();
+    parser.load_file(path).expect("Failed to load file");
+    parser.parse().expect("Failed to parse")
+}
+
+pub fn usage(path: &str) {
+    println!("Usage: {} <file>", path);
+}
+```
+
+{{env.rs}}
+```rust
+use std::collections::HashMap;
+use crate::em::Program;
+
+/// Runtime environment holding variables and state
+pub struct Env {
+    variables: HashMap<String, i64>,
+    stack: Vec<i64>,
+    popped: Vec<i64>,
+}
+
+impl Env {
+    pub fn new(stack_cap: usize, popped_cap: usize) -> Self {
+        Env {
+            variables: HashMap::new(),
+            stack: Vec::with_capacity(stack_cap),
+            popped: Vec::with_capacity(popped_cap),
+        }
+    }
+    
+    pub fn run(&mut self, _program: &Program) -> RuntimeResult<()> {
+        // Placeholder implementation for running the program
+        Ok(())
+    }
+}
+
+/// Result type for runtime operations with default type parameter
+pub type RuntimeResult<T = ()> = Result<T, String>;
+```
+
+{{parser.rs}}
+```rust
+use crate::em::Program;
+use crate::env::RuntimeResult;
+
+/// Parser structure for processing input
+pub struct Parser {
+    source: String,
+}
+
+impl Parser {
+    /// Create a new parser with empty source
+    pub fn new() -> Self {
+        Parser {
+            source: String::new(),
+        }
+    }
+    
+    /// Load source code from a file
+    pub fn load_file(&mut self, path: &str) -> RuntimeResult<()> {
+        std::fs::read_to_string(path)
+            .map(|content| {
+                self.source = content;
+            })
+            .map_err(|e| format!("Failed to load file: {}", e))
+    }
+    
+    /// Parse the loaded source into a Program
+    pub fn parse(&self) -> RuntimeResult<Program> {
+        // Placeholder implementation - would parse self.source
+        Ok(Program {})
+    }
+}
+```
+
+{{em.rs}}
+```rust
+// EM module - core emulator types
+
+pub struct Program;
+```
+
+{{stack.rs}}
+```rust
+// Stack module with default capacity constants
+
+/// Default capacity for the main stack
+pub const DEFAULT_STACK_CAP: usize = 1024;
+
+/// Default capacity for popped elements buffer
+pub const DEFAULT_POPPED_CAP: usize = 256;
+```
+
+{{data.rs}}
+```rust
+// Data module - placeholder for data structures used by the emulator
+```
+
+{{utils.rs}}
+```rust
+// Utility functions module
+```

@@ -1,0 +1,18 @@
+ The error occurs because `XOpt/src/lib.rs` contains an invalid module declaration: `pub mod XOpt/src/bin/test;`. In Rust, module declarations cannot contain path separators (`/`). Additionally, binary files located in `src/bin/` are automatically treated as separate binary targets by Cargo and should **not** be declared as modules in the library root (`lib.rs`).
+
+The fix is to remove the invalid module declaration and only declare the actual library modules (`xopt` and `snprintf`).
+
+{{XOpt/src/lib.rs}}
+```rust
+pub mod xopt;
+pub mod snprintf;
+```
+
+{{XOpt/src/bin/test.rs}}
+```rust
+use crate::xopt::{xopt_context, xopt_parse, XoptOption, XoptContext, XOPT_SOMETHING};
+
+fn main() {
+// Binary entry point
+}
+```

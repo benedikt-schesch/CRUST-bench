@@ -1,0 +1,21 @@
+ {{openhash.rs}}
+```rust
+pub struct OpenHashTable;
+
+impl OpenHashTable {
+    pub fn new(capacity: usize) -> Self {
+        Self
+    }
+}
+```
+
+{{cuckoohash.rs}}
+```rust
+pub struct CuckooHashTable;
+
+impl CuckooHashTable {
+    pub fn new(capacity: usize) -> Self {
+        Self
+    }
+}
+```

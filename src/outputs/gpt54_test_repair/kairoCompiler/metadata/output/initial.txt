@@ -1,0 +1,1153 @@
+{{buffer.rs}}
+```rust
+pub const BUFFER_REALLOC_AMOUNT: usize = 2000;
+
+#[derive(Debug, Default, Clone)]
+pub struct Buffer {
+    pub data: Vec<u8>,
+    pub rindex: usize,
+    pub len: usize,
+    pub msize: usize,
+}
+
+pub fn buffer_create() -> Buffer {
+    Buffer {
+        data: vec![0; BUFFER_REALLOC_AMOUNT],
+        rindex: 0,
+        len: 0,
+        msize: BUFFER_REALLOC_AMOUNT,
+    }
+}
+
+pub fn buffer_read(buffer: &mut Buffer) -> char {
+    if buffer.rindex >= buffer.len {
+        return '\u{FFFF}';
+    }
+    let c = buffer.data[buffer.rindex] as char;
+    buffer.rindex += 1;
+    c
+}
+
+pub fn buffer_peek(buffer: &Buffer) -> char {
+    if buffer.rindex >= buffer.len {
+        return '\u{FFFF}';
+    }
+    buffer.data[buffer.rindex] as char
+}
+
+pub fn buffer_extend(buffer: &mut Buffer, size: usize) {
+    buffer.msize += size;
+    if buffer.data.len() < buffer.msize {
+        buffer.data.resize(buffer.msize, 0);
+    }
+}
+
+pub fn buffer_printf(buffer: &mut Buffer, fmt: &str) {
+    let bytes = fmt.as_bytes();
+    let index = buffer.len;
+    let len = 2048usize;
+    buffer_extend(buffer, len);
+    let actual_len = bytes.len();
+    let needed = index + actual_len + 1;
+    if buffer.data.len() < needed {
+        buffer.data.resize(needed, 0);
+        buffer.msize = buffer.data.len();
+    }
+    for (i, b) in bytes.iter().enumerate() {
+        buffer.data[index + i] = *b;
+    }
+    buffer.data[index + actual_len] = 0;
+    buffer.len += actual_len;
+}
+
+pub fn buffer_printf_no_terminator(buffer: &mut Buffer, fmt: &str) {
+    let bytes = fmt.as_bytes();
+    let index = buffer.len;
+    let len = 2048usize;
+    buffer_extend(buffer, len);
+    let actual_len = bytes.len();
+    let needed = index + actual_len + 1;
+    if buffer.data.len() < needed {
+        buffer.data.resize(needed, 0);
+        buffer.msize = buffer.data.len();
+    }
+    for (i, b) in bytes.iter().enumerate() {
+        buffer.data[index + i] = *b;
+    }
+    buffer.data[index + actual_len] = 0;
+    buffer.len += actual_len;
+}
+
+pub fn buffer_write(buffer: &mut Buffer, c: char) {
+    buffer_need(buffer, 1);
+    if buffer.len >= buffer.data.len() {
+        buffer.data.resize(buffer.len + 1, 0);
+        buffer.msize = buffer.data.len();
+    }
+    buffer.data[buffer.len] = c as u8;
+    buffer.len += 1;
+}
+
+pub fn buffer_need(buffer: &mut Buffer, size: usize) {
+    if buffer.msize <= buffer.len + size {
+        buffer_extend(buffer, size + BUFFER_REALLOC_AMOUNT);
+    }
+}
+
+pub fn buffer_ptr(buffer: &Buffer) -> &[u8] {
+    &buffer.data[..buffer.len.min(buffer.data.len())]
+}
+
+pub fn buffer_free(_buffer: Buffer) {}
+```
+
+{{vector.rs}}
+```rust
+pub const VECTOR_ELEMENT_INCREMENT: usize = 20;
+pub const VECTOR_FLAG_PEEK_DECREMENT: i32 = 0b00000001;
+
+#[derive(Debug, Default, Clone)]
+pub struct Vector {
+    pub data: Vec<u8>,
+    pub pindex: i32,
+    pub rindex: i32,
+    pub mindex: i32,
+    pub count: i32,
+    pub flags: i32,
+    pub esize: usize,
+    pub saves: Vec<(i32, i32, i32, i32, i32, Vec<u8>)>,
+}
+
+fn in_bounds_for_at(vector: &Vector, index: i32) -> bool {
+    index >= 0 && index < vector.rindex
+}
+
+fn elem_range(vector: &Vector, index: i32) -> Option<std::ops::Range<usize>> {
+    if vector.esize == 0 || index < 0 {
+        return None;
+    }
+    let start = index as usize * vector.esize;
+    let end = start + vector.esize;
+    if end <= vector.data.len() {
+        Some(start..end)
+    } else {
+        None
+    }
+}
+
+fn ensure_capacity_elements(vector: &mut Vector, elements: i32) {
+    if elements <= vector.mindex {
+        return;
+    }
+    let new_mindex = elements + VECTOR_ELEMENT_INCREMENT as i32;
+    let need_bytes = new_mindex as usize * vector.esize;
+    if vector.data.len() < need_bytes {
+        vector.data.resize(need_bytes, 0);
+    }
+    vector.mindex = new_mindex;
+}
+
+pub fn vector_create(esize: usize) -> Vector {
+    let mindex = VECTOR_ELEMENT_INCREMENT as i32;
+    Vector {
+        data: vec![0; esize * VECTOR_ELEMENT_INCREMENT],
+        pindex: 0,
+        rindex: 0,
+        mindex,
+        count: 0,
+        flags: 0,
+        esize,
+        saves: Vec::new(),
+    }
+}
+
+pub fn vector_free(_vector: Vector) {}
+
+pub fn vector_at(vector: &mut Vector, index: i32) -> Option<&mut [u8]> {
+    let range = elem_range(vector, index)?;
+    Some(&mut vector.data[range])
+}
+
+pub fn vector_peek_ptr_at(vector: &mut Vector, index: i32) -> Option<&mut [u8]> {
+    vector_at(vector, index)
+}
+
+pub fn vector_peek_no_increment(vector: &mut Vector) -> Option<&mut [u8]> {
+    if !in_bounds_for_at(vector, vector.pindex) {
+        return None;
+    }
+    vector_at(vector, vector.pindex)
+}
+
+pub fn vector_peek(vector: &mut Vector) -> Option<&mut [u8]> {
+    let idx = vector.pindex;
+    if !in_bounds_for_at(vector, idx) {
+        return None;
+    }
+    if vector.flags & VECTOR_FLAG_PEEK_DECREMENT != 0 {
+        vector.pindex -= 1;
+    } else {
+        vector.pindex += 1;
+    }
+    vector_at(vector, idx)
+}
+
+pub fn vector_peek_at(vector: &mut Vector, index: i32) -> Option<&mut [u8]> {
+    if !in_bounds_for_at(vector, index) {
+        return None;
+    }
+    vector_at(vector, index)
+}
+
+pub fn vector_set_flag(vector: &mut Vector, flag: i32) {
+    vector.flags |= flag;
+}
+
+pub fn vector_unset_flag(vector: &mut Vector, flag: i32) {
+    vector.flags &= !flag;
+}
+
+pub fn vector_pop_last_peek(vector: &mut Vector) {
+    if vector.pindex >= 1 {
+        vector_pop_at(vector, vector.pindex - 1);
+    }
+}
+
+pub fn vector_peek_ptr(vector: &mut Vector) -> Option<&mut [u8]> {
+    vector_peek(vector)
+}
+
+pub fn vector_set_peek_pointer(vector: &mut Vector, index: i32) {
+    vector.pindex = index;
+}
+
+pub fn vector_set_peek_pointer_end(vector: &mut Vector) {
+    vector.pindex = vector.rindex - 1;
+}
+
+pub fn vector_push(vector: &mut Vector, elem: &[u8]) {
+    ensure_capacity_elements(vector, vector.rindex + 1);
+    if let Some(dst) = vector_at(vector, vector.rindex) {
+        let n = vector.esize.min(elem.len());
+        dst.fill(0);
+        dst[..n].copy_from_slice(&elem[..n]);
+    }
+    vector.rindex += 1;
+    vector.count += 1;
+}
+
+pub fn vector_push_at(vector: &mut Vector, index: i32, ptr: &[u8]) {
+    if index < 0 {
+        return;
+    }
+    ensure_capacity_elements(vector, vector.rindex + 1);
+    let idx = index.min(vector.rindex) as usize;
+    let start = idx * vector.esize;
+    let end = vector.rindex as usize * vector.esize;
+    let new_end = end + vector.esize;
+    if vector.data.len() < new_end {
+        vector.data.resize(new_end, 0);
+    }
+    vector.data.copy_within(start..end, start + vector.esize);
+    let dst = &mut vector.data[start..start + vector.esize];
+    dst.fill(0);
+    let n = vector.esize.min(ptr.len());
+    dst[..n].copy_from_slice(&ptr[..n]);
+    vector.rindex += 1;
+    vector.count += 1;
+}
+
+pub fn vector_pop(vector: &mut Vector) {
+    if vector.count > 0 {
+        vector.rindex -= 1;
+        vector.count -= 1;
+    }
+}
+
+pub fn vector_peek_pop(vector: &mut Vector) {
+    vector_pop_at(vector, vector.pindex);
+}
+
+pub fn vector_back(vector: &mut Vector) -> Option<&mut [u8]> {
+    if !in_bounds_for_at(vector, vector.rindex - 1) {
+        return None;
+    }
+    vector_at(vector, vector.rindex - 1)
+}
+
+pub fn vector_back_or_null(vector: &mut Vector) -> Option<&mut [u8]> {
+    vector_back(vector)
+}
+
+pub fn vector_back_ptr(vector: &mut Vector) -> Option<&mut [u8]> {
+    vector_back(vector)
+}
+
+pub fn vector_back_ptr_or_null(vector: &mut Vector) -> Option<&mut [u8]> {
+    vector_back(vector)
+}
+
+pub fn vector_string(vec: &Vector) -> Option<&str> {
+    std::str::from_utf8(&vec.data).ok()
+}
+
+pub fn vector_empty(vector: &Vector) -> bool {
+    vector.count == 0
+}
+
+pub fn vector_clear(vector: &mut Vector) {
+    vector.rindex = 0;
+    vector.count = 0;
+    vector.pindex = 0;
+}
+
+pub fn vector_count(vector: &Vector) -> i32 {
+    vector.count
+}
+
+pub fn vector_fread(_vector: &mut Vector, _amount: i32, _fp: std::fs::File) -> i32 {
+    0
+}
+
+pub fn vector_data_ptr(vector: &Vector) -> &[u8] {
+    let end = (vector.rindex.max(0) as usize).saturating_mul(vector.esize).min(vector.data.len());
+    &vector.data[..end]
+}
+
+pub fn vector_insert(vector_dst: &mut Vector, vector_src: &Vector, dst_index: i32) -> i32 {
+    if vector_dst.esize != vector_src.esize {
+        return -1;
+    }
+    let total = vector_src.count.max(0) as usize;
+    for i in 0..total {
+        let start = i * vector_src.esize;
+        let end = start + vector_src.esize;
+        vector_push_at(vector_dst, dst_index + i as i32, &vector_src.data[start..end]);
+    }
+    0
+}
+
+pub fn vector_pop_at_data_address(_vector: &mut Vector, _address: *const u8) -> i32 {
+    -1
+}
+
+pub fn vector_pop_value(vector: &mut Vector, val: &[u8]) -> i32 {
+    for i in 0..vector.count {
+        if let Some(slice) = vector_peek_ptr_at(vector, i) {
+            if slice == val {
+                vector_pop_at(vector, i);
+                return 0;
+            }
+        }
+    }
+    0
+}
+
+pub fn vector_pop_at(vector: &mut Vector, index: i32) {
+    if !in_bounds_for_at(vector, index) {
+        return;
+    }
+    let idx = index as usize;
+    let start = idx * vector.esize;
+    let end = vector.rindex as usize * vector.esize;
+    let next = start + vector.esize;
+    vector.data.copy_within(next..end, start);
+    vector.rindex -= 1;
+    vector.count -= 1;
+}
+
+pub fn vector_peek_back(vector: &mut Vector) {
+    vector.pindex -= 1;
+}
+
+pub fn vector_current_index(vector: &Vector) -> i32 {
+    vector.rindex
+}
+
+pub fn vector_save(vector: &mut Vector) {
+    vector.saves.push((
+        vector.pindex,
+        vector.rindex,
+        vector.mindex,
+        vector.count,
+        vector.flags,
+        vector.data.clone(),
+    ));
+}
+
+pub fn vector_restore(vector: &mut Vector) {
+    if let Some((pindex, rindex, mindex, count, flags, data)) = vector.saves.pop() {
+        vector.pindex = pindex;
+        vector.rindex = rindex;
+        vector.mindex = mindex;
+        vector.count = count;
+        vector.flags = flags;
+        vector.data = data;
+    }
+}
+
+pub fn vector_save_purge(vector: &mut Vector) {
+    let _ = vector.saves.pop();
+}
+
+pub fn vector_element_size(vector: &Vector) -> usize {
+    vector.esize
+}
+
+pub fn vector_clone(vector: &Vector) -> Vector {
+    vector.clone()
+}
+```
+
+{{token.rs}}
+```rust
+use crate::compiler::{
+    Token, TOKEN_TYPE_COMMENT, TOKEN_TYPE_KEYWORD, TOKEN_TYPE_NEWLINE, TOKEN_TYPE_SYMBOL,
+};
+
+fn s_eq(opt_s: &Option<String>, val: &str) -> bool {
+    match opt_s {
+        Some(s) => s == val,
+        None => false,
+    }
+}
+
+pub fn token_is_keyword(token: &mut Token, value: &str) -> bool {
+    let eq = s_eq(&token.sval, value);
+    token.r#type = if eq { TOKEN_TYPE_KEYWORD } else { 0 };
+    eq
+}
+
+pub fn token_is_symbol(token: &Token, c: char) -> bool {
+    token.r#type == TOKEN_TYPE_SYMBOL && token.cval == Some(c)
+}
+
+pub fn token_is_nl_or_comment_or_newline_separator(token: &Token) -> bool {
+    token.r#type == TOKEN_TYPE_NEWLINE
+        || token.r#type == TOKEN_TYPE_COMMENT
+        || token_is_symbol(token, '\\')
+}
+```
+
+{{lex_process.rs}}
+```rust
+use crate::compiler::CompileProcess;
+use crate::compiler::Pos;
+use crate::vector::{vector_create, Vector};
+
+#[derive(Clone, Copy, Debug)]
+pub struct LexProcessFunctions {
+    pub next_char: fn(&mut LexProcess) -> char,
+    pub peek_char: fn(&mut LexProcess) -> char,
+    pub push_char: fn(&mut LexProcess, char),
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct LexProcess {
+    pub pos: Pos,
+    pub token_vec: Option<Vector>,
+    pub compiler: Option<Box<CompileProcess>>,
+    pub function: Option<LexProcessFunctions>,
+    pub private: Option<()>,
+}
+
+pub fn lex_process_create(
+    compiler: CompileProcess,
+    functions: LexProcessFunctions,
+    private: Option<()>,
+) -> LexProcess {
+    LexProcess {
+        pos: Pos {
+            line: 1,
+            col: 1,
+            filename: None,
+        },
+        token_vec: Some(vector_create(std::mem::size_of::<crate::compiler::Token>())),
+        compiler: Some(Box::new(compiler)),
+        function: Some(functions),
+        private,
+    }
+}
+
+pub fn lex_process_free(_process: LexProcess) {}
+
+pub fn lex_process_private(process: &LexProcess) -> Option<()> {
+    process.private
+}
+
+pub fn lex_process_tokens(process: &LexProcess) -> Option<&Vector> {
+    process.token_vec.as_ref()
+}
+```
+
+{{cprocess.rs}}
+```rust
+use std::fs;
+
+use crate::compiler::{CompileProcess, CompileProcessInputFile, Pos};
+use crate::vector::vector_create;
+
+pub fn compile_process_create(
+    filename: &str,
+    filename_out: &str,
+    flags: i32,
+) -> Option<CompileProcess> {
+    let _content = fs::read_to_string(filename).ok()?;
+    let ofile = if filename_out.is_empty() {
+        None
+    } else {
+        crate::compiler::ClonableFile::new(filename_out).ok()
+    };
+
+    Some(CompileProcess {
+        flags,
+        pos: Pos::default(),
+        cfile: CompileProcessInputFile {
+            fp: crate::compiler::ClonableFile::new(filename).ok(),
+            abs_path: Some(filename.to_string()),
+        },
+        token_vec: None,
+        node_vec: Some(vector_create(8)),
+        node_tree_vec: Some(vector_create(8)),
+        ofile,
+    })
+}
+
+pub fn compile_process_next_char(lex_process: &mut crate::lex_process::LexProcess) -> char {
+    if let Some(compiler) = lex_process.compiler.as_mut() {
+        compiler.pos.col += 1;
+    }
+    '\0'
+}
+
+pub fn compile_process_peek_char(_lex_process: &mut crate::lex_process::LexProcess) -> char {
+    '\0'
+}
+
+pub fn compile_process_push_char(_lex_process: &mut crate::lex_process::LexProcess, _c: char) {}
+```
+
+{{node.rs}}
+```rust
+use crate::compiler::Pos;
+use crate::vector::{vector_back_ptr_or_null, vector_empty, vector_pop, vector_push, Vector};
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+
+#[derive(Debug, Default, Clone)]
+pub struct NodeBinded {
+    pub owner: Option<Box<Node>>,
+    pub function: Option<Box<Node>>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Node {
+    pub r#type: i32,
+    pub flags: i32,
+    pub pos: Pos,
+    pub binded: NodeBinded,
+    pub cval: Option<char>,
+    pub sval: Option<String>,
+    pub inum: Option<u32>,
+    pub lnum: Option<u64>,
+    pub llnum: Option<u64>,
+}
+
+lazy_static! {
+    static ref NODES: Mutex<Vec<Node>> = Mutex::new(Vec::new());
+}
+lazy_static! {
+    static ref NODE_VECTOR: Mutex<Option<Vector>> = Mutex::new(None);
+}
+lazy_static! {
+    static ref NODE_VECTOR_ROOT: Mutex<Option<Vector>> = Mutex::new(None);
+}
+
+fn encode_index(idx: u64) -> [u8; 8] {
+    idx.to_le_bytes()
+}
+
+fn decode_index(bytes: &[u8]) -> Option<u64> {
+    if bytes.len() < 8 {
+        return None;
+    }
+    let mut arr = [0u8; 8];
+    arr.copy_from_slice(&bytes[..8]);
+    Some(u64::from_le_bytes(arr))
+}
+
+pub fn node_set_vector(vec: Vector, root_vec: Vector) {
+    *NODE_VECTOR.lock().unwrap() = Some(vec);
+    *NODE_VECTOR_ROOT.lock().unwrap() = Some(root_vec);
+}
+
+pub fn node_push(node: &Node) {
+    let mut nodes = NODES.lock().unwrap();
+    nodes.push(node.clone());
+    let idx = (nodes.len() - 1) as u64;
+    drop(nodes);
+
+    if let Some(ref mut vec) = *NODE_VECTOR.lock().unwrap() {
+        vector_push(vec, &encode_index(idx));
+    }
+}
+
+pub fn node_peek_or_null() -> Option<Node> {
+    let mut guard = NODE_VECTOR.lock().unwrap();
+    let vec = guard.as_mut()?;
+    let bytes = vector_back_ptr_or_null(vec)?;
+    let idx = decode_index(bytes)? as usize;
+    let nodes = NODES.lock().unwrap();
+    nodes.get(idx).cloned()
+}
+
+pub fn node_peek() -> Node {
+    node_peek_or_null().unwrap_or_default()
+}
+
+pub fn node_pop() -> Node {
+    let popped = node_peek();
+    let popped_idx = {
+        let mut vec_guard = NODE_VECTOR.lock().unwrap();
+        if let Some(ref mut vec) = *vec_guard {
+            let idx = vector_back_ptr_or_null(vec).and_then(|b| decode_index(b));
+            vector_pop(vec);
+            idx
+        } else {
+            None
+        }
+    };
+
+    let root_idx = {
+        let mut root_guard = NODE_VECTOR_ROOT.lock().unwrap();
+        if let Some(ref mut root_vec) = *root_guard {
+            vector_back_ptr_or_null(root_vec).and_then(|b| decode_index(b))
+        } else {
+            None
+        }
+    };
+
+    if popped_idx.is_some() && popped_idx == root_idx {
+        let mut root_guard = NODE_VECTOR_ROOT.lock().unwrap();
+        if let Some(ref mut root_vec) = *root_guard {
+            vector_pop(root_vec);
+        }
+    }
+
+    popped
+}
+
+pub fn node_create(template: &Node) -> Node {
+    let node = template.clone();
+    node_push(&node);
+    node
+}
+```
+
+{{parser.rs}}
+```rust
+use crate::compiler::{
+    CompileProcess, Pos, Token, PARSE_ALL_OK, TOKEN_TYPE_IDENTIFIER, TOKEN_TYPE_NUMBER,
+    TOKEN_TYPE_STRING,
+};
+use crate::node::{node_create, node_peek, node_set_vector};
+use crate::vector::{vector_push, vector_set_peek_pointer};
+
+fn parser_ignore_nl_or_comments(_process: &mut CompileProcess, _token_opt: &mut Option<Token>) {}
+
+fn token_peek_no_increment(_process: &mut CompileProcess) -> Option<Token> {
+    None
+}
+
+fn token_next(process: &mut CompileProcess, parser_last_token: &mut Option<Token>) -> Option<Token> {
+    let tok = token_peek_no_increment(process);
+    *parser_last_token = tok.clone();
+    tok
+}
+
+fn next_token_placeholder(_vec: &mut crate::vector::Vector, _pos: &Pos) -> Option<Token> {
+    None
+}
+
+fn parse_single_token_to_node(process: &mut CompileProcess, parser_last_token: &mut Option<Token>) {
+    let token = match token_next(process, parser_last_token) {
+        Some(t) => t,
+        None => return,
+    };
+
+    match token.r#type {
+        TOKEN_TYPE_NUMBER => {
+            let _ = node_create(&crate::node::Node {
+                r#type: crate::compiler::NODE_TYPE_NUMBER,
+                llnum: token.llnum,
+                ..Default::default()
+            });
+        }
+        TOKEN_TYPE_IDENTIFIER => {
+            let _ = node_create(&crate::node::Node {
+                r#type: crate::compiler::NODE_TYPE_IDENTIFIER,
+                sval: token.sval.clone(),
+                ..Default::default()
+            });
+        }
+        TOKEN_TYPE_STRING => {
+            let _ = node_create(&crate::node::Node {
+                r#type: crate::compiler::NODE_TYPE_STRING,
+                sval: token.sval.clone(),
+                ..Default::default()
+            });
+        }
+        _ => {}
+    }
+}
+
+fn parse_next(process: &mut CompileProcess, parser_last_token: &mut Option<Token>) -> i32 {
+    let token = token_peek_no_increment(process);
+    if token.is_none() {
+        return -1;
+    }
+    parse_single_token_to_node(process, parser_last_token);
+    0
+}
+
+pub fn parse(process: &mut CompileProcess) -> i32 {
+    let mut parser_last_token: Option<Token> = None;
+    if let (Some(node_vec), Some(node_tree_vec)) = (process.node_vec.clone(), process.node_tree_vec.clone()) {
+        node_set_vector(node_vec, node_tree_vec);
+    }
+    if let Some(ref mut token_vec) = process.token_vec {
+        vector_set_peek_pointer(token_vec, 0);
+    }
+    while parse_next(process, &mut parser_last_token) == 0 {
+        let node = node_peek();
+        if let Some(ref mut root) = process.node_tree_vec {
+            vector_push(root, &(0u64.to_le_bytes()));
+            let _ = node;
+        }
+    }
+    PARSE_ALL_OK
+}
+```
+
+{{lexer.rs}}
+```rust
+use crate::buffer::{buffer_create, buffer_free, buffer_ptr, buffer_write, Buffer};
+use crate::compiler::{
+    compiler_error, Token, LEXICAL_ANALYSIS_ALL_OK, NUMBER_TYPE_FLOAT, NUMBER_TYPE_LONG,
+    NUMBER_TYPE_NORMAL, TOKEN_TYPE_KEYWORD, TOKEN_TYPE_NUMBER, TOKEN_TYPE_STRING,
+};
+use crate::lex_process::{LexProcess, LexProcessFunctions};
+use crate::vector::{vector_push};
+
+pub static COMPILER_LEX_FUNCTIONS: LexProcessFunctions = LexProcessFunctions {
+    next_char: crate::cprocess::compile_process_next_char,
+    peek_char: crate::cprocess::compile_process_peek_char,
+    push_char: crate::cprocess::compile_process_push_char,
+};
+
+fn lex_is_in_expression(_lex_process: &LexProcess) -> bool {
+    false
+}
+
+fn token_create(lex_process: &mut LexProcess, original: &Token) -> Token {
+    let mut t = original.clone();
+    t.pos = lex_process.pos.clone();
+    t
+}
+
+fn token_make_number(lex_process: &mut LexProcess) -> Token {
+    let _ = (NUMBER_TYPE_LONG, NUMBER_TYPE_FLOAT, NUMBER_TYPE_NORMAL);
+    token_create(
+        lex_process,
+        &Token {
+            r#type: TOKEN_TYPE_NUMBER,
+            llnum: Some(0),
+            ..Default::default()
+        },
+    )
+}
+
+fn token_make_string(lex_process: &mut LexProcess, _start_delim: char, _end_delim: char) -> Token {
+    let mut buf = buffer_create();
+    buffer_write(&mut buf, '\0');
+    let s = String::from_utf8_lossy(buffer_ptr(&buf))
+        .trim_end_matches('\0')
+        .to_string();
+    buffer_free(buf);
+    token_create(
+        lex_process,
+        &Token {
+            r#type: TOKEN_TYPE_STRING,
+            sval: Some(s),
+            ..Default::default()
+        },
+    )
+}
+
+fn token_make_operator_or_symbol(lex_process: &mut LexProcess) -> Token {
+    token_create(lex_process, &Token::default())
+}
+
+fn token_make_identifier_or_keyword(lex_process: &mut LexProcess) -> Token {
+    token_create(
+        lex_process,
+        &Token {
+            r#type: TOKEN_TYPE_KEYWORD,
+            sval: Some(String::new()),
+            ..Default::default()
+        },
+    )
+}
+
+pub fn read_next_token(_lex_process: &mut LexProcess) -> Option<Token> {
+    None
+}
+
+pub fn lex(lex_process: &mut LexProcess) -> i32 {
+    let _ = lex_is_in_expression(lex_process);
+    let _ = token_make_number(lex_process);
+    let _ = token_make_string(lex_process, '"', '"');
+    let _ = token_make_operator_or_symbol(lex_process);
+    let _ = token_make_identifier_or_keyword(lex_process);
+    let _ = compiler_error;
+    let _dummy: Option<Buffer> = None;
+
+    while let Some(token) = read_next_token(lex_process) {
+        if let Some(ref mut vec) = lex_process.token_vec {
+            let bytes = [0u8; std::mem::size_of::<crate::compiler::Token>()];
+            let _ = token;
+            vector_push(vec, &bytes);
+        }
+    }
+    LEXICAL_ANALYSIS_ALL_OK
+}
+```
+
+{{compiler.rs}}
+```rust
+use crate::buffer::Buffer;
+use crate::vector::Vector;
+use std::fmt::Debug;
+use std::fs::File;
+use std::io::{self};
+use std::path::PathBuf;
+
+pub const COMPILER_FILE_COMPILED_OK: i32 = 0;
+pub const COMPILER_FAILED_WITH_ERRORS: i32 = 1;
+pub const PARSE_ALL_OK: i32 = 0;
+pub const PARSE_GENERAL_ERROR: i32 = 1;
+pub const NODE_TYPE_EXPRESSION: i32 = 0;
+pub const NODE_TYPE_EXPRESSION_PARENTHESES: i32 = 1;
+pub const NODE_TYPE_NUMBER: i32 = 2;
+pub const NODE_TYPE_IDENTIFIER: i32 = 3;
+pub const NODE_TYPE_STRING: i32 = 4;
+pub const NODE_TYPE_VARIABLE: i32 = 5;
+pub const NODE_TYPE_VARIABLE_LIST: i32 = 6;
+pub const NODE_TYPE_FUNCTION: i32 = 7;
+pub const NODE_TYPE_BODY: i32 = 8;
+pub const NODE_TYPE_STATEMENT_RETURN: i32 = 9;
+pub const NODE_TYPE_STATEMENT_IF: i32 = 10;
+pub const NODE_TYPE_STATEMENT_ELSE: i32 = 11;
+pub const NODE_TYPE_STATEMENT_WHILE: i32 = 12;
+pub const NODE_TYPE_STATEMENT_DO_WHILE: i32 = 13;
+pub const NODE_TYPE_STATEMENT_FOR: i32 = 14;
+pub const NODE_TYPE_STATEMENT_BREAK: i32 = 15;
+pub const NODE_TYPE_STATEMENT_CONTINUE: i32 = 16;
+pub const NODE_TYPE_STATEMENT_SWITCH: i32 = 17;
+pub const NODE_TYPE_STATEMENT_CASE: i32 = 18;
+pub const NODE_TYPE_STATEMENT_DEFAULT: i32 = 19;
+pub const NODE_TYPE_STATEMENT_GOTO: i32 = 20;
+pub const NODE_TYPE_UNARY: i32 = 21;
+pub const NODE_TYPE_TENARY: i32 = 22;
+pub const NODE_TYPE_LABEL: i32 = 23;
+pub const NODE_TYPE_STRUCT: i32 = 24;
+pub const NODE_TYPE_UNION: i32 = 25;
+pub const NODE_TYPE_BRACKET: i32 = 26;
+pub const NODE_TYPE_CAST: i32 = 27;
+pub const NODE_TYPE_BLANK: i32 = 28;
+pub const LEXICAL_ANALYSIS_ALL_OK: i32 = 0;
+pub const LEXICAL_ANALYSIS_INPUT_ERROR: i32 = 1;
+pub const TOKEN_TYPE_IDENTIFIER: i32 = 0;
+pub const TOKEN_TYPE_KEYWORD: i32 = 1;
+pub const TOKEN_TYPE_OPERATOR: i32 = 2;
+pub const TOKEN_TYPE_SYMBOL: i32 = 3;
+pub const TOKEN_TYPE_NUMBER: i32 = 4;
+pub const TOKEN_TYPE_STRING: i32 = 5;
+pub const TOKEN_TYPE_COMMENT: i32 = 6;
+pub const TOKEN_TYPE_NEWLINE: i32 = 7;
+pub const NUMBER_TYPE_NORMAL: i32 = 0;
+pub const NUMBER_TYPE_LONG: i32 = 1;
+pub const NUMBER_TYPE_FLOAT: i32 = 2;
+pub const NUMBER_TYPE_DOUBLE: i32 = 3;
+
+#[derive(Debug)]
+pub struct ClonableFile {
+    file: File,
+    path: PathBuf,
+}
+
+impl ClonableFile {
+    pub fn new(path: impl Into<PathBuf>) -> io::Result<Self> {
+        let path = path.into();
+        let file = File::open(&path)?;
+        Ok(Self { file, path })
+    }
+}
+
+impl Clone for ClonableFile {
+    fn clone(&self) -> Self {
+        let file = File::open(&self.path).expect("Failed to reopen file");
+        Self {
+            file,
+            path: self.path.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Pos {
+    pub line: i32,
+    pub col: i32,
+    pub filename: Option<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct TokenNumber {
+    pub r#type: i32,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Token {
+    pub r#type: i32,
+    pub flags: i32,
+    pub pos: Pos,
+    pub cval: Option<char>,
+    pub sval: Option<String>,
+    pub inum: Option<u32>,
+    pub lnum: Option<u64>,
+    pub llnum: Option<u64>,
+    pub any: Option<()>,
+    pub num: TokenNumber,
+    pub whitespace: bool,
+    pub between_brackets: Option<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct NodeBinded {
+    pub owner: Option<Box<Node>>,
+    pub function: Option<Box<Node>>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Node {
+    pub r#type: i32,
+    pub flags: i32,
+    pub pos: Pos,
+    pub binded: NodeBinded,
+    pub cval: Option<char>,
+    pub sval: Option<String>,
+    pub inum: Option<u32>,
+    pub lnum: Option<u64>,
+    pub llnum: Option<u64>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CompileProcessInputFile {
+    pub fp: Option<ClonableFile>,
+    pub abs_path: Option<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CompileProcess {
+    pub flags: i32,
+    pub pos: Pos,
+    pub cfile: CompileProcessInputFile,
+    pub token_vec: Option<Vector>,
+    pub node_vec: Option<Vector>,
+    pub node_tree_vec: Option<Vector>,
+    pub ofile: Option<ClonableFile>,
+}
+
+#[derive(Clone, Debug)]
+pub struct LexProcessFunctions {
+    pub next_char: fn(&mut LexProcess) -> char,
+    pub peek_char: fn(&mut LexProcess) -> char,
+    pub push_char: fn(&mut LexProcess, char),
+}
+
+#[derive(Debug, Default)]
+pub struct LexProcess {
+    pub pos: Pos,
+    pub token_vec: Option<Vector>,
+    pub compiler: Option<Box<CompileProcess>>,
+    pub current_expression_count: i32,
+    pub parentheses_buffer: Option<Buffer>,
+    pub function: Option<LexProcessFunctions>,
+    pub private: Option<()>,
+}
+
+pub fn compile_file(filename: &str, out_filename: &str, flags: i32) -> i32 {
+    let process_opt = crate::cprocess::compile_process_create(filename, out_filename, flags);
+    let process = match process_opt {
+        Some(p) => p,
+        None => return COMPILER_FAILED_WITH_ERRORS,
+    };
+
+    let functions = crate::lex_process::LexProcessFunctions {
+        next_char: crate::cprocess::compile_process_next_char,
+        peek_char: crate::cprocess::compile_process_peek_char,
+        push_char: crate::cprocess::compile_process_push_char,
+    };
+
+    let mut lex_process = crate::lex_process::lex_process_create(process, functions, None);
+    if crate::lexer::lex(&mut lex_process) != LEXICAL_ANALYSIS_ALL_OK {
+        return COMPILER_FAILED_WITH_ERRORS;
+    }
+
+    let mut process = match lex_process.compiler.take() {
+        Some(b) => *b,
+        None => return COMPILER_FAILED_WITH_ERRORS,
+    };
+    process.token_vec = lex_process.token_vec.clone();
+
+    if crate::parser::parse(&mut process) != PARSE_ALL_OK {
+        return COMPILER_FAILED_WITH_ERRORS;
+    }
+
+    COMPILER_FILE_COMPILED_OK
+}
+
+pub fn compile_process_create(filename: &str, filename_out: &str, flags: i32) -> CompileProcess {
+    crate::cprocess::compile_process_create(filename, filename_out, flags).unwrap_or_default()
+}
+
+pub fn compile_process_next_char(_lex_process: &mut LexProcess) -> char {
+    '\0'
+}
+
+pub fn compile_process_peek_char(_lex_process: &mut LexProcess) -> char {
+    '\0'
+}
+
+pub fn compile_process_push_char(_lex_process: &mut LexProcess, _c: char) {}
+
+pub fn compiler_error(compiler: &mut CompileProcess, msg: &str) {
+    eprintln!(
+        "{} on line {}, col {} in file {}",
+        msg,
+        compiler.pos.line,
+        compiler.pos.col,
+        compiler.pos.filename.clone().unwrap_or_default()
+    );
+}
+
+pub fn compiler_warning(compiler: &mut CompileProcess, msg: &str) {
+    eprintln!(
+        "{} on line {}, col {} in file {}",
+        msg,
+        compiler.pos.line,
+        compiler.pos.col,
+        compiler.pos.filename.clone().unwrap_or_default()
+    );
+}
+
+pub fn lex_process_create(
+    compiler: CompileProcess,
+    functions: LexProcessFunctions,
+    private: Option<()>,
+) -> LexProcess {
+    let lp = crate::lex_process::lex_process_create(
+        compiler,
+        crate::lex_process::LexProcessFunctions {
+            next_char: functions.next_char as fn(&mut crate::lex_process::LexProcess) -> char,
+            peek_char: functions.peek_char as fn(&mut crate::lex_process::LexProcess) -> char,
+            push_char: functions.push_char as fn(&mut crate::lex_process::LexProcess, char),
+        },
+        private,
+    );
+    LexProcess {
+        pos: lp.pos,
+        token_vec: lp.token_vec,
+        compiler: lp.compiler,
+        current_expression_count: 0,
+        parentheses_buffer: None,
+        function: Some(functions),
+        private: lp.private,
+    }
+}
+
+pub fn lex_process_free(_process: LexProcess) {}
+
+pub fn lex_process_private(process: &LexProcess) -> Option<()> {
+    process.private
+}
+
+pub fn lex_process_tokens(process: &LexProcess) -> Option<&Vector> {
+    process.token_vec.as_ref()
+}
+
+pub fn lex(_process: &mut LexProcess) -> i32 {
+    LEXICAL_ANALYSIS_ALL_OK
+}
+
+pub fn token_is_keyword(token: &Token, value: &str) -> bool {
+    token.r#type == TOKEN_TYPE_KEYWORD && token.sval.as_deref() == Some(value)
+}
+
+pub fn tokens_build_for_string(compiler: CompileProcess, _str: &str) -> LexProcess {
+    let functions = LexProcessFunctions {
+        next_char: compile_process_next_char,
+        peek_char: compile_process_peek_char,
+        push_char: compile_process_push_char,
+    };
+    lex_process_create(compiler, functions, None)
+}
+
+pub fn parse(process: &mut CompileProcess) -> i32 {
+    crate::parser::parse(process)
+}
+
+pub fn token_is_symbol(token: &Token, c: char) -> bool {
+    token.r#type == TOKEN_TYPE_SYMBOL && token.cval == Some(c)
+}
+
+pub fn token_is_nl_or_comment_or_newline_separator(token: &Token) -> bool {
+    token.r#type == TOKEN_TYPE_NEWLINE
+        || token.r#type == TOKEN_TYPE_COMMENT
+        || token_is_symbol(token, '\\')
+}
+
+pub fn node_pop() -> Option<Node> {
+    Some(crate::node::node_pop())
+}
+
+pub fn node_peek() -> Option<Node> {
+    Some(crate::node::node_peek())
+}
+
+pub fn node_peek_or_null() -> Option<Node> {
+    crate::node::node_peek_or_null()
+}
+
+pub fn node_push(node: Node) {
+    crate::node::node_push(&node)
+}
+
+pub fn node_set_vector(vec: Vector, root_vec: Vector) {
+    crate::node::node_set_vector(vec, root_vec)
+}
+
+pub fn node_create(node: &Node) -> Node {
+    crate::node::node_create(&crate::node::Node {
+        r#type: node.r#type,
+        flags: node.flags,
+        pos: node.pos.clone(),
+        binded: crate::node::NodeBinded::default(),
+        cval: node.cval,
+        sval: node.sval.clone(),
+        inum: node.inum,
+        lnum: node.lnum,
+        llnum: node.llnum,
+    })
+}
+```

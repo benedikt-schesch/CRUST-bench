@@ -1,0 +1,239 @@
+ {{cset.rs}}
+```rust
+use std::mem;
+use std::ptr;
+
+// Type aliases
+pub type XXH64HashT = u64;
+pub type XXHU8 = u8;
+pub type XXHU64 = XXH64HashT;
+pub type XXHU32 = u32;
+pub type XXH32HashT = u32;
+
+// Constants
+pub const XXH_PRIME64_1: u64 = 0x9E3779B185EBCA87;
+pub const XXH_PRIME64_2: u64 = 0xC2B2AE3D27D4EB4F;
+pub const XXH_PRIME64_3: u64 = 0x165667B19E3779F9;
+pub const XXH_PRIME64_4: u64 = 0x85EBCA77C2B2AE63;
+pub const XXH_PRIME64_5: u64 = 0x27D4EB2F165667C5;
+pub const CSET_FORCE_INITIALIZE: bool = true;
+pub const CSET_INITIAL_CAP: usize = 2;
+pub const CSET_DEFAULT_SEED: u64 = 2718182;
+pub const CSET_MAX_LOAD_FACTOR: f64 = 0.7;
+pub const CSET_MIN_LOAD_FACTOR: f64 = 0.2;
+
+// Helper rotation functions
+fn xxh_rotl64(x: u64, r: u32) -> u64 {
+    (x << r) | (x >> (64 - r))
+}
+
+fn xxh_rotl32(x: u32, r: u32) -> u32 {
+    (x << r) | (x >> (32 - r))
+}
+
+pub fn xxh_get64bits(mem_ptr: &mut XXHU8) -> XXHU64 {
+    let ptr = mem_ptr as *mut XXHU8;
+    unsafe {
+        let mut result: XXHU64 = 0;
+        for i in 0..8 {
+            result |= (*ptr.add(i) as XXHU64) << (i * 8);
+        }
+        result
+    }
+}
+
+pub fn xxh_read_le64(mem_ptr: &mut XXHU8) -> XXHU64 {
+    xxh_get64bits(mem_ptr)
+}
+
+pub fn xxh_is_little_endian() -> bool {
+    cfg!(target_endian = "little")
+}
+
+pub fn xxh_read_le64_align(mem_ptr: &mut XXHU8) -> XXHU64 {
+    xxh_read_le64(mem_ptr)
+}
+
+pub fn xxh_swap32(x: &mut XXHU32) -> XXHU32 {
+    let val = *x;
+    ((val << 24) & 0xff000000) | ((val << 8) & 0x00ff0000) |
+    ((val >> 8) & 0x0000ff00) | ((val >> 24) & 0x000000ff)
+}
+
+pub fn xxh_read32(mem_ptr: &mut XXHU32) -> XXHU32 {
+    *mem_ptr
+}
+
+pub fn xxh64_round(acc: XXHU64, input: XXHU64) -> XXHU64 {
+    let mut acc = acc;
+    acc = acc.wrapping_add(input.wrapping_mul(XXH_PRIME64_2));
+    acc = xxh_rotl64(acc, 31);
+    acc = acc.wrapping_mul(XXH_PRIME64_1);
+    acc
+}
+
+pub fn xxh64_merge_round(acc: XXHU64, val: XXHU64) -> XXHU64 {
+    let mut acc = acc;
+    let val = xxh64_round(0, val);
+    acc ^= val;
+    acc = acc.wrapping_mul(XXH_PRIME64_1).wrapping_add(XXH_PRIME64_4);
+    acc
+}
+
+pub fn xxh_get_32bits(ptr: &mut XXHU32) -> XXHU32 {
+    if xxh_is_little_endian() {
+        *ptr
+    } else {
+        xxh_swap32(ptr)
+    }
+}
+
+pub fn xxh_read_le32_align(ptr: &mut XXHU32) -> XXHU32 {
+    xxh_get_32bits(ptr)
+}
+
+pub fn xxh64_avalanche(mut h64: XXHU64) -> XXHU64 {
+    h64 ^= h64 >> 33;
+    h64 = h64.wrapping_mul(XXH_PRIME64_2);
+    h64 ^= h64 >> 29;
+    h64 = h64.wrapping_mul(XXH_PRIME64_3);
+    h64 ^= h64 >> 32;
+    h64
+}
+
+pub fn xxh64_finalize(mut h64: XXHU64, ptr: &mut XXHU8, len: usize) -> XXHU64 {
+    let mut len = len & 31;
+    let p = ptr as *mut XXHU8;
+    
+    unsafe {
+        let mut current = p;
+        while len >= 8 {
+            let k1 = xxh64_round(0, xxh_get64bits(&mut *current));
+            current = current.add(8);
+            h64 ^= k1;
+            h64 = xxh_rotl64(h64, 27).wrapping_mul(XXH_PRIME64_1).wrapping_add(XXH_PRIME64_4);
+            len -= 8;
+        }
+        
+        if len >= 4 {
+            h64 ^= (xxh_get_32bits(&mut *(current as *mut XXHU32)) as XXHU64).wrapping_mul(XXH_PRIME64_1);
+            current = current.add(4);
+            h64 = xxh_rotl64(h64, 23).wrapping_mul(XXH_PRIME64_2).wrapping_add(XXH_PRIME64_3);
+            len -= 4;
+        }
+        
+        while len > 0 {
+            h64 ^= (*current as XXHU64).wrapping_mul(XXH_PRIME64_5);
+            h64 = xxh_rotl64(h64, 11).wrapping_mul(XXH_PRIME64_1);
+            current = current.add(1);
+            len -= 1;
+        }
+    }
+    
+    xxh64_avalanche(h64)
+}
+
+pub fn xxh64_endian_align(input: &mut XXHU8, len: usize, seed: XXHU64) -> XXHU64 {
+    let mut h64: XXHU64;
+    let b_end = input as *mut XXHU8;
+    
+    unsafe {
+        if len >= 32 {
+            let limit = b_end.add(len).sub(32);
+            let mut v1 = seed.wrapping_add(XXH_PRIME64_1).wrapping_add(XXH_PRIME64_2);
+            let mut v2 = seed.wrapping_add(XXH_PRIME64_2);
+            let mut v3 = seed;
+            let mut v4 = seed.wrapping_sub(XXH_PRIME64_1);
+            
+            let mut p = b_end;
+            while p <= limit {
+                v1 = xxh64_round(v1, xxh_get64bits(&mut *p));
+                p = p.add(8);
+                v2 = xxh64_round(v2, xxh_get64bits(&mut *p));
+                p = p.add(8);
+                v3 = xxh64_round(v3, xxh_get64bits(&mut *p));
+                p = p.add(8);
+                v4 = xxh64_round(v4, xxh_get64bits(&mut *p));
+                p = p.add(8);
+            }
+            
+            h64 = xxh_rotl64(v1, 1).wrapping_add(xxh_rotl64(v2, 7))
+                .wrapping_add(xxh_rotl64(v3, 12)).wrapping_add(xxh_rotl64(v4, 18));
+            h64 = xxh64_merge_round(h64, v1);
+            h64 = xxh64_merge_round(h64, v2);
+            h64 = xxh64_merge_round(h64, v3);
+            h64 = xxh64_merge_round(h64, v4);
+        } else {
+            h64 = seed.wrapping_add(XXH_PRIME64_5);
+        }
+        
+        h64 = h64.wrapping_add(len as XXHU64);
+        h64 = xxh64_finalize(h64, &mut *b_end, len);
+    }
+    
+    h64
+}
+
+pub fn xxh64_endian_align_h(input: &mut XXHU8, len: usize, seed: XXHU64) -> XXHU64 {
+    let mut h64: XXHU64;
+    let b_end = input as *mut XXHU8;
+    
+    unsafe {
+        if len >= 32 {
+            let limit = b_end.add(len).sub(32);
+            let mut v1 = seed.wrapping_add(XXH_PRIME64_1).wrapping_add(XXH_PRIME64_2);
+            let mut v2 = seed.wrapping_sub(XXH_PRIME64_2);
+            let mut v3 = seed.wrapping_add(XXH_PRIME64_3);
+            let mut v4 = seed.wrapping_sub(XXH_PRIME64_1);
+            
+            let mut p = b_end;
+            while p <= limit {
+                v1 = xxh64_round(v1, xxh_get64bits(&mut *p));
+                p = p.add(8);
+                v2 = xxh64_round(v2, xxh_get64bits(&mut *p));
+                p = p.add(8);
+                v3 = xxh64_round(v3, xxh_get64bits(&mut *p));
+                p = p.add(8);
+                v4 = xxh64_round(v4, xxh_get64bits(&mut *p));
+                p = p.add(8);
+            }
+            
+            h64 = xxh_rotl64(v1, 1).wrapping_add(xxh_rotl64(v2, 7))
+                .wrapping_add(xxh_rotl64(v3, 12)).wrapping_add(xxh_rotl64(v4, 18));
+            h64 = xxh64_merge_round(h64, v1);
+            h64 = xxh64_merge_round(h64, v2);
+            h64 = xxh64_merge_round(h64, v3);
+            h64 = xxh64_merge_round(h64, v4);
+        } else {
+            h64 = seed.wrapping_add(XXH_PRIME64_1);
+        }
+        
+        h64 = h64.wrapping_add(len as XXHU64);
+        h64 = xxh64_finalize(h64, &mut *b_end, len);
+    }
+    
+    h64
+}
+
+pub fn xxh64(input: *const u8, len: usize, seed: XXH64HashT) -> XXH64HashT {
+    if input.is_null() {
+        return 0;
+    }
+    unsafe {
+        xxh64_endian_align(&mut *(input as *mut u8), len, seed)
+    }
+}
+
+pub fn xxh64_h(input: *const u8, len: usize, seed: XXH64HashT) -> XXH64HashT {
+    if input.is_null() {
+        return 0;
+    }
+    unsafe {
+        xxh64_endian_align_h(&mut *(input as *mut u8), len, seed)
+    }
+}
+
+pub fn cset_hash1_callback(memptr: &mut XXHU8, size: usize) -> XXHU64 {
+    xxh64(memptr as *mut XXHU8 as *const u8, size, CSET_DEFAULT_SEED)
+}
+

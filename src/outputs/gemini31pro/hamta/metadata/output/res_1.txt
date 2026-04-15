@@ -1,0 +1,5 @@
+```rust
+// Generated Rust Code
+pub mod hamta;
+pub use crate::hamta::*;
+```

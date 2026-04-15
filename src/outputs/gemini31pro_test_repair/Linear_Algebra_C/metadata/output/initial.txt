@@ -1,0 +1,92 @@
+```rust
+// Generated Rust Code
+```
+
+{{linear_algebra.rs}}
+```rust
+use crate::matrix::*;
+use crate::vector::*;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Matrix {
+    pub rows: usize,
+    pub cols: usize,
+    pub data: Vec<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Vector {
+    pub cols: usize,
+    pub data: Vec<f64>,
+}
+
+// --- Helper assertion functions ---
+pub fn assert_matrix(m: &Matrix) -> bool {
+    assert_matrix_impl(m)
+}
+
+pub fn assert_vector(v: &Vector) -> bool {
+    assert_vector_impl(v)
+}
+
+// --- Creation functions ---
+pub fn new_matrix(d: &[f64], rows: usize, cols: usize) -> Matrix {
+    new_matrix_impl(d, rows, cols)
+}
+
+pub fn new_vector(d: &[f64], cols: usize) -> Vector {
+    new_vector_impl(d, cols)
+}
+
+pub fn null_matrix(rows: usize, cols: usize) -> Matrix {
+    null_matrix_impl(rows, cols)
+}
+
+pub fn null_vector(cols: usize) -> Vector {
+    null_vector_impl(cols)
+}
+
+pub fn zero_matrix(rows: usize, cols: usize) -> Matrix {
+    zero_matrix_impl(rows, cols)
+}
+
+pub fn zero_vector(cols: usize) -> Vector {
+    zero_vector_impl(cols)
+}
+
+// --- Fill functions ---
+pub fn fill_matrix(m: &mut Matrix, n: f64) {
+    fill_matrix_impl(m, n)
+}
+
+pub fn fill_vector(v: &mut Vector, n: f64) {
+    fill_vector_impl(v, n)
+}
+
+/// Returns an identity matrix of size n.
+pub fn identity_matrix(n: usize) -> Matrix {
+    identity_matrix_impl(n)
+}
+
+/// “Releases” a matrix (stub; memory is managed automatically in Rust).
+pub fn delete_matrix(m: Matrix) {
+    delete_matrix_impl(m)
+}
+
+/// “Releases” a vector.
+pub fn delete_vector(v: Vector) {
+    delete_vector_impl(v)
+}
+
+/// Returns a copy of the given matrix.
+pub fn copy_matrix(m: &Matrix) -> Matrix {
+    copy_matrix_impl(m)
+}
+
+/// Returns a copy of the given vector.
+pub fn copy_vector(v: &Vector) -> Vector {
+    copy_vector_impl(v)
+}
+
+/// Flattens the given matrix into a vector.
+pub fn flatten_matrix(m: &Matrix) -> Vector {

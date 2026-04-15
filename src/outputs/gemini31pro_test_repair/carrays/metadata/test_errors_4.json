@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `carrays::carrays`", "file_path": "carrays/src/bin/runtests.rs", "row": "1", "col": "5", "error_snippet": "|\n1 | use carrays::carrays;\n  |     ^^^^^^^^^^^^^^^^ no `carrays` in the root"}]

@@ -1,0 +1,60 @@
+ {{lib.rs}} 
+```rust
+pub mod common;
+pub mod config;
+pub mod io;
+pub mod parser;
+pub mod hash_table;
+pub mod reducer;
+pub mod typechecker;
+```
+
+{{common.rs}} 
+```rust
+//! Common types and utilities for the lambda calculus evaluator.
+
+/// Abstract Syntax Tree node
+pub struct AstNode {
+    // Placeholder for actual implementation
+}
+
+/// Types of AST nodes
+pub enum AstNodeType {
+    // Placeholder for actual implementation
+}
+```
+
+{{config.rs}} 
+```rust
+//! Configuration module for the lambda calculus evaluator.
+```
+
+{{io.rs}} 
+```rust
+//! IO utilities for the lambda calculus evaluator.
+```
+
+{{parser.rs}} 
+```rust
+//! Parser module for the lambda calculus evaluator.
+```
+
+{{hash_table.rs}} 
+```rust
+//! Hash table implementation for the lambda calculus evaluator.
+
+/// Hash table structure
+pub struct HashTable {
+    // Placeholder for actual implementation
+}
+```
+
+{{reducer.rs}} 
+```rust
+//! Reducer module for the lambda calculus evaluator.
+```
+
+{{typechecker.rs}} 
+```rust
+//! Type checker module for the lambda calculus evaluator.
+```

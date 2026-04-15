@@ -1,0 +1,48 @@
+` increments by 4, which is 4 `u64`s = 32 bytes.
+`rs_idx` increments by 2, which is 2 `M128i`s = 32 bytes.
+This matches the C code:
+```c
+    for (; string + 3 < endstring; randomsource += 2, string += 4) {
+```
+Wait, `string + 3 < endstring` means `str_idx + 3 < end_idx`.
+This is correct.
+
+Let's check `clmulhalfscalarproductwithtailwithoutreduction`.
+```rust
+    if str_idx + 1 < end_idx {
+        let temp1 = load_m128i(randomsource, rs_idx);
+        let temp2 = load_m128i_from_u64(string, str_idx);
+        let add1 = temp1.xor(temp2);
+        let clprod1 = add1.clmulepi64(add1, 0x10);
+        acc = clprod1.xor(acc);
+        rs_idx += 1;
+        str_idx += 2;
+    }
+    if str_idx < end_idx {
+        let temp1 = load_m128i(randomsource, rs_idx);
+        let temp2 = M128i::cvtsi64_si128(load_u64(string, str_idx));
+        let add1 = temp1.xor(temp2);
+        let clprod1 = add1.clmulepi64(add1, 0x10);
+        acc = clprod1.xor(acc);
+    }
+```
+This matches the C code:
+```c
+    if (string + 1 < endstring) {
+        // ...
+        randomsource += 1;
+        string += 2;
+    }
+    if (string < endstring) {
+        const __m128i temp1 = _mm_load_si128(randomsource);
+        const __m128i temp2 = _mm_loadl_epi64((__m128i const*)string);
+        // ...
+    }
+```
+`_mm_loadl_epi64` loads 64 bits into the lower half and zeroes the upper half. This is exactly `M128i::cvtsi64_si128(load_u64(...))`. Correct.
+
+Let's check `clmulhalfscalarproductwithtailwithoutreduction_with_extra_word`.
+```rust
+    if str_idx < end_idx {
+        let temp1 = load_m128i(randomsource, rs_idx);
+        let temp2 = M128i::set(extraword, load_u64(string, str_

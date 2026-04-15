@@ -1,0 +1,10 @@
+{
+    "No errors": 92,
+    "unresolved import": 3,
+    "borrow": 1,
+    "args": 1,
+    "trait": 2,
+    "type": 2,
+    "Unresolved name used.": 1,
+    "unsafe": 0
+}

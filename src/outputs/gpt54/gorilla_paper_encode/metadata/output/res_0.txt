@@ -1,0 +1,412 @@
+{{lib.rs}}
+```rust
+pub mod gorilla;
+```
+
+{{gorilla.rs}}
+```rust
+// Generated Rust Code
+
+pub type U8 = u8;
+pub type U32 = u32;
+pub type U64 = u64;
+pub type F64 = f64;
+
+pub const DE_BRUIJN64: U64 = 0x03f79d71b4ca8b09;
+pub const DE_BRUIJN64_TAB: [u8; 64] = [
+    0, 1, 56, 2, 57, 49, 28, 3, 61, 58, 42, 50, 38, 29, 17, 4, 62, 47, 59, 36, 45, 43, 51, 22,
+    53, 39, 33, 30, 24, 18, 12, 5, 63, 55, 48, 27, 60, 41, 37, 16, 46, 35, 44, 21, 52, 32, 23,
+    11, 54, 26, 40, 15, 34, 20, 31, 10, 25, 14, 19, 9, 13, 8, 7, 6,
+];
+
+const fn make_len8_tab() -> [u8; 256] {
+    let mut arr = [0u8; 256];
+    let mut i = 1usize;
+    while i < 256 {
+        let mut v = i as u8;
+        let mut n = 0u8;
+        while v != 0 {
+            n += 1;
+            v >>= 1;
+        }
+        arr[i] = n;
+        i += 1;
+    }
+    arr
+}
+
+pub const LEN8_TAB: [u8; 256] = make_len8_tab();
+
+pub const NAN_BITS: u64 = 0x7FF8_0000_0000_0001;
+
+pub struct FloatEncoder {
+    pub w: BitWriter,
+    pub val: U64,
+    pub leading: U64,
+    pub trailing: U64,
+    pub first: bool,
+    pub finished: bool,
+}
+
+impl FloatEncoder {
+    pub fn float_encoder_init(&mut self) -> i32 {
+        self.w = BitWriter {
+            cache: [0; 1024],
+            pos: 0,
+            byte: 0,
+            bit_count: 0,
+        };
+        self.val = 0;
+        self.leading = 0;
+        self.trailing = 0;
+        self.first = false;
+        self.finished = false;
+
+        self.w.bitwriter_init();
+        self.first = true;
+        self.leading = !0u64;
+        self.w.write_byte(0x10);
+        0
+    }
+
+    pub fn float_cache_print(&self) -> i32 {
+        let a = &self.w.cache;
+        let end = (self.w.pos + 1) as usize;
+        for i in 0..end.min(a.len()) {
+            print!("{:02x} ", a[i]);
+            if (i + 1) % 16 == 0 {
+                println!();
+            } else if (i + 1) % 8 == 0 {
+                print!("  ");
+            }
+        }
+        println!();
+        0
+    }
+
+    pub fn float_encode_flush(&mut self, dst: &mut [U8], length: &mut U32) -> i32 {
+        if !self.finished {
+            self.finished = true;
+            let na = F64::from_bits(NAN_BITS);
+            self.float_encode_write(na);
+            self.w.write_flush(false);
+        }
+        *length = self.w.pos + 1;
+        let n = (*length as usize).min(dst.len()).min(self.w.cache.len());
+        dst[..n].copy_from_slice(&self.w.cache[..n]);
+        *length as i32
+    }
+
+    pub fn float_encode_write(&mut self, v: F64) -> i32 {
+        let vp = v.to_bits();
+        if self.first {
+            self.val = vp;
+            self.first = false;
+            self.w.write_bits(vp, 64);
+            return 0;
+        }
+
+        let vdelta = vp ^ self.val;
+        if vdelta == 0 {
+            self.w.write_bit(false);
+            self.val = vp;
+            return 0;
+        } else {
+            self.w.write_bit(true);
+        }
+
+        let mut leading = leading_zero64(vdelta) as U64;
+        let trailing = trailing_zero64(vdelta) as U64;
+        leading &= 0x1F;
+        if leading >= 32 {
+            leading = 31;
+        }
+
+        if self.leading != !0u64 && leading >= self.leading && trailing >= self.trailing {
+            self.w.write_bit(false);
+            self.w
+                .write_bits(vdelta >> self.trailing, (64 - self.leading - self.trailing) as i32);
+        } else {
+            self.leading = leading;
+            self.trailing = trailing;
+            self.w.write_bit(true);
+            self.w.write_bits(leading, 5);
+            let sigbits = 64 - leading - trailing;
+            self.w.write_bits(sigbits, 6);
+            self.w.write_bits(vdelta >> trailing, sigbits as i32);
+        }
+
+        self.val = vp;
+        0
+    }
+}
+
+pub struct FloatDecoder<'a> {
+    pub val: U64,
+    pub leading: U64,
+    pub trailing: U64,
+    pub br: BitReader<'a>,
+    pub b: [U8; 1024],
+    pub first: bool,
+    pub finished: bool,
+    pub err: i32,
+}
+
+impl FloatDecoder<'_> {
+    pub fn float_decode_block(&mut self, data: &[U8], res: &mut [F64], res_len: &mut U32) -> i32 {
+        let mut cnt: U32 = 0;
+        let ret = self.float_decode_setbytes(&mut data.to_vec());
+        if ret != 0 {
+            println!("Error");
+            return ret;
+        }
+
+        while self.br.read_next() {
+            let val = F64::from_bits(self.val);
+            if (cnt as usize) < res.len() {
+                res[cnt as usize] = val;
+            }
+            cnt += 1;
+            if cnt > 20 {
+                break;
+            }
+        }
+
+        *res_len = cnt;
+        if self.err != 0 {
+            println!("Error when decode");
+            return -1;
+        }
+        0
+    }
+
+    pub fn float_decode_setbytes(&mut self, data: &mut [u8]) -> i32 {
+        self.b = [0; 1024];
+        let copy_len = data.len().min(self.b.len());
+        self.b[..copy_len].copy_from_slice(&data[..copy_len]);
+
+        let tail_len = copy_len.saturating_sub(1);
+        let mut tmp = self.b[1..1 + tail_len].to_vec();
+        self.br.bitread_reset(&mut tmp);
+
+        let v = self.br.read_bits(64);
+        if v == !0u64 {
+            return -1;
+        }
+
+        self.val = v;
+        self.leading = 0;
+        self.trailing = 0;
+        self.first = true;
+        self.finished = false;
+        self.err = 0;
+        0
+    }
+}
+
+pub struct BitWriter {
+    pub cache: [U8; 1024],
+    pub pos: U32,
+    pub byte: U8,
+    pub bit_count: U8,
+}
+
+impl BitWriter {
+    pub fn bitwriter_init(&mut self) -> i32 {
+        self.cache = [0; 1024];
+        self.pos = 0;
+        self.byte = 0;
+        self.bit_count = 8;
+        0
+    }
+
+    pub fn append_to_cache(&mut self) -> i32 {
+        if self.pos as usize >= self.cache.len() {
+            return -1;
+        }
+        self.cache[self.pos as usize] = self.byte;
+        self.pos += 1;
+        0
+    }
+
+    pub fn write_bit(&mut self, bit: bool) -> i32 {
+        if bit {
+            self.byte |= 1u8 << (self.bit_count - 1);
+        }
+        self.bit_count -= 1;
+        if self.bit_count == 0 {
+            if self.append_to_cache() != 0 {
+                return -1;
+            }
+            self.byte = 0;
+            self.bit_count = 8;
+        }
+        0
+    }
+
+    pub fn write_byte(&mut self, b: U8) -> i32 {
+        self.byte |= b >> (8 - self.bit_count);
+        if self.append_to_cache() != 0 {
+            return -1;
+        }
+        self.byte = b << self.bit_count;
+        0
+    }
+
+    pub fn write_bits(&mut self, mut u: U64, mut nbits: i32) -> i32 {
+        if !(0..=64).contains(&nbits) {
+            return -1;
+        }
+        if nbits == 0 {
+            return 0;
+        }
+        let mut byte: U8;
+        u <<= 64 - nbits as u32;
+        while nbits >= 8 {
+            byte = (u >> 56) as U8;
+            if self.write_byte(byte) != 0 {
+                return -1;
+            }
+            u <<= 8;
+            nbits -= 8;
+        }
+        while nbits > 0 {
+            if self.write_bit((u >> 63) != 0) != 0 {
+                return -2;
+            }
+            u <<= 1;
+            nbits -= 1;
+        }
+        0
+    }
+
+    pub fn write_flush(&mut self, bit: bool) -> i32 {
+        while self.bit_count != 8 {
+            if self.write_bit(bit) != 0 {
+                return -1;
+            }
+        }
+        0
+    }
+}
+
+pub struct BitReader<'a> {
+    pub data: &'a [u8],
+    pub len: U32,
+    pub v: U64,
+    pub n: U32,
+}
+
+impl BitReader<'_> {
+    pub fn bit_readbuf(&mut self) -> i32 {
+        let available = self.data.len().min(self.len as usize);
+        if available == 0 {
+            self.v = 0;
+            self.n = 0;
+            return 0;
+        }
+
+        let byte_n = available.min(8);
+        self.v = 0;
+        self.n = 0;
+
+        for i in 0..byte_n {
+            self.n += 8;
+            self.v |= (self.data[i] as U64) << (64 - self.n);
+        }
+
+        self.data = &self.data[byte_n..];
+        self.len -= byte_n as U32;
+        0
+    }
+
+    pub fn bitread_reset(&mut self, _data: &mut [u8]) -> i32 {
+        self.data = &[];
+        self.len = 0;
+        self.n = 0;
+        self.v = 0;
+        0
+    }
+
+    pub fn read_bits(&mut self, nbits: U32) -> U64 {
+        if nbits > 64 {
+            return !0u64;
+        }
+
+        let mut remaining = nbits;
+        let mut out: U64 = 0;
+
+        while remaining > 0 {
+            if self.n == 0 {
+                self.bit_readbuf();
+                if self.n == 0 {
+                    return !0u64;
+                }
+            }
+
+            let take = remaining.min(self.n);
+            let chunk = self.v >> (64 - take);
+            out = (out << take) | chunk;
+            self.v <<= take;
+            self.n -= take;
+            remaining -= take;
+        }
+
+        out
+    }
+
+    pub fn read_bit(&mut self) -> U64 {
+        self.read_bits(1)
+    }
+
+    pub fn can_read_bitfast(&mut self) -> bool {
+        self.n > 1
+    }
+
+    pub fn read_bitfast(&mut self) -> bool {
+        let v = (self.v & (1u64 << 63)) != 0;
+        self.v <<= 1;
+        if self.n > 0 {
+            self.n -= 1;
+        }
+        v
+    }
+
+    pub fn read_next(&mut self) -> bool {
+        false
+    }
+}
+
+pub fn bitslen(mut x: U64) -> i32 {
+    let mut n = 0;
+    if x >= (1u64 << 32) {
+        x >>= 32;
+        n = 32;
+    }
+    if x >= (1u64 << 16) {
+        x >>= 16;
+        n += 16;
+    }
+    if x >= (1u64 << 8) {
+        x >>= 8;
+        n += 8;
+    }
+    n + LEN8_TAB[x as usize] as i32
+}
+
+pub fn leading_zero64(u: U64) -> i32 {
+    if u == 0 {
+        64
+    } else {
+        64 - bitslen(u)
+    }
+}
+
+pub fn trailing_zero64(u: U64) -> i32 {
+    if u == 0 {
+        return 64;
+    }
+    let idx = (((u & u.wrapping_neg()).wrapping_mul(DE_BRUIJN64)) >> (64 - 6)) as usize;
+    DE_BRUIJN64_TAB[idx] as i32
+}
+```

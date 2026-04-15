@@ -1,0 +1,349 @@
+project,error_code,error_message,file_path,row,col
+proj_2DPartInt,E0433,failed to resolve: use of unresolved module or unlinked crate `twoDPartInt`,proj_2DPartInt/src/test.rs,1,5
+proj_2DPartInt,E0433,failed to resolve: use of unresolved module or unlinked crate `twoDPartInt`,proj_2DPartInt/src/test.rs,2,5
+proj_42_Kocaeli_Printf,No errors,No errors,No errors,No errors,No errors
+aes128_SIMD,No errors,No errors,No errors,No errors,No errors
+amp,E0063,missing field `pos` in initializer of `amp::amp::Amp`,amp/src/bin/test.rs,9,19
+approxidate,E0432,unresolved import `approxidate::approxidate`,approxidate/src/bin/test.rs,1,5
+avalanche,No errors,No errors,No errors,No errors,No errors
+bhshell,No errors,No errors,No errors,No errors,No errors
+bigint,,"expected one of `;` or `{`, found `/`",bigint/src/lib.rs,1,12
+bitset,No errors,No errors,No errors,No errors,No errors
+blt,E0308,mismatched types,blt/src/bin/blt_test.rs,64,34
+bostree,E0282,type annotations needed,bostree/src/timing.rs,16,37
+bostree,E0432,unresolved import `Bostree`,bostree/src/remove_bug.rs,1,5
+bostree,E0432,unresolved import `Bostree`,bostree/src/remove_bug_2.rs,1,5
+bostree,E0432,unresolved import `Bostree`,bostree/src/timing.rs,1,5
+bostree,E0433,failed to resolve: use of undeclared type `Bostree`,bostree/src/remove_bug.rs,2,5
+bostree,E0433,failed to resolve: use of undeclared type `Bostree`,bostree/src/remove_bug_2.rs,2,5
+bostree,E0433,failed to resolve: use of undeclared type `Bostree`,bostree/src/timing.rs,2,5
+btree_map,No errors,No errors,No errors,No errors,No errors
+c_aces,E0061,this function takes 2 arguments but 1 argument was supplied,c_aces/src/bin/matrix_test.rs,9,18
+c_aces,E0061,this function takes 2 arguments but 1 argument was supplied,c_aces/src/bin/matrix_test.rs,10,18
+c_aces,E0061,this function takes 2 arguments but 3 arguments were supplied,c_aces/src/bin/matrix_test.rs,22,18
+c_aces,E0061,this function takes 2 arguments but 1 argument was supplied,c_aces/src/bin/matrix_test.rs,30,18
+c_aces,E0061,this function takes 2 arguments but 1 argument was supplied,c_aces/src/bin/matrix_test.rs,31,18
+c_aces,E0061,this function takes 0 arguments but 4 arguments were supplied,c_aces/src/bin/matrix_test.rs,33,5
+c_aces,E0061,this function takes 2 arguments but 3 arguments were supplied,c_aces/src/bin/matrix_test.rs,34,18
+c_aces,E0061,this function takes 2 arguments but 1 argument was supplied,c_aces/src/bin/matrix_test.rs,36,26
+c_aces,E0063,missing fields `gain` and `offset` in initializer of `Parameters`,c_aces/src/bin/aces_internal_test.rs,16,17
+c_aces,E0063,missing fields `gain` and `offset` in initializer of `Parameters`,c_aces/src/bin/aces_internal_test.rs,32,17
+c_aces,E0063,missing fields `gain` and `offset` in initializer of `Parameters`,c_aces/src/bin/aces_internal_test.rs,43,17
+c_aces,E0308,mismatched types,c_aces/src/bin/matrix_test.rs,16,26
+c_aces,E0308,mismatched types,c_aces/src/bin/matrix_test.rs,20,18
+c_aces,E0308,mismatched types,c_aces/src/bin/matrix_test.rs,37,18
+c_aces,E0599,no method named `unwrap` found for struct `Matrix2D` in the current scope,c_aces/src/bin/matrix_test.rs,20,27
+c_aces,E0599,no method named `unwrap` found for struct `Matrix2D` in the current scope,c_aces/src/bin/matrix_test.rs,37,35
+carrays,No errors,No errors,No errors,No errors,No errors
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSAContext` in this scope",c_blind_rsa_signatures/src/test.rs,5,19
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindMessage` in this scope",c_blind_rsa_signatures/src/test.rs,12,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindingSecret` in this scope",c_blind_rsa_signatures/src/test.rs,16,25
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindSignature` in this scope",c_blind_rsa_signatures/src/test.rs,20,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSASignature` in this scope",c_blind_rsa_signatures/src/test.rs,24,15
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSASerializedKey` in this scope",c_blind_rsa_signatures/src/test.rs,35,18
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSASerializedKey` in this scope",c_blind_rsa_signatures/src/test.rs,39,18
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSAContext` in this scope",c_blind_rsa_signatures/src/test.rs,50,19
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindMessage` in this scope",c_blind_rsa_signatures/src/test.rs,57,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindingSecret` in this scope",c_blind_rsa_signatures/src/test.rs,61,25
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindSignature` in this scope",c_blind_rsa_signatures/src/test.rs,65,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSASignature` in this scope",c_blind_rsa_signatures/src/test.rs,69,15
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindSignature` in this scope",c_blind_rsa_signatures/src/test.rs,75,22
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSAContext` in this scope",c_blind_rsa_signatures/src/test.rs,81,19
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindMessage` in this scope",c_blind_rsa_signatures/src/test.rs,88,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindingSecret` in this scope",c_blind_rsa_signatures/src/test.rs,92,25
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindSignature` in this scope",c_blind_rsa_signatures/src/test.rs,96,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSASignature` in this scope",c_blind_rsa_signatures/src/test.rs,100,15
+c_blind_rsa_signatures,E0433,failed to resolve: use of unresolved module or unlinked crate `c_blind_rsa_signatures`,c_blind_rsa_signatures/src/test.rs,1,5
+c_blind_rsa_signatures,E0433,failed to resolve: use of undeclared type `BRSAHashFunction`,c_blind_rsa_signatures/src/test.rs,7,16
+c_blind_rsa_signatures,E0433,failed to resolve: use of undeclared type `BRSAPublicKey`,c_blind_rsa_signatures/src/test.rs,31,14
+c_blind_rsa_signatures,E0433,failed to resolve: use of undeclared type `BRSASecretKey`,c_blind_rsa_signatures/src/test.rs,45,14
+c_blind_rsa_signatures,E0433,failed to resolve: use of undeclared type `BRSAHashFunction`,c_blind_rsa_signatures/src/test.rs,52,16
+c_blind_rsa_signatures,E0433,failed to resolve: use of undeclared type `BRSAHashFunction`,c_blind_rsa_signatures/src/test.rs,83,16
+cfsm,No errors,No errors,No errors,No errors,No errors
+chtrie,No errors,No errors,No errors,No errors,No errors
+CircularBuffer,E0061,this method takes 0 arguments but 2 arguments were supplied,CircularBuffer/src/bin/test_circular_buffer.rs,29,18
+CircularBuffer,E0308,mismatched types,CircularBuffer/src/bin/test_circular_buffer.rs,24,25
+CircularBuffer,E0308,mismatched types,CircularBuffer/src/bin/test_circular_buffer.rs,29,15
+CircularBuffer,E0308,mismatched types,CircularBuffer/src/bin/test_circular_buffer.rs,30,25
+CircularBuffer,E0308,mismatched types,CircularBuffer/src/bin/test_circular_buffer.rs,41,25
+CircularBuffer,E0308,mismatched types,CircularBuffer/src/bin/test_circular_buffer.rs,57,25
+CircularBuffer,E0308,mismatched types,CircularBuffer/src/bin/test_circular_buffer.rs,67,25
+CircularBuffer,E0369,"binary operation `<=` cannot be applied to type `Result<usize, CircularBuffer::circular_buffer::Error>`",CircularBuffer/src/bin/test_circular_buffer.rs,47,21
+cissy,E0432,unresolved import `cissy::range::range`,cissy/src/bin/test_range.rs,1,19
+cJSON,No errors,No errors,No errors,No errors,No errors
+clhash,,"expected one of `;` or `{`, found `/`",clhash/src/lib.rs,2,12
+clog,E0432,unresolved import `clog::clog`,clog/src/bin/test.rs,1,5
+coroutine,No errors,No errors,No errors,No errors,No errors
+cset,,"expected one of `;` or `{`, found `/`",cset/src/lib.rs,1,12
+c_string,No errors,No errors,No errors,No errors,No errors
+csyncmers,No errors,No errors,No errors,No errors,No errors
+dict,,"expected one of `;` or `{`, found `/`",dict/src/lib.rs,1,13
+emlang,No errors,No errors,No errors,No errors,No errors
+expr,E0599,no method named `as_f32` found for type `f32` in the current scope,expr/src/bin/test.rs,11,24
+expr,E0599,no method named `as_f32` found for type `f32` in the current scope,expr/src/bin/test.rs,21,28
+FastHamming,No errors,No errors,No errors,No errors,No errors
+fft,No errors,No errors,No errors,No errors,No errors
+file2str,No errors,No errors,No errors,No errors,No errors
+fleur,No errors,No errors,No errors,No errors,No errors
+fs_c,No errors,No errors,No errors,No errors,No errors
+fslib,E0308,mismatched types,fslib/src/bin/test_fst.rs,61,32
+fslib,E0308,mismatched types,fslib/src/bin/test_fst.rs,62,32
+Genetic_neural_network_for_simple_control,E0599,no function or associated item named `default` found for struct `NeuralNetwork` in the current scope,Genetic_neural_network_for_simple_control/src/test_neural_network.rs,37,30
+geofence,No errors,No errors,No errors,No errors,No errors
+gfc,No errors,No errors,No errors,No errors,No errors
+gorilla_paper_encode,E0308,mismatched types,gorilla_paper_encode/src/bin/test.rs,48,44
+gorilla_paper_encode,E0308,mismatched types,gorilla_paper_encode/src/bin/test.rs,51,53
+gorilla_paper_encode,E0560,struct `FloatEncoder` has no field named `first`,gorilla_paper_encode/src/bin/test.rs,31,9
+gorilla_paper_encode,E0560,struct `FloatDecoder<'_>` has no field named `first`,gorilla_paper_encode/src/bin/test.rs,40,9
+Graph_recogniser,E0308,arguments to this method are incorrect,Graph_recogniser/src/bin/test_cuckoohash.rs,24,22
+Graph_recogniser,E0308,arguments to this method are incorrect,Graph_recogniser/src/bin/test_openhash.rs,24,22
+Graph_recogniser,E0599,"no method named `find` found for struct `std::sync::RwLockReadGuard<'_, Vec<Option<(u64, u64)>>>` in the current scope",Graph_recogniser/src/bin/test_cuckoohash.rs,31,25
+Graph_recogniser,E0599,"no method named `find` found for struct `std::sync::RwLockReadGuard<'_, Vec<Option<(u64, u64)>>>` in the current scope",Graph_recogniser/src/bin/test_openhash.rs,31,25
+hamta,E0107,function takes 0 generic arguments but 1 generic argument was supplied,hamta/src/bin/test.rs,5,48
+hamta,E0107,function takes 0 generic arguments but 1 generic argument was supplied,hamta/src/bin/test.rs,5,70
+hamta,E0277,the size for values of type `str` cannot be known at compilation time,hamta/src/bin/test.rs,63,17
+hamta,E0277,the size for values of type `str` cannot be known at compilation time,hamta/src/bin/test.rs,84,17
+hamta,E0277,the size for values of type `str` cannot be known at compilation time,hamta/src/bin/test.rs,117,17
+hamta,E0308,arguments to this method are incorrect,hamta/src/bin/test.rs,20,22
+hamta,E0308,arguments to this method are incorrect,hamta/src/bin/test.rs,41,26
+hamta,E0308,mismatched types,hamta/src/bin/test.rs,54,52
+hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,72,7
+hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,73,7
+hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,74,7
+hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,75,7
+hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,76,21
+hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,80,7
+hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,94,11
+hamta,E0599,"the method `hamt_size` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,97,18
+hamta,E0599,"the method `hamt_search` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,99,23
+hamta,E0599,"the method `hamt_size` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,103,18
+hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,109,25
+hamta,E0599,"the method `hamt_size` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,112,22
+hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,128,11
+hamta,E0599,"the method `hamt_size` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,132,18
+Holdem_Odds,No errors,No errors,No errors,No errors,No errors
+hydra,No errors,No errors,No errors,No errors,No errors
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,29,31
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,33,30
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,38,30
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,40,31
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,44,31
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,52,30
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,53,32
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,54,30
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,57,30
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,60,30
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,79,22
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,81,22
+impcheck,E0308,mismatched types,impcheck/src/bin/test.rs,106,49
+inversion_list,No errors,No errors,No errors,No errors,No errors
+jccc,,"expected one of `;` or `{`, found `/`",jccc/src/lib.rs,6,12
+kairoCompiler,No errors,No errors,No errors,No errors,No errors
+kd3,E0308,mismatched types,kd3/src/bin/test.rs,11,17
+kd3,E0308,mismatched types,kd3/src/bin/test.rs,15,17
+kd3,E0308,mismatched types,kd3/src/bin/test.rs,19,17
+kd3,E0308,mismatched types,kd3/src/bin/test.rs,23,17
+kd3,E0308,mismatched types,kd3/src/bin/test.rs,26,17
+kd3,E0308,mismatched types,kd3/src/bin/test.rs,30,17
+kd3,E0308,mismatched types,kd3/src/bin/test.rs,42,22
+lambda_calculus_eval,E0277,`option_type_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,24,1
+lambda_calculus_eval,E0277,`option_type_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,25,1
+lambda_calculus_eval,E0277,`option_type_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,26,1
+lambda_calculus_eval,E0277,`tokens_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,81,1
+lambda_calculus_eval,E0277,`tokens_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,82,1
+lambda_calculus_eval,E0277,`tokens_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,83,1
+lambda_calculus_eval,E0277,`tokens_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,84,1
+lambda_calculus_eval,E0277,`tokens_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,85,1
+lambda_calculus_eval,E0277,`tokens_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,86,1
+lambda_calculus_eval,E0277,`tokens_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,87,1
+lambda_calculus_eval,E0277,`tokens_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,88,1
+lambda_calculus_eval,E0277,`tokens_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,89,1
+lambda_calculus_eval,E0277,`tokens_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,90,1
+lambda_calculus_eval,E0277,`tokens_t` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,91,1
+lambda_calculus_eval,E0277,`AstNodeType` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,106,1
+lambda_calculus_eval,E0277,`AstNodeType` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,118,1
+lambda_calculus_eval,E0277,`AstNodeType` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,132,1
+lambda_calculus_eval,E0277,`AstNodeType` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,177,1
+lambda_calculus_eval,E0277,`AstNodeType` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,213,1
+lambda_calculus_eval,E0277,`AstNodeType` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,227,1
+lambda_calculus_eval,E0277,`lambda_calculus_eval::typechecker::Type` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,255,1
+lambda_calculus_eval,E0277,`lambda_calculus_eval::typechecker::Type` doesn't implement `Debug`,lambda_calculus_eval/src/bin/test.rs,256,1
+lambda_calculus_eval,E0308,mismatched types,lambda_calculus_eval/src/bin/test.rs,48,25
+lambda_calculus_eval,E0308,mismatched types,lambda_calculus_eval/src/bin/test.rs,56,29
+lambda_calculus_eval,E0308,mismatched types,lambda_calculus_eval/src/bin/test.rs,57,26
+lambda_calculus_eval,E0308,mismatched types,lambda_calculus_eval/src/bin/test.rs,65,17
+lambda_calculus_eval,E0308,mismatched types,lambda_calculus_eval/src/bin/test.rs,71,28
+lambda_calculus_eval,E0308,mismatched types,lambda_calculus_eval/src/bin/test.rs,73,17
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `option_type_t`,lambda_calculus_eval/src/bin/test.rs,24,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `option_type_t`,lambda_calculus_eval/src/bin/test.rs,25,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `option_type_t`,lambda_calculus_eval/src/bin/test.rs,26,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `tokens_t`,lambda_calculus_eval/src/bin/test.rs,81,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `tokens_t`,lambda_calculus_eval/src/bin/test.rs,82,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `tokens_t`,lambda_calculus_eval/src/bin/test.rs,83,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `tokens_t`,lambda_calculus_eval/src/bin/test.rs,84,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `tokens_t`,lambda_calculus_eval/src/bin/test.rs,85,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `tokens_t`,lambda_calculus_eval/src/bin/test.rs,86,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `tokens_t`,lambda_calculus_eval/src/bin/test.rs,87,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `tokens_t`,lambda_calculus_eval/src/bin/test.rs,88,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `tokens_t`,lambda_calculus_eval/src/bin/test.rs,89,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `tokens_t`,lambda_calculus_eval/src/bin/test.rs,90,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `tokens_t`,lambda_calculus_eval/src/bin/test.rs,91,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `AstNodeType`,lambda_calculus_eval/src/bin/test.rs,106,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `AstNodeType`,lambda_calculus_eval/src/bin/test.rs,118,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `AstNodeType`,lambda_calculus_eval/src/bin/test.rs,132,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `AstNodeType`,lambda_calculus_eval/src/bin/test.rs,177,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `AstNodeType`,lambda_calculus_eval/src/bin/test.rs,213,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `AstNodeType`,lambda_calculus_eval/src/bin/test.rs,227,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `lambda_calculus_eval::typechecker::Type`,lambda_calculus_eval/src/bin/test.rs,255,1
+lambda_calculus_eval,E0369,binary operation `==` cannot be applied to type `lambda_calculus_eval::typechecker::Type`,lambda_calculus_eval/src/bin/test.rs,256,1
+lambda_calculus_eval,E0609,no field `type_` on type `lambda_calculus_eval::common::Variable`,lambda_calculus_eval/src/bin/test.rs,108,21
+lambda_calculus_eval,E0609,no field `function` on type `lambda_calculus_eval::common::Application`,lambda_calculus_eval/src/bin/test.rs,119,21
+lambda_calculus_eval,E0609,no field `argument` on type `lambda_calculus_eval::common::Application`,lambda_calculus_eval/src/bin/test.rs,120,21
+lambda_calculus_eval,E0609,no field `parameter` on type `lambda_calculus_eval::common::LambdaExpr`,lambda_calculus_eval/src/bin/test.rs,133,24
+lambda_calculus_eval,E0609,no field `type_` on type `lambda_calculus_eval::common::LambdaExpr`,lambda_calculus_eval/src/bin/test.rs,134,24
+lambda_calculus_eval,E0609,no field `type_` on type `lambda_calculus_eval::common::Variable`,lambda_calculus_eval/src/bin/test.rs,179,16
+lambda_calculus_eval,E0609,no field `parameter` on type `lambda_calculus_eval::common::LambdaExpr`,lambda_calculus_eval/src/bin/test.rs,192,19
+lambda_calculus_eval,E0609,no field `type_` on type `lambda_calculus_eval::common::Variable`,lambda_calculus_eval/src/bin/test.rs,215,16
+lambda_calculus_eval,E0609,no field `parameter` on type `lambda_calculus_eval::common::LambdaExpr`,lambda_calculus_eval/src/bin/test.rs,228,19
+lambda_calculus_eval,E0609,no field `type_` on type `lambda_calculus_eval::common::LambdaExpr`,lambda_calculus_eval/src/bin/test.rs,229,19
+leftpad,No errors,No errors,No errors,No errors,No errors
+lib2bit,E0599,"no method named `twobit_sequence` found for enum `Result<T, E>` in the current scope",lib2bit/src/bin/test.rs,22,19
+lib2bit,E0599,"no method named `twobit_sequence` found for enum `Result<T, E>` in the current scope",lib2bit/src/bin/test.rs,24,19
+lib2bit,E0599,"no method named `twobit_bases` found for enum `Result<T, E>` in the current scope",lib2bit/src/bin/test.rs,26,21
+lib2bit,E0599,"no method named `twobit_bases` found for enum `Result<T, E>` in the current scope",lib2bit/src/bin/test.rs,31,21
+lib2bit,E0599,"no method named `twobit_close` found for enum `Result<T, E>` in the current scope",lib2bit/src/bin/test.rs,36,8
+lib2bit,E0609,"no field `hdr` on type `Result<TwoBit, std::io::Error>`",lib2bit/src/bin/test.rs,13,20
+lib2bit,E0609,"no field `cl` on type `Result<TwoBit, std::io::Error>`",lib2bit/src/bin/test.rs,17,12
+lib2bit,E0609,"no field `idx` on type `Result<TwoBit, std::io::Error>`",lib2bit/src/bin/test.rs,18,12
+lib2bit,E0609,"no field `idx` on type `Result<TwoBit, std::io::Error>`",lib2bit/src/bin/test.rs,19,12
+libbase122,No errors,No errors,No errors,No errors,No errors
+libbeaufort,E0432,unresolved import `crate::BEAUFORT_ALPHA`,libbeaufort/src/decrypt.rs,2,5
+libbeaufort,E0432,unresolved import `crate::BEAUFORT_ALPHA`,libbeaufort/src/encrypt.rs,2,5
+libfor,,"expected one of `;` or `{`, found `/`",libfor/src/lib.rs,1,12
+libm17,E0277,can't compare `{integer}` with `f32`,libm17/src/bin/unit_tests.rs,9,5
+libm17,E0277,can't compare `{integer}` with `f32`,libm17/src/bin/unit_tests.rs,10,5
+libm17,E0277,can't compare `{integer}` with `f32`,libm17/src/bin/unit_tests.rs,11,5
+libm17,E0277,can't compare `{integer}` with `f32`,libm17/src/bin/unit_tests.rs,12,5
+libm17,E0277,can't compare `{integer}` with `f32`,libm17/src/bin/unit_tests.rs,13,5
+libm17,E0277,can't compare `{integer}` with `f32`,libm17/src/bin/unit_tests.rs,14,5
+libm17,E0277,can't compare `{integer}` with `f32`,libm17/src/bin/unit_tests.rs,15,5
+libm17,E0277,can't compare `{integer}` with `f32`,libm17/src/bin/unit_tests.rs,16,5
+libm17,E0277,can't compare `{integer}` with `f32`,libm17/src/bin/unit_tests.rs,17,5
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,9,5
+libm17,E0308,arguments to this function are incorrect,libm17/src/bin/unit_tests.rs,9,24
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,10,5
+libm17,E0308,arguments to this function are incorrect,libm17/src/bin/unit_tests.rs,10,24
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,11,5
+libm17,E0308,arguments to this function are incorrect,libm17/src/bin/unit_tests.rs,11,24
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,12,5
+libm17,E0308,arguments to this function are incorrect,libm17/src/bin/unit_tests.rs,12,24
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,13,5
+libm17,E0308,arguments to this function are incorrect,libm17/src/bin/unit_tests.rs,13,24
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,14,5
+libm17,E0308,arguments to this function are incorrect,libm17/src/bin/unit_tests.rs,14,24
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,15,5
+libm17,E0308,arguments to this function are incorrect,libm17/src/bin/unit_tests.rs,15,24
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,16,5
+libm17,E0308,arguments to this function are incorrect,libm17/src/bin/unit_tests.rs,16,24
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,17,5
+libm17,E0308,arguments to this function are incorrect,libm17/src/bin/unit_tests.rs,17,24
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,150,42
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,174,40
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,183,40
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,202,40
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,211,40
+libm17,E0308,mismatched types,libm17/src/bin/unit_tests.rs,224,40
+libpgn,No errors,No errors,No errors,No errors,No errors
+libpsbt,No errors,No errors,No errors,No errors,No errors
+libqueue,No errors,No errors,No errors,No errors,No errors
+libtinyfseq,No errors,No errors,No errors,No errors,No errors
+libutf,E0277,the trait bound `[u16]: AsRef<[u8]>` is not satisfied,libutf/src/bin/test.rs,44,48
+libutf,E0277,the trait bound `[u16]: AsRef<[u8]>` is not satisfied,libutf/src/bin/test.rs,110,39
+libutf,E0277,the trait bound `[u16]: AsRef<[u8]>` is not satisfied,libutf/src/bin/test.rs,144,38
+libutf,E0308,mismatched types,libutf/src/bin/test.rs,59,56
+libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,6,18
+libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,15,18
+libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,24,18
+libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,33,18
+libvcd,,"expected one of `;` or `{`, found `/`",libvcd/src/lib.rs,1,12
+libwecan,No errors,No errors,No errors,No errors,No errors
+Linear_Algebra_C,No errors,No errors,No errors,No errors,No errors
+ljmm,No errors,No errors,No errors,No errors,No errors
+LTRE,No errors,No errors,No errors,No errors,No errors
+Math_Library_in_C,No errors,No errors,No errors,No errors,No errors
+matrix_multiplication,No errors,No errors,No errors,No errors,No errors
+mdb,E0432,unresolved import `mdb::mdb`,mdb/src/bin/tests.rs,4,10
+Megalania,E0063,missing fields `index` and `operation` in initializer of `PacketSlabUndo`,Megalania/src/bin/packet_slab_undo_stack_test.rs,24,24
+Megalania,E0063,missing fields `index` and `operation` in initializer of `PacketSlabUndo`,Megalania/src/bin/packet_slab_undo_stack_test.rs,58,24
+Megalania,E0277,can't compare `&u32` with `u32`,Megalania/src/bin/max_heap_test.rs,57,9
+Megalania,E0308,mismatched types,Megalania/src/bin/max_heap_test.rs,114,25
+Megalania,E0308,mismatched types,Megalania/src/bin/packet_slab_undo_stack_test.rs,26,29
+Megalania,E0308,mismatched types,Megalania/src/bin/packet_slab_undo_stack_test.rs,60,29
+Megalania,E0308,mismatched types,Megalania/src/bin/substring_enumerator_test.rs,13,47
+Megalania,E0308,mismatched types,Megalania/src/bin/substring_enumerator_test.rs,44,47
+Megalania,E0308,mismatched types,Megalania/src/bin/substring_enumerator_test.rs,62,47
+Megalania,E0606,casting `&u32` as `usize` is invalid,Megalania/src/bin/max_heap_test.rs,103,50
+Megalania,E0606,casting `&u32` as `usize` is invalid,Megalania/src/bin/max_heap_test.rs,104,49
+Megalania,E0606,casting `&u32` as `usize` is invalid,Megalania/src/bin/max_heap_test.rs,116,41
+Megalania,E0606,casting `&u32` as `usize` is invalid,Megalania/src/bin/max_heap_test.rs,121,51
+Megalania,E0631,type mismatch in function arguments,Megalania/src/bin/max_heap_test.rs,42,44
+Megalania,E0631,type mismatch in closure arguments,Megalania/src/bin/max_heap_test.rs,88,44
+merkle_tree_c,E0308,mismatched types,merkle_tree_c/src/bin/test_merkle_tree.rs,37,21
+merkle_tree_c,E0308,mismatched types,merkle_tree_c/src/bin/test_merkle_tree.rs,59,21
+merkle_tree_c,E0308,mismatched types,merkle_tree_c/src/bin/test_merkle_tree.rs,125,21
+merkle_tree_c,E0308,mismatched types,merkle_tree_c/src/bin/test_merkle_tree.rs,161,21
+morton,No errors,No errors,No errors,No errors,No errors
+murmurhash_c,No errors,No errors,No errors,No errors,No errors
+mvptree,No errors,No errors,No errors,No errors,No errors
+NandC,No errors,No errors,No errors,No errors,No errors
+Phills_DHT,No errors,No errors,No errors,No errors,No errors
+quadtree,E0308,mismatched types,quadtree/src/bin/test.rs,38,49
+quadtree,E0308,mismatched types,quadtree/src/bin/test.rs,39,53
+quadtree,E0308,mismatched types,quadtree/src/bin/test.rs,40,48
+quadtree,E0308,mismatched types,quadtree/src/bin/test.rs,44,49
+quadtree,E0308,mismatched types,quadtree/src/bin/test.rs,45,48
+quadtree,E0308,mismatched types,quadtree/src/bin/test.rs,46,48
+quadtree,E0308,mismatched types,quadtree/src/bin/test.rs,49,48
+quadtree,E0609,"no field `x` on type `&(quadtree::quadtree::QuadtreePoint, i32)`",quadtree/src/bin/test.rs,42,72
+quadtree,E0609,"no field `y` on type `&(quadtree::quadtree::QuadtreePoint, i32)`",quadtree/src/bin/test.rs,43,72
+quadtree,E0631,type mismatch in function arguments,quadtree/src/bin/test.rs,52,28
+quadtree,E0631,type mismatch in function arguments,quadtree/src/bin/test.rs,52,36
+quadtree,E0659,`quadtree` is ambiguous,quadtree/src/bin/test.rs,1,5
+razz_simulation,,"expected one of `;` or `{`, found `/`",razz_simulation/src/lib.rs,2,24
+rbtree_lab,E0282,"type annotations needed for `RBTree<_, _>`",rbtree_lab/src/bin/test.rs,5,9
+rbtree_lab,E0282,"type annotations needed for `RBTree<i32, _>`",rbtree_lab/src/bin/test.rs,26,9
+rbtree_lab,E0599,"no method named `borrow` found for reference `&Box<Node<i32, _>>` in the current scope",rbtree_lab/src/bin/test.rs,17,41
+rbtree_lab,E0599,"no method named `borrow` found for raw pointer `*mut Node<i32, _>` in the current scope",rbtree_lab/src/bin/test.rs,18,18
+rbtree_lab,E0599,"no method named `borrow` found for raw pointer `*mut Node<i32, _>` in the current scope",rbtree_lab/src/bin/test.rs,19,15
+rbtree_lab,E0599,"no method named `borrow` found for raw pointer `*mut Node<i32, _>` in the current scope",rbtree_lab/src/bin/test.rs,20,15
+rbtree_lab,E0599,"no method named `borrow` found for raw pointer `*mut Node<i32, _>` in the current scope",rbtree_lab/src/bin/test.rs,21,15
+rbtree_lab,E0599,"no method named `borrow` found for reference `&Box<Node<i32, _>>` in the current scope",rbtree_lab/src/bin/test.rs,49,41
+recordManager,,"expected one of `;` or `{`, found `/`",recordManager/src/lib.rs,1,12
+rect_pack_h,No errors,No errors,No errors,No errors,No errors
+Remimu,E0061,this function takes 1 argument but 4 arguments were supplied,Remimu/src/bin/my_regex_test.rs,14,18
+Remimu,E0061,this function takes 2 arguments but 6 arguments were supplied,Remimu/src/bin/my_regex_test.rs,22,21
+Remimu,E0599,no method named `is_ok` found for struct `Vec<RegexToken>` in the current scope,Remimu/src/bin/my_regex_test.rs,15,20
+rhbloom,No errors,No errors,No errors,No errors,No errors
+roaring_bitmap,,"expected one of `;` or `{`, found `/`",roaring_bitmap/src/lib.rs,1,12
+rubiksolver,No errors,No errors,No errors,No errors,No errors
+satc,E0432,unresolved import `satc::satc`,satc/src/bin/satc_test.rs,1,5
+Simple_Config,,"expected one of `;` or `{`, found `/`",Simple_Config/src/lib.rs,1,12
+simple_lang,,"expected one of `;` or `{`, found `/`",simple_lang/src/lib.rs,2,20
+Simple_Sparsehash,No errors,No errors,No errors,No errors,No errors
+SimpleXML,No errors,No errors,No errors,No errors,No errors
+skp,,"expected one of `;` or `{`, found `/`",skp/src/lib.rs,2,12
+SlothLang,No errors,No errors,No errors,No errors,No errors
+ted,No errors,No errors,No errors,No errors,No errors
+tisp,No errors,No errors,No errors,No errors,No errors
+totp,No errors,No errors,No errors,No errors,No errors
+ulidgen,No errors,No errors,No errors,No errors,No errors
+utf8,No errors,No errors,No errors,No errors,No errors
+VaultSync,E0063,missing fields `path` and `staged_changes` in initializer of `Repository`,VaultSync/src/bin/main_test.rs,46,16
+VaultSync,E0063,missing fields `path` and `staged_changes` in initializer of `Repository`,VaultSync/src/bin/main_test.rs,70,20
+VaultSync,E0063,missing fields `message` and `timestamp` in initializer of `Commit`,VaultSync/src/bin/main_test.rs,74,27
+VaultSync,E0063,missing fields `message` and `timestamp` in initializer of `Commit`,VaultSync/src/bin/main_test.rs,81,22
+VaultSync,E0308,mismatched types,VaultSync/src/bin/main_test.rs,49,22
+VaultSync,E0308,mismatched types,VaultSync/src/bin/main_test.rs,74,22
+vec,No errors,No errors,No errors,No errors,No errors
+worsp,,"expected one of `;` or `{`, found `/`",worsp/src/lib.rs,1,12
+XOpt,,"expected one of `;` or `{`, found `/`",XOpt/src/lib.rs,1,13

@@ -1,0 +1,287 @@
+ {{bigint.rs}}
+```rust
+use std::cmp::Ordering;
+use std::fmt;
+
+#[derive(Clone, Debug)]
+pub struct BigInt {
+    negative: bool,
+    digits: Vec<u8>,
+}
+
+impl BigInt {
+    pub fn zero() -> Self {
+        Self {
+            negative: false,
+            digits: vec![0],
+        }
+    }
+
+    pub fn is_64_bit(&self) -> bool {
+        // Following C logic: true only if size < 10
+        self.digits.len() < 10
+    }
+
+    pub fn remove_leading_zeros(&mut self) {
+        if let Some(pos) = self.digits.iter().position(|&d| d != 0) {
+            if pos > 0 {
+                self.digits.drain(0..pos);
+            }
+        } else {
+            self.digits = vec![0];
+            self.negative = false;
+        }
+    }
+
+    pub fn from_int(n: i64) -> Self {
+        if n == 0 {
+            return Self::zero();
+        }
+        let negative = n < 0;
+        let mut n = n.abs();
+        let mut digits = Vec::new();
+        while n > 0 {
+            digits.push((n % 10) as u8);
+            n /= 10;
+        }
+        digits.reverse();
+        Self { negative, digits }
+    }
+
+    pub fn to_int(&self) -> i64 {
+        let mut result: i64 = 0;
+        for &digit in &self.digits {
+            result = result * 10 + digit as i64;
+        }
+        if self.negative {
+            -result
+        } else {
+            result
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        let mut chars = s.chars().peekable();
+        let negative = if chars.peek() == Some(&'-') {
+            chars.next();
+            true
+        } else {
+            false
+        };
+        let digits: Vec<u8> = chars.map(|c| (c as u8) - b'0').collect();
+        let mut result = Self { negative, digits };
+        result.remove_leading_zeros();
+        result
+    }
+
+    pub fn copy(&self) -> BigInt {
+        self.clone()
+    }
+
+    pub fn print(&self) {
+        if self.negative {
+            print!("-");
+        }
+        for &digit in &self.digits {
+            print!("{}", digit);
+        }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.digits.len() == 1 && self.digits[0] == 0
+    }
+
+    pub fn lt_zero(&self) -> bool {
+        self.negative && !self.is_zero()
+    }
+
+    pub fn gt_zero(&self) -> bool {
+        !self.negative && !self.is_zero()
+    }
+
+    pub fn lezero(&self) -> bool {
+        self.negative || self.is_zero()
+    }
+
+    pub fn gezero(&self) -> bool {
+        !self.negative
+    }
+
+    pub fn abs(&self) -> Self {
+        let mut result = self.clone();
+        result.negative = false;
+        result
+    }
+
+    pub fn add(&self, other: &Self) -> Self {
+        if self.negative && other.negative {
+            let mut result = self.abs().add(&other.abs());
+            result.negative = true;
+            return result;
+        } else if self.negative {
+            return other.sub(&self.abs());
+        } else if other.negative {
+            return self.sub(&other.abs());
+        }
+
+        let mut result_digits = Vec::new();
+        let mut carry: i64 = 0;
+        let max_len = std::cmp::max(self.digits.len(), other.digits.len());
+        
+        for i in 0..max_len {
+            let a = self.digits.get(self.digits.len() - 1 - i).copied().unwrap_or(0) as i64;
+            let b = other.digits.get(other.digits.len() - 1 - i).copied().unwrap_or(0) as i64;
+            let sum = a + b + carry;
+            result_digits.push((sum % 10) as u8);
+            carry = sum / 10;
+        }
+        
+        if carry > 0 {
+            result_digits.push(carry as u8);
+        }
+        
+        result_digits.reverse();
+        Self {
+            negative: false,
+            digits: result_digits,
+        }
+    }
+
+    pub fn sub(&self, other: &Self) -> Self {
+        if self.negative && other.negative {
+            return other.abs().sub(&self.abs());
+        }
+        if self.negative {
+            let mut result = self.abs().add(other);
+            result.negative = true;
+            return result;
+        }
+        if other.negative {
+            return self.add(&other.abs());
+        }
+
+        if self.lt(other) {
+            let mut result = other.sub(self);
+            result.negative = true;
+            return result;
+        }
+
+        let mut result_digits = Vec::new();
+        let mut borrow: i64 = 0;
+        let max_len = self.digits.len();
+        
+        for i in 0..max_len {
+            let a = self.digits.get(self.digits.len() - 1 - i).copied().unwrap_or(0) as i64;
+            let b = other.digits.get(other.digits.len() - 1 - i).copied().unwrap_or(0) as i64;
+            let mut diff = a - b - borrow;
+            if diff < 0 {
+                diff += 10;
+                borrow = 1;
+            } else {
+                borrow = 0;
+            }
+            result_digits.push(diff as u8);
+        }
+        
+        result_digits.reverse();
+        let mut result = Self {
+            negative: false,
+            digits: result_digits,
+        };
+        result.remove_leading_zeros();
+        result
+    }
+
+    pub fn inc(&mut self) {
+        *self = self.add(&Self::from_int(1));
+    }
+
+    pub fn dec(&mut self) {
+        *self = self.sub(&Self::from_int(1));
+    }
+
+    pub fn mul(&self, other: &Self) -> Self {
+        if self.is_64_bit() && other.is_64_bit() {
+            return Self::from_int(self.to_int() * other.to_int());
+        }
+
+        let mut result_digits = vec![0u8; self.digits.len() + other.digits.len()];
+        
+        for i in 0..self.digits.len() {
+            for j in 0..other.digits.len() {
+                let pos = result_digits.len() - 1 - i - j;
+                result_digits[pos] += self.digits[self.digits.len() - 1 - i] * other.digits[other.digits.len() - 1 - j];
+            }
+        }
+        
+        let mut carry: i64 = 0;
+        for i in 0..result_digits.len() {
+            let pos = result_digits.len() - 1 - i;
+            let sum = result_digits[pos] as i64 + carry;
+            result_digits[pos] = (sum % 10) as u8;
+            carry = sum / 10;
+        }
+        
+        if carry > 0 {
+            result_digits.insert(0, carry as u8);
+        }
+        
+        let mut result = Self {
+            negative: self.negative != other.negative,
+            digits: result_digits,
+        };
+        result.remove_leading_zeros();
+        result
+    }
+
+    pub fn divmod(&self, other: &Self) -> (Self, Self) {
+        if self.is_64_bit() && other.is_64_bit() {
+            let q = self.to_int() / other.to_int();
+            let r = self.to_int() % other.to_int();
+            return (Self::from_int(q), Self::from_int(r));
+        }
+
+        let mut quotient = Self::from_int(0);
+        let negative = self.negative != other.negative;
+        
+        let mut numerator = self.abs();
+        let denominator = other.abs();
+        
+        while numerator.gt_zero() {
+            numerator = numerator.sub(&denominator);
+            if numerator.lt_zero() {
+                break;
+            }
+            quotient.inc();
+        }
+        
+        if numerator.lt_zero() {
+            numerator = numerator.add(&denominator);
+        }
+        
+        let mut remainder = numerator;
+        quotient.remove_leading_zeros();
+        
+        if negative {
+            quotient.negative = true;
+            remainder.negative = true;
+        }
+        
+        (quotient, remainder)
+    }
+
+    pub fn div(&self, other: &Self) -> Self {
+        let (q, _) = self.divmod(other);
+        q
+    }
+
+    pub fn r#mod(&self, other: &Self) -> Self {
+        let (_, r) = self.divmod(other);
+        r
+    }
+
+    pub fn pow(&self, exponent: &Self) -> Self {
+        if exponent.negative {
+            return Self::from_int(0);
+        }
+        if exponent.is_zero() {

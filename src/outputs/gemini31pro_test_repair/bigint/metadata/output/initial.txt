@@ -1,0 +1,95 @@
+```rust
+// Generated Rust Code
+use std::cmp::Ordering;
+use std::fmt;
+
+#[derive(Clone, Debug)]
+pub struct BigInt {
+    negative: bool,
+    digits: Vec<u8>,
+}
+
+impl BigInt {
+    pub fn zero() -> Self {
+        BigInt {
+            negative: false,
+            digits: vec![0],
+        }
+    }
+
+    pub fn is_64_bit(&self) -> bool {
+        if self.digits.len() > 10 {
+            return false;
+        }
+        if self.digits.len() < 10 {
+            return true;
+        }
+        false
+    }
+
+    pub fn remove_leading_zeros(&mut self) {
+        let mut leading_zeros = 0;
+        for &d in &self.digits {
+            if d == 0 {
+                leading_zeros += 1;
+            } else {
+                break;
+            }
+        }
+
+        if leading_zeros > 0 {
+            if leading_zeros >= self.digits.len() {
+                self.digits = vec![0];
+                return;
+            }
+            self.digits.drain(0..leading_zeros);
+        }
+    }
+
+    pub fn from_int(n: i64) -> Self {
+        let mut result = BigInt {
+            negative: false,
+            digits: Vec::new(),
+        };
+        let mut m = n;
+        if m < 0 {
+            result.negative = true;
+            if m == std::i64::MIN {
+                // Handle MIN properly since -MIN overflows i64
+                let mut res = BigInt::from_str("9223372036854775808");
+                res.negative = true;
+                return res;
+            }
+            m = -m;
+        }
+
+        if m == 0 {
+            result.digits.push(0);
+            return result;
+        }
+
+        while m > 0 {
+            result.digits.push((m % 10) as u8);
+            m /= 10;
+        }
+        result.digits.reverse();
+        result.remove_leading_zeros();
+        result
+    }
+
+    pub fn to_int(&self) -> i64 {
+        let mut result: i64 = 0;
+        for &d in &self.digits {
+            result = result.wrapping_mul(10);
+            result = result.wrapping_add(d as i64);
+        }
+        if self.negative {
+            result = result.wrapping_neg();
+        }
+        result
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        let mut result = BigInt {
+            negative: false,
+            digits

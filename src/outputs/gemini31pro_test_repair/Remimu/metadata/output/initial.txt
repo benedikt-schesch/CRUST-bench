@@ -1,0 +1,55 @@
+```rust
+// Generated Rust Code
+use std::fmt;
+
+pub const REMIMU_FLAG_DOT_NO_NEWLINES: i32 = 1;
+pub const REMIMU_KIND_NORMAL: u8 = 0;
+pub const REMIMU_KIND_OPEN: u8 = 1;
+pub const REMIMU_KIND_NCOPEN: u8 = 2;
+pub const REMIMU_KIND_CLOSE: u8 = 3;
+pub const REMIMU_KIND_OR: u8 = 4;
+pub const REMIMU_KIND_CARET: u8 = 5;
+pub const REMIMU_KIND_DOLLAR: u8 = 6;
+pub const REMIMU_KIND_BOUND: u8 = 7;
+pub const REMIMU_KIND_NBOUND: u8 = 8;
+pub const REMIMU_KIND_END: u8 = 9;
+pub const REMIMU_MODE_POSSESSIVE: u8 = 1;
+pub const REMIMU_MODE_LAZY: u8 = 2;
+pub const REMIMU_MODE_INVERTED: u8 = 128;
+
+#[derive(Debug, Clone, Copy)]
+pub struct RegexToken {
+    pub kind: u8,
+    pub mode: u8,
+    pub count_lo: u16,
+    pub count_hi: u16,
+    pub mask: [u16; 16],
+    pub pair_offset: i16,
+}
+
+impl RegexToken {
+    pub fn new(kind: u8, mode: u8) -> Self {
+        Self {
+            kind,
+            mode,
+            count_lo: 1,
+            count_hi: 2,
+            mask: [0; 16],
+            pair_offset: 0,
+        }
+    }
+    pub fn set_mask(&mut self, byte: u8) {
+        self.mask[(byte >> 4) as usize] |= 1 << (byte & 0xF);
+    }
+    pub fn invert_mask(&mut self) {
+        for n in 0..16 {
+            self.mask[n] = !self.mask[n];
+        }
+        self.mode &= !REMIMU_MODE_INVERTED;
+    }
+    pub fn check_mask(&self, byte: u8) -> bool {
+        (self.mask[(byte >> 4) as usize] & (1 << (byte & 0xF))) != 0
+    }
+    /// Pushes the token to the provided vector while ensuring proper constraints.
+    pub fn push_to_vec(&mut self, tokens: &mut Vec<RegexToken>, max_len: usize) -> Result<(), i32> {
+        let k =

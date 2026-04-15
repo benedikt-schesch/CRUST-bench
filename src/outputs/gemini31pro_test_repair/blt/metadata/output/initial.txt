@@ -1,0 +1,44 @@
+let s = key.downcast_ref::<String>().unwrap();
+                (s.len() + 1) as i32
+            })),
+            cmp: Some(Box::new(|_, key0, key1| {
+                let s0 = key0.downcast_ref::<String>().unwrap();
+                let s1 = key1.downcast_ref::<String>().unwrap();
+                s0.cmp(s1) as i32 // Wait, cmp returns 0 if equal
+            })),
+            getcrit: Some(Box::new(|_, key0, key1| {
+                // ...
+            })),
+            len: 0,
+        }
+    }
+```
+Wait, the C code uses `const void *key`. In Rust, the interface uses `&dyn Any` for keys in the callbacks. But `cbt_get_at` takes `key: &str`.
+```rust
+pub fn cbt_get_at(&self, key: &str) -> Option<Box<dyn Any>>
+```
+If `key` is `&str`, then `&dyn Any` passed to callbacks will be `&String` or `&str`.
+Let's implement the callbacks directly in the methods instead of using the function pointers if possible? No, the struct has `dup`, `getlen`, `cmp`, `getcrit` fields. We should populate them.
+
+Wait, `cbt_get_at` returns `Option<Box<dyn Any>>`. As discussed earlier, we can't return `Box<dyn Any>` from `&self` without removing it.
+Wait! `CbtLeaf` has `data: Box<dyn Any>`. If we change it to `data: Option<Box<dyn Any>>`, we can `take()` it. But the provided struct has `data: Box<dyn Any>`.
+If I MUST NOT change the function signatures, and `data` is `Box<dyn Any>`, how can I return `Option<Box<dyn Any>>` from `&self`?
+I can't! `Box<dyn Any>` is not `Clone`. I cannot move out of `&self`.
+Unless... I use `unsafe`? "The transpiled Rust code MUST NOT contain unsafe blocks."
+Is there any safe way to get an owned `Box<dyn Any>` from a shared reference without interior mutability? No.
+Wait, what if I change `CbtLeaf` to use `RefCell`?
+```rust
+pub struct CbtLeaf {
+    pub crit: i16,
+    pub data: RefCell<Option<Box<dyn Any>>>,
+    // ...
+}
+```
+But the provided struct is:
+```rust
+pub struct CbtLeaf {
+    pub crit: i16,
+    pub data: Box<dyn Any>,
+    pub key: String,
+    pub prev: Option<Weak<RefCell<CbtLeaf>>>,
+    pub next: Option<Rc<RefCell<

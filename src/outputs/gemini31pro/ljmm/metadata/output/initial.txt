@@ -1,0 +1,212 @@
+```rust
+// Generated Rust Code
+
+use std::sync::Mutex;
+use std::fs::File;
+use std::io::Read;
+
+const BUFFER_SZ: usize = 8192;
+const ADDR_2G: usize = 0x80000000;
+const ADDR_1G: usize = 0x40000000;
+
+struct Ljmm {
+    page_size: usize,
+    page_mask: usize,
+    addr_upbound: usize,
+    addr_lowbound: usize,
+    map_file: String,
+    buffer: Vec<u8>,
+    buf_len: usize,
+    os_take_care_1g_2g: bool,
+    init_succ: bool,
+}
+
+static LJMM: Mutex<Ljmm> = Mutex::new(Ljmm {
+    page_size: 4096,
+    page_mask: 4095,
+    addr_upbound: ADDR_2G,
+    addr_lowbound: 0,
+    map_file: String::new(),
+    buffer: Vec::new(),
+    buf_len: 0,
+    os_take_care_1g_2g: true,
+    init_succ: false,
+});
+
+/// Initializes the ljmm system.
+///
+/// # Returns
+/// An integer status code.
+pub fn ljmm_init() -> i32 {
+    let mut ljmm = LJMM.lock().unwrap();
+    ljmm.os_take_care_1g_2g = true;
+    ljmm.addr_lowbound = 0;
+    ljmm.addr_upbound = ADDR_2G;
+    ljmm.page_size = 4096;
+    ljmm.page_mask = 4095;
+    ljmm.map_file = "/proc/self/maps".to_string();
+    ljmm.buffer = vec![0; BUFFER_SZ];
+    ljmm.init_succ = true;
+    0
+}
+
+/// Instructs the OS to take care of the [1G..2G] space.
+///
+/// # Parameters
+/// - `turn_on`: If non-zero, the OS should manage the space.
+pub fn ljmm_let_os_take_care_1g_2g(turn_on: i32) {
+    let mut ljmm = LJMM.lock().unwrap();
+    ljmm.os_take_care_1g_2g = turn_on != 0;
+}
+
+/// Sets test parameters for the ljmm system.
+///
+/// # Parameters
+/// - `map_file`: The mapping file name.
+/// - `sbrk0`: An address representing the current program break (as a safe usize).
+/// - `page_size`: The system's page size.
+pub fn ljmm_test_set_test_param(map_file: &str, sbrk0: usize, page_size: i32) {
+    let mut ljmm = LJMM.lock().unwrap();
+    ljmm.map_file = map_file.to_string();
+    ljmm.addr_lowbound = sbrk0;
+    
+    if page_size != 0 && (((page_size - 1) & page_size) == 0) {
+        ljmm.page_size = page_size as usize;
+        ljmm.page_mask = (page_size - 1) as usize;
+    } else {
+        panic!("Assert failed: page_size && (((page_size - 1) & page_size) == 0)");
+    }
+}
+
+#[allow(dead_code)]
+fn read_maps_to_buffer(ljmm: &mut Ljmm) -> i32 {
+    let mut file = match File::open(&ljmm.map_file) {
+        Ok(f) => f,
+        Err(_) => return -1,
+    };
+    
+    let mut temp_buf = vec![0; BUFFER_SZ - 1];
+    let len = match file.read(&mut temp_buf) {
+        Ok(l) => l,
+        Err(_) => return -1,
+    };
+    
+    ljmm.buffer[..len].copy_from_slice(&temp_buf[..len]);
+    let mut final_len = len;
+    if final_len > 0 && ljmm.buffer[final_len - 1] != b'\n' {
+        ljmm.buffer[final_len] = b'\n';
+        final_len += 1;
+    }
+    ljmm.buf_len = final_len;
+    final_len as i32
+}
+
+#[allow(dead_code)]
+fn page_align_addr(addr: usize, ljmm: &Ljmm) -> usize {
+    (addr + ljmm.page_size - 1) & !ljmm.page_mask
+}
+
+#[allow(dead_code)]
+fn parse_addr(addr_str: &[u8], addr_val: &mut usize) -> usize {
+    let mut addr: usize = 0;
+    let mut p = 0;
+    while p < addr_str.len() {
+        let mut c = addr_str[p];
+        p += 1;
+        if c >= b'0' && c <= b'9' {
+            addr = addr * 16 + (c - b'0') as usize;
+            continue;
+        }
+        c |= 0x20;
+        if c >= b'a' && c <= b'f' {
+            addr = addr * 16 + 10 + (c - b'a') as usize;
+            continue;
+        }
+        *addr_val = addr;
+        return p - 1;
+    }
+    0
+}
+
+#[derive(Clone, Copy)]
+struct MemBlk {
+    start: usize,
+    size: usize,
+}
+
+#[allow(dead_code)]
+fn find_best_fit(mut length: usize, ljmm: &mut Ljmm) -> usize {
+    if read_maps_to_buffer(ljmm) < 0 {
+        return 0;
+    }
+    length = page_align_addr(length, ljmm);
+    let mut best_fit = MemBlk { start: ljmm.addr_upbound, size: usize::MAX };
+    let mut prev_blk = MemBlk { start: 0, size: 0 };
+    
+    let mut ofst = 0;
+    let buf_len = ljmm.buf_len;
+    let upbound = ljmm.addr_upbound;
+    let lowbound = ljmm.addr_lowbound;
+    
+    if buf_len == 0 || ljmm.buffer[buf_len - 1] != b'\n' {
+        panic!("Assert failed: buffer[buf_len-1] == '\\n'");
+    }
+    
+    while ofst < buf_len {
+        let mut start_addr = 0;
+        let mut end_addr = 0;
+        
+        let advance = parse_addr(&ljmm.buffer[ofst..buf_len], &mut start_addr);
+        if advance > 0 && ljmm.buffer[ofst + advance] == b'-' {
+            ofst += advance + 1;
+        } else {
+            break;
+        }
+        
+        let advance2 = parse_addr(&ljmm.buffer[ofst..buf_len], &mut end_addr);
+        if advance2 > 0 && ljmm.buffer[ofst + advance2] == b' ' {
+            ofst += advance2 + 1;
+            if ofst >= buf_len {
+                panic!("Assert failed: ofst < buf_len");
+            }
+            while ljmm.buffer[ofst] != b'\n' {
+                ofst += 1;
+            }
+            ofst += 1;
+        } else {
+            end_addr = if upbound >= start_addr { upbound } else { start_addr };
+        }
+        end_addr = page_align_addr(end_addr, ljmm);
+        
+        let hole_start = prev_blk.start + prev_blk.size;
+        let hole_size = if start_addr > hole_start { start_addr - hole_start } else { 0 };
+        
+        if hole_size >= length &&
+           hole_start >= lowbound && (hole_start + length) <= upbound &&
+           hole_size < best_fit.size {
+            best_fit.start = hole_start;
+            best_fit.size = hole_size;
+            if best_fit.size == length {
+                break;
+            }
+        }
+        
+        if start_addr >= ADDR_1G {
+            if !ljmm.os_take_care_1g_2g || start_addr >= upbound {
+                break;
+            }
+        }
+        if end_addr >= upbound {
+            break;
+        }
+        prev_blk.start = start_addr;
+        prev_blk.size = if end_addr > start_addr { end_addr - start_addr } else { 0 };
+    }
+    
+    if best_fit.size != usize::MAX {
+        best_fit.start
+    } else {
+        0
+    }
+}
+```

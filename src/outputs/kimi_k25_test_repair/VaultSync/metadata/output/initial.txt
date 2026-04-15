@@ -1,0 +1,264 @@
+ {{hashing.rs}}
+```rust
+use rand::Rng;
+use sha2::{Sha256, Digest};
+
+pub const RANDOM_SIZE: usize = 16;
+
+pub fn generate_random_data(buffer: &mut [u8]) {
+    const CHARSET: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let mut rng = rand::thread_rng();
+    for i in 0..buffer.len() {
+        let idx = rng.gen_range(0..CHARSET.len());
+        buffer[i] = CHARSET[idx];
+    }
+}
+
+pub fn generate_hash(data: &[u8], hash: &mut [u8]) {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let result = hasher.finalize();
+    hash.copy_from_slice(&result);
+}
+```
+
+{{logger.rs}}
+```rust
+use std::time::SystemTime;
+use std::io::Error;
+
+pub const KNORMAL: &str = "\x1B[0m";
+pub const KRED: &str = "\x1B[31m";
+pub const KGREEN: &str = "\x1B[32m";
+pub const KYELLOW: &str = "\x1B[33m";
+pub const KBLUE: &str = "\x1B[34m";
+pub const KMAGENTA: &str = "\x1B[35m";
+pub const KCYAN: &str = "\x1B[36m";
+pub const KWHITE: &str = "\x1B[37m";
+pub const COLOR_BOLD: &str = "\x1B[1m";
+pub const COLOR_OFF: &str = "\x1B[m";
+
+pub enum LOGGING_TAG {
+    INFO_TAG = 1,
+    ERROR_TAG = 2,
+    WARNING_TAG = 3,
+}
+
+pub fn logger(tag: LOGGING_TAG, message: &str) {
+    let now = SystemTime::now();
+    let time_str = format!("{:?}", now);
+    
+    match tag {
+        LOGGING_TAG::INFO_TAG => {
+            println!("{} {}{}[{}]{}: {}", time_str, COLOR_BOLD, COLOR_OFF, "INFO", COLOR_OFF, message);
+        }
+        LOGGING_TAG::ERROR_TAG => {
+            let err = Error::last_os_error();
+            eprintln!("{} {}{}[{}]{}: {} ({})", time_str, KRED, COLOR_BOLD, "ERROR", COLOR_OFF, message, err);
+        }
+        LOGGING_TAG::WARNING_TAG => {
+            println!("{} {}{}[{}]{}: {}", time_str, COLOR_BOLD, COLOR_OFF, "WARNING", COLOR_OFF, message);
+        }
+    }
+}
+```
+
+{{main.rs}}
+```rust
+use crate::vm::{init_repository, commit_changes, rollback_changes, load_repository, load_author, add_changes};
+use crate::logger::{logger, LOGGING_TAG};
+use std::path::Path;
+
+pub const ARG_INIT: &str = "init";
+pub const ARG_HELP: &str = "--help";
+pub const ARG_HELP_SC: &str = "-h";
+pub const ARG_ADD_CHANGES: &str = "add";
+pub const ARG_COMMIT: &str = "commit";
+pub const ARG_ROLLBACK: &str = "rollback";
+
+pub fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let argc = args.len() as i32;
+    let argv: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    
+    run_cli(argc, &argv);
+}
+
+fn run_cli(argc: i32, argv: &[&str]) {
+    if argc < 2 {
+        invalid_args();
+        return;
+    } else if argc < 3 {
+        let arg1 = argv[1];
+        if arg1 == ARG_INIT {
+            init_repository();
+        } else if arg1 == ARG_COMMIT {
+            commit_changes();
+        } else if arg1 == ARG_HELP || arg1 == ARG_HELP_SC {
+            getting_help();
+        } else {
+            invalid_args();
+        }
+        return;
+    } else if argc < 4 && argv[1] == ARG_ROLLBACK {
+        rollback_changes(argv[2]);
+        return;
+    }
+    
+    if argv[1] == ARG_ADD_CHANGES {
+        let files: Vec<&str> = argv[2..].to_vec();
+        track_changes(argc - 2, &files);
+        return;
+    }
+    
+    invalid_args();
+}
+
+pub fn getting_help() {
+    println!("Usage: vaultsync [OPTIONS] COMMAND\n");
+    println!("Options:");
+    println!("  -h, --help     Show help message and exit\n");
+    println!("Commands:");
+    println!("  init           Initialize a repository");
+    println!("  commit         Make a commit");
+    println!("  add [files]    Add files to be tracked in the next commit\n");
+    println!("For more information, see 'man vaultsync'");
+}
+
+fn invalid_args() {
+    logger(LOGGING_TAG::INFO_TAG, "Invalid arguments, check --help");
+}
+
+pub fn init_repository() {
+    let author = load_author();
+    
+    match init_repo(&author) {
+        Ok(_) => {
+            logger(LOGGING_TAG::INFO_TAG, "Initialization done");
+        }
+        Err(_) => {
+            logger(LOGGING_TAG::ERROR_TAG, "Can not getting the author, check the default config at ~/.vsync_rc");
+        }
+    }
+}
+
+pub fn track_changes(n: i32, files: &Vec<&str>) {
+    let paths: Vec<&Path> = files.iter().map(|s| Path::new(s)).collect();
+    let repo = load_repository();
+    
+    match add_changes(&repo, &paths) {
+        Ok(_) => {
+            logger(LOGGING_TAG::INFO_TAG, "Files has been tracked successfully");
+        }
+        Err(_) => {
+            logger(LOGGING_TAG::ERROR_TAG, "Can not getting the repo info");
+        }
+    }
+}
+
+pub fn commit_changes() {
+    use crate::vm::{Commit, make_commit};
+    
+    let author = load_author();
+    let repo = load_repository();
+    
+    let new_commit = Commit {
+        hash: String::new(),
+        author: author.clone(),
+        parent_hash: String::new(),
+    };
+    
+    match make_commit(&repo, &author, &new_commit) {
+        Ok(_) => {
+            logger(LOGGING_TAG::INFO_TAG, "The commit has been done successfully");
+        }
+        Err(_) => {
+            logger(LOGGING_TAG::ERROR_TAG, "Can not getting the repo info");
+        }
+    }
+}
+
+pub fn rollback_changes(hash: &str) {
+    let repo = load_repository();
+    
+    match rollback(&repo, hash) {
+        Ok(_) => {
+            logger(LOGGING_TAG::INFO_TAG, "The rollback has been successfully done");
+        }
+        Err(_) => {
+            logger(LOGGING_TAG::ERROR_TAG, "Can not getting the repo info");
+        }
+    }
+}
+```
+
+{{vm.rs}}
+```rust
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    fs,
+    io::{self, Read, Write, BufRead},
+};
+use crate::hashing::{generate_random_data, generate_hash, RANDOM_SIZE};
+use crate::logger::{logger, LOGGING_TAG};
+
+pub const MAX_UNAME: usize = 50;
+pub const MAX_MAIL: usize = 100;
+pub const CONFIG_FILE: &str = "/config";
+pub const REPOSITORY_FILE: &str = "/repository";
+pub const LOG_FILE: &str = "/log";
+pub const MAX_REPOSITORY_FILE_INIT: usize = 1024;
+pub const MAX_CWD: usize = 4096;
+pub const MAX_REP_NAME: usize = 80;
+
+#[derive(Clone)]
+pub struct RepoValue {
+    pub raw_path: String,
+    pub hash: String,
+}
+
+#[derive(Clone)]
+pub struct Author {
+    pub username: String,
+    pub mail: String,
+}
+
+pub const TRACKED_DIR: &str = "tracked";
+pub const HASH_LEN: usize = 2 * 32 + 1;
+
+#[derive(Clone)]
+pub struct Commit {
+    pub hash: String,
+    pub author: Author,
+    pub parent_hash: String,
+}
+
+#[derive(Clone)]
+pub struct Repository {
+    pub name: String,
+    pub author: Author,
+    pub dir: String,
+    pub last_commit: Option<Commit>,
+}
+
+pub fn init_repo(author: &Author) -> Result<Repository, String> {
+    let mut repo = Repository {
+        name: "foo".to_string(),
+        author: author.clone(),
+        dir: std::env::current_dir()
+            .map_err(|_| "[init_repo] Can not get the current working directory".to_string())?
+            .to_string_lossy()
+            .to_string(),
+        last_commit: None,
+    };
+    
+    let first_commit = Commit {
+        hash: "0".to_string(),
+        parent_hash: "-".to_string(),
+        author: author.clone(),
+    };
+    repo.last_commit = Some(first_commit.clone());
+    
+    let dotdir_path = Path::new(&repo.dir).join(".vsync");
+    fs::create_dir_all(&dot

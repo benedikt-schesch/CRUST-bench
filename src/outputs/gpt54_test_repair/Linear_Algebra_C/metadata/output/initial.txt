@@ -1,0 +1,1240 @@
+{{utils.rs}}
+```rust
+/// Returns the exclusive-or of two booleans.
+pub fn exclusive_or(a: bool, b: bool) -> bool {
+    (a || b) && !(a && b)
+}
+
+/// Rounds the given value to n digits.
+pub fn roundn(val: f64, n: u32) -> f64 {
+    assert!(n > 0);
+    let x = 10_f64.powi(n as i32);
+    (val * x).round() / x
+}
+
+/// A basic custom assert function.
+/// (In Rust one would normally use the built-in assert! macro.)
+pub fn custom_assert(condition: i32) {
+    if condition == 0 {
+        println!("Assertion failed.");
+        print_call_stack();
+        panic!("Assertion failed");
+    }
+}
+
+/// Prints the call stack up until an assertion failure.
+pub fn print_call_stack() {
+    println!("----------------------------- STACK TRACE ------------------------------");
+    let bt = std::backtrace::Backtrace::capture();
+    println!("{bt}");
+    println!("------------------------------------------------------------------------");
+}
+```
+
+{{vector.rs}}
+```rust
+use crate::linear_algebra::Vector;
+
+pub fn assert_vector_impl(v: &Vector) -> bool {
+    assert!(v.cols > 0);
+    assert!(v.data.len() == v.cols);
+    true
+}
+
+pub fn new_vector_impl(d: &[f64], cols: usize) -> Vector {
+    assert!(!d.is_empty());
+    assert!(cols > 0);
+    assert!(d.len() >= cols);
+
+    let mut v = null_vector_impl(cols);
+    for (i, val) in d.iter().copied().take(cols).enumerate() {
+        v.data[i] = val;
+    }
+    v
+}
+
+pub fn null_vector_impl(cols: usize) -> Vector {
+    assert!(cols > 0);
+    Vector {
+        cols,
+        data: vec![0.0; cols],
+    }
+}
+
+pub fn zero_vector_impl(cols: usize) -> Vector {
+    let mut v = null_vector_impl(cols);
+    fill_vector_impl(&mut v, 0.0);
+    v
+}
+
+pub fn fill_vector_impl(v: &mut Vector, n: f64) {
+    assert_vector_impl(v);
+    for x in &mut v.data {
+        *x = n;
+    }
+}
+
+pub fn delete_vector_impl(v: Vector) {
+    drop(v);
+}
+
+pub fn copy_vector_impl(v: &Vector) -> Vector {
+    assert_vector_impl(v);
+    let mut c = zero_vector_impl(v.cols);
+    for i in 0..v.cols {
+        c.data[i] = v.data[i];
+    }
+    c
+}
+
+pub fn vector_size_impl(v: &Vector) -> usize {
+    assert_vector_impl(v);
+    v.cols
+}
+
+pub fn vector_size_bytes_impl(v: &Vector) -> usize {
+    std::mem::size_of::<f64>() * vector_size_impl(v)
+}
+
+pub fn is_vector_equal_impl(v: &Vector, w: &Vector) -> bool {
+    assert!(assert_vector_impl(v) && assert_vector_impl(w));
+    if v.cols != w.cols {
+        return false;
+    }
+    for i in 0..v.cols {
+        if v.data[i] != w.data[i] {
+            return false;
+        }
+    }
+    true
+}
+
+pub fn set_vector_element_impl(v: &mut Vector, i: usize, s: f64) {
+    assert!(assert_vector_impl(v) && i < v.cols);
+    v.data[i] = s;
+}
+
+pub fn get_vector_element_impl(v: &Vector, i: usize) -> f64 {
+    assert!(assert_vector_impl(v) && i < v.cols);
+    v.data[i]
+}
+
+pub fn print_vector_impl(v: &Vector, include_indices: bool) {
+    assert_vector_impl(v);
+    for i in 0..v.cols {
+        if include_indices {
+            print!("[{}] -> ", i);
+        }
+        print!("{:16.8} ", v.data[i]);
+    }
+}
+
+pub fn vector_magnitude_impl(v: &Vector) -> f64 {
+    assert_vector_impl(v);
+    let mut sum = 0.0;
+    for i in 0..v.cols {
+        sum += v.data[i] * v.data[i];
+    }
+    sum.sqrt()
+}
+
+pub fn is_unit_vector_impl(v: &Vector) -> bool {
+    vector_magnitude_impl(v) == 1.0
+}
+
+pub fn is_vector_orthogonal_impl(v1: &Vector, v2: &Vector) -> bool {
+    assert!(assert_vector_impl(v1) && assert_vector_impl(v2));
+    dot_product_impl(v1, v2) == 0.0
+}
+
+pub fn dot_product_impl(v: &Vector, w: &Vector) -> f64 {
+    assert!(assert_vector_impl(v) && assert_vector_impl(w) && v.cols == w.cols);
+    let mut dp = 0.0;
+    for i in 0..v.cols {
+        dp += v.data[i] * w.data[i];
+    }
+    dp
+}
+
+pub fn cross_product_impl(v: &Vector, w: &Vector) -> Vector {
+    assert!(assert_vector_impl(v) && assert_vector_impl(w) && v.cols == 3 && w.cols == 3);
+    let mut c = null_vector_impl(3);
+    c.data[0] = (v.data[1] * w.data[2]) - (v.data[2] * w.data[1]);
+    c.data[1] = (v.data[0] * w.data[2]) - (v.data[2] * w.data[0]);
+    c.data[2] = (v.data[0] * w.data[1]) - (v.data[1] * w.data[0]);
+    c
+}
+
+pub fn vector_distance_impl(v: &Vector, w: &Vector) -> f64 {
+    assert!(assert_vector_impl(v) && assert_vector_impl(w) && v.cols == w.cols);
+    let mut d = 0.0;
+    for i in 0..v.cols {
+        d += (w.data[i] - v.data[i]) * (w.data[i] - v.data[i]);
+    }
+    d.sqrt()
+}
+
+pub fn add_vectors_impl(v1: &Vector, v2: &Vector) -> Vector {
+    assert!(assert_vector_impl(v1) && assert_vector_impl(v2) && v1.cols == v2.cols);
+    let mut sum = null_vector_impl(v1.cols);
+    for i in 0..v1.cols {
+        sum.data[i] = v1.data[i] + v2.data[i];
+    }
+    sum
+}
+
+pub fn scale_vector_impl(v: &Vector, s: f64) -> Vector {
+    assert!(assert_vector_impl(v));
+    let mut scaled = null_vector_impl(v.cols);
+    for i in 0..v.cols {
+        scaled.data[i] = v.data[i] * s;
+    }
+    scaled
+}
+
+pub fn pow_vector_impl(v: &Vector, k: f64) -> Vector {
+    assert_vector_impl(v);
+    let mut p = null_vector_impl(v.cols);
+    for i in 0..v.cols {
+        p.data[i] = v.data[i].powf(k);
+    }
+    p
+}
+
+pub fn scalar_triple_product_impl(v1: &Vector, v2: &Vector, v3: &Vector) -> f64 {
+    assert!(v1.cols == 3 && v2.cols == 3 && v3.cols == 3);
+    let cp = cross_product_impl(v2, v3);
+    dot_product_impl(v1, &cp)
+}
+```
+
+{{matrix.rs}}
+```rust
+use crate::linear_algebra::{Matrix, Vector};
+use crate::utils::exclusive_or;
+
+pub fn assert_matrix_impl(m: &Matrix) -> bool {
+    assert!(m.rows > 0 && m.cols > 0);
+    assert!(m.data.len() == m.rows * m.cols);
+    true
+}
+
+pub fn new_matrix_impl(d: &[f64], rows: usize, cols: usize) -> Matrix {
+    assert!(!d.is_empty() && rows > 0 && cols > 0);
+    assert!(d.len() >= rows * cols);
+
+    let mut m = null_matrix_impl(rows, cols);
+    let mut idx = 0;
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            m.data[i * m.cols + j] = d[idx];
+            idx += 1;
+        }
+    }
+    m
+}
+
+pub fn null_matrix_impl(rows: usize, cols: usize) -> Matrix {
+    assert!(rows > 0 && cols > 0);
+    Matrix {
+        rows,
+        cols,
+        data: vec![0.0; rows * cols],
+    }
+}
+
+pub fn zero_matrix_impl(rows: usize, cols: usize) -> Matrix {
+    let mut m = null_matrix_impl(rows, cols);
+    fill_matrix_impl(&mut m, 0.0);
+    m
+}
+
+pub fn fill_matrix_impl(m: &mut Matrix, n: f64) {
+    assert_matrix_impl(m);
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            m.data[i * m.cols + j] = n;
+        }
+    }
+}
+
+pub fn identity_matrix_impl(n: usize) -> Matrix {
+    let mut m = zero_matrix_impl(n, n);
+    for i in 0..m.rows {
+        for j in 0..m.rows {
+            if i == j {
+                m.data[i * m.cols + j] = 1.0;
+            }
+        }
+    }
+    m
+}
+
+pub fn delete_matrix_impl(m: Matrix) {
+    drop(m);
+}
+
+pub fn copy_matrix_impl(m: &Matrix) -> Matrix {
+    assert_matrix_impl(m);
+    let mut c = zero_matrix_impl(m.rows, m.cols);
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            c.data[i * m.cols + j] = m.data[i * m.cols + j];
+        }
+    }
+    c
+}
+
+pub fn flatten_matrix_impl(m: &Matrix) -> Vector {
+    assert_matrix_impl(m);
+    Vector {
+        cols: m.rows * m.cols,
+        data: m.data.clone(),
+    }
+}
+
+pub fn matrix_size_impl(m: &Matrix) -> usize {
+    assert_matrix_impl(m);
+    m.rows * m.cols
+}
+
+pub fn matrix_size_bytes_impl(m: &Matrix) -> usize {
+    std::mem::size_of::<f64>() * matrix_size_impl(m)
+}
+
+pub fn set_matrix_element_impl(m: &mut Matrix, i: usize, j: usize, s: f64) {
+    assert!(assert_matrix_impl(m) && i < m.rows && j < m.cols);
+    m.data[i * m.cols + j] = s;
+}
+
+pub fn get_matrix_element_impl(m: &Matrix, i: usize, j: usize) -> f64 {
+    assert!(assert_matrix_impl(m) && i < m.rows && j < m.cols);
+    m.data[i * m.cols + j]
+}
+
+pub fn set_row_vector_impl(m: &mut Matrix, i: usize, v: &Vector) {
+    assert!(assert_matrix_impl(m) && crate::vector::assert_vector_impl(v) && i < m.rows);
+    for j in 0..v.cols {
+        m.data[i * m.cols + j] = v.data[j];
+    }
+}
+
+pub fn get_row_vector_impl(m: &Matrix, i: usize) -> Vector {
+    assert!(assert_matrix_impl(m) && i < m.rows);
+    let mut row = vec![0.0; m.cols];
+    for (j, item) in row.iter_mut().enumerate().take(m.cols) {
+        *item = m.data[i * m.cols + j];
+    }
+    crate::vector::new_vector_impl(&row, m.cols)
+}
+
+pub fn set_col_vector_impl(m: &mut Matrix, j: usize, v: &Vector) {
+    assert!(assert_matrix_impl(m) && crate::vector::assert_vector_impl(v) && j < m.cols);
+    for i in 0..v.cols {
+        m.data[i * m.cols + j] = v.data[i];
+    }
+}
+
+pub fn get_col_vector_impl(m: &Matrix, j: usize) -> Vector {
+    assert!(assert_matrix_impl(m) && j < m.cols);
+    let mut col = vec![0.0; m.rows];
+    for (i, item) in col.iter_mut().enumerate().take(m.rows) {
+        *item = m.data[i * m.cols + j];
+    }
+    crate::vector::new_vector_impl(&col, m.rows)
+}
+
+pub fn get_main_diagonal_impl(m: &Matrix) -> Vector {
+    assert!(is_square_matrix_impl(m));
+    let mut diag = vec![0.0; m.rows];
+    for (x, item) in diag.iter_mut().enumerate().take(m.rows) {
+        *item = m.data[x * m.cols + x];
+    }
+    crate::vector::new_vector_impl(&diag, m.rows)
+}
+
+pub fn set_main_diagonal_impl(m: &mut Matrix, v: &Vector) {
+    assert!(
+        is_square_matrix_impl(m)
+            && crate::vector::assert_vector_impl(v)
+            && m.rows == m.cols
+            && m.cols == v.cols
+    );
+    for x in 0..v.cols {
+        m.data[x * m.cols + x] = v.data[x];
+    }
+}
+
+pub fn get_anti_diagonal_impl(m: &Matrix) -> Vector {
+    assert!(is_square_matrix_impl(m));
+    let mut x = 0usize;
+    let mut diag = vec![0.0; m.rows];
+    for i in (0..m.rows).rev() {
+        for j in (0..m.cols).rev() {
+            if i + j == m.rows - 1 {
+                diag[x] = m.data[i * m.cols + j];
+                x += 1;
+                if x == m.rows {
+                    break;
+                }
+            }
+        }
+    }
+    crate::vector::new_vector_impl(&diag, m.rows)
+}
+
+pub fn set_anti_diagonal_impl(m: &mut Matrix, v: &Vector) {
+    assert!(
+        is_square_matrix_impl(m)
+            && crate::vector::assert_vector_impl(v)
+            && m.rows == m.cols
+            && m.cols == v.cols
+    );
+    let mut idx = 0usize;
+    for i in (0..m.rows).rev() {
+        for j in (0..m.cols).rev() {
+            if i + j == m.rows - 1 {
+                m.data[i * m.cols + j] = v.data[idx];
+                idx += 1;
+                if idx == m.rows {
+                    break;
+                }
+            }
+        }
+    }
+}
+
+pub fn diagonal_product_impl(m: &Matrix) -> f64 {
+    let diagonal = get_main_diagonal_impl(m);
+    let mut product = 1.0;
+    for i in 0..diagonal.cols {
+        product *= diagonal.data[i];
+    }
+    product
+}
+
+pub fn is_matrix_equal_impl(m: &Matrix, n: &Matrix) -> bool {
+    assert!(assert_matrix_impl(m) && assert_matrix_impl(n));
+    if m.rows != n.rows || m.cols != n.cols {
+        return false;
+    }
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            if m.data[i * m.cols + j] != n.data[i * n.cols + j] {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn has_same_dimensions_impl(m: &Matrix, n: &Matrix) -> bool {
+    assert!(assert_matrix_impl(m) && assert_matrix_impl(n));
+    (m.rows == n.rows) && (m.cols == n.cols)
+}
+
+pub fn is_zero_matrix_impl(m: &Matrix) -> bool {
+    assert_matrix_impl(m);
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            if m.data[i * m.cols + j] != 0.0 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn is_identity_matrix_impl(m: &Matrix) -> bool {
+    if !is_square_matrix_impl(m) {
+        return false;
+    }
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            if i == j && m.data[i * m.cols + j] != 1.0 {
+                return false;
+            } else if i != j && m.data[i * m.cols + j] != 0.0 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn is_square_matrix_impl(m: &Matrix) -> bool {
+    assert_matrix_impl(m);
+    m.rows == m.cols
+}
+
+pub fn is_invertible_impl(m: &Matrix) -> bool {
+    is_square_matrix_impl(m) && determinant_impl(m) != 0.0
+}
+
+pub fn is_diagonal_matrix_impl(m: &Matrix) -> bool {
+    assert!(is_square_matrix_impl(m));
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            if i != j && m.data[i * m.cols + j] != 0.0 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn is_triangular_matrix_impl(m: &Matrix) -> bool {
+    assert!(is_square_matrix_impl(m));
+    exclusive_or(is_up_tri_matrix_impl(m), is_lo_tri_matrix_impl(m))
+}
+
+pub fn is_up_tri_matrix_impl(m: &Matrix) -> bool {
+    assert!(is_square_matrix_impl(m));
+    for i in 0..m.rows {
+        for j in 0..i {
+            if m.data[i * m.cols + j] != 0.0 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn is_lo_tri_matrix_impl(m: &Matrix) -> bool {
+    assert!(is_square_matrix_impl(m));
+    for i in 0..m.rows {
+        for j in (i + 1)..m.cols {
+            if m.data[i * m.cols + j] != 0.0 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn is_matrix_symmetric_impl(m: &Matrix) -> bool {
+    let t = transpose_matrix_impl(m);
+    is_matrix_equal_impl(m, &t)
+}
+
+pub fn has_zero_row_impl(m: &Matrix) -> bool {
+    assert_matrix_impl(m);
+    let mut all_zeroes = true;
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            if m.data[i * m.cols + j] != 0.0 {
+                all_zeroes = false;
+            }
+        }
+        if all_zeroes {
+            return true;
+        }
+        all_zeroes = true;
+    }
+    false
+}
+
+pub fn has_zero_col_impl(m: &Matrix) -> bool {
+    assert_matrix_impl(m);
+    let mut all_zeroes = true;
+    for j in 0..m.rows {
+        for i in 0..m.cols {
+            if m.data[i * m.cols + j] != 0.0 {
+                all_zeroes = false;
+            }
+        }
+        if all_zeroes {
+            return true;
+        }
+        all_zeroes = true;
+    }
+    false
+}
+
+pub fn transpose_matrix_impl(m: &Matrix) -> Matrix {
+    assert_matrix_impl(m);
+    let mut t = zero_matrix_impl(m.cols, m.rows);
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            t.data[j * t.cols + i] = m.data[i * m.cols + j];
+        }
+    }
+    t
+}
+
+pub fn trace_matrix_impl(m: &Matrix) -> f64 {
+    assert!(is_square_matrix_impl(m));
+    let mut trace = 0.0;
+    for i in 0..m.rows {
+        trace += m.data[i * m.cols + i];
+    }
+    trace
+}
+
+pub fn add_matrices_impl(m1: &Matrix, m2: &Matrix) -> Matrix {
+    assert!(has_same_dimensions_impl(m1, m2));
+    let mut sum = null_matrix_impl(m1.rows, m1.cols);
+    let mut idx = 0usize;
+    for _i in 0..m1.rows {
+        for _j in 0..m1.cols {
+            sum.data[idx] = m1.data[idx] + m2.data[idx];
+            idx += 1;
+        }
+    }
+    sum
+}
+
+pub fn pow_matrix_impl(m: &Matrix, k: f64) -> Matrix {
+    assert_matrix_impl(m);
+    let mut p = null_matrix_impl(m.rows, m.cols);
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            p.data[i * m.cols + j] = m.data[i * m.cols + j].powf(k);
+        }
+    }
+    p
+}
+
+pub fn multiply_matrices_impl(m1: &Matrix, m2: &Matrix) -> Matrix {
+    assert!(assert_matrix_impl(m1) && assert_matrix_impl(m2) && m1.cols == m2.cols && m1.rows == m2.rows);
+    let mut prod = null_matrix_impl(m1.rows, m1.cols);
+    for j in 0..m1.rows {
+        for i in 0..m1.cols {
+            let mut val = 0.0;
+            for k in 0..m1.cols {
+                val += m1.data[i * m1.cols + k] * m2.data[k * m1.cols + j];
+            }
+            prod.data[i * m1.cols + j] = val;
+        }
+    }
+    prod
+}
+
+pub fn scale_matrix_impl(m: &Matrix, s: f64) -> Matrix {
+    assert_matrix_impl(m);
+    let mut scaled = null_matrix_impl(m.rows, m.cols);
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            scaled.data[i * m.cols + j] = m.data[i * m.cols + j] * s;
+        }
+    }
+    scaled
+}
+
+pub fn sub_matrix_impl(m: &Matrix, i: usize, j: usize) -> Matrix {
+    assert!(assert_matrix_impl(m) && i < m.rows && j < m.cols);
+    let mut sm = null_matrix_impl(m.rows - 1, m.cols - 1);
+    let mut idx = 0usize;
+    for row in 0..m.rows {
+        for col in 0..m.cols {
+            if row != i && col != j {
+                sm.data[idx] = m.data[row * m.cols + col];
+                idx += 1;
+            }
+        }
+    }
+    sm
+}
+
+pub fn element_minor_impl(m: &Matrix, i: usize, j: usize) -> f64 {
+    let sm = sub_matrix_impl(m, i, j);
+    determinant_impl(&sm)
+}
+
+pub fn matrix_minor_impl(m: &Matrix) -> Matrix {
+    assert_matrix_impl(m);
+    let mut mm = null_matrix_impl(m.rows, m.cols);
+    for i in 0..mm.rows {
+        for j in 0..mm.cols {
+            mm.data[i * mm.cols + j] = element_minor_impl(m, i, j);
+        }
+    }
+    mm
+}
+
+pub fn element_cofactor_impl(m: &Matrix, i: usize, j: usize) -> f64 {
+    (-1.0f64).powf((i + 1 + j + 1) as f64) * element_minor_impl(m, i, j)
+}
+
+pub fn matrix_cofactor_impl(m: &Matrix) -> Matrix {
+    assert_matrix_impl(m);
+    let mut cfm = null_matrix_impl(m.rows, m.cols);
+    for i in 0..cfm.rows {
+        for j in 0..cfm.cols {
+            cfm.data[i * cfm.cols + j] = element_cofactor_impl(m, i, j);
+        }
+    }
+    cfm
+}
+
+pub fn sign_matrix_impl(rows: usize, cols: usize) -> Matrix {
+    assert!(rows > 0 && cols > 0);
+    let mut sm = null_matrix_impl(rows, cols);
+    fill_matrix_impl(&mut sm, 1.0);
+    for i in 0..sm.rows {
+        for j in 0..sm.cols {
+            sm.data[i * sm.cols + j] = if ((i * sm.cols + j) + 1) % 2 == 1 {
+                1.0
+            } else {
+                -1.0
+            };
+        }
+    }
+    sm
+}
+
+pub fn adjugate_matrix_impl(m: &Matrix) -> Matrix {
+    assert_matrix_impl(m);
+    let mm = matrix_minor_impl(m);
+    let sign = sign_matrix_impl(m.rows, m.cols);
+    multiply_matrices_impl(&mm, &sign)
+}
+
+pub fn lu_decomposition_impl(m: &Matrix) -> (Matrix, Matrix, Matrix, i32) {
+    assert!(is_square_matrix_impl(m));
+    let n = m.cols;
+    let mut swaps = 0i32;
+    let mut l = zero_matrix_impl(n, n);
+    let mut u = zero_matrix_impl(n, n);
+    let (p, p_swaps) = pivot_matrix_impl(m);
+    swaps = p_swaps;
+    let m2 = multiply_matrices_impl(&p, m);
+
+    for j in 0..n {
+        l.data[j * n + j] = 1.0;
+        for i in 0..(j + 1) {
+            let mut sum_u = 0.0;
+            for k in 0..i {
+                sum_u += u.data[k * n + j] * l.data[i * n + k];
+            }
+            u.data[i * n + j] = m2.data[i * n + j] - sum_u;
+        }
+        for i in j..n {
+            let mut sum_l = 0.0;
+            for k in 0..j {
+                sum_l += u.data[k * n + j] * l.data[i * n + k];
+            }
+            l.data[i * n + j] = (m2.data[i * n + j] - sum_l) / u.data[j * n + j];
+        }
+    }
+
+    (l, u, p, swaps)
+}
+
+pub fn inverse_matrix_impl(m: &Matrix) -> Matrix {
+    assert!(is_invertible_impl(m));
+    let adj = adjugate_matrix_impl(m);
+    scale_matrix_impl(&adj, 1.0 / determinant_impl(m))
+}
+
+pub fn pivot_matrix_impl(m: &Matrix) -> (Matrix, i32) {
+    assert!(is_square_matrix_impl(m));
+    let n = m.cols;
+    let mut pivot = identity_matrix_impl(n);
+    let mut swaps = 0i32;
+
+    for i in 0..n {
+        let mut max = m.data[i * n + i];
+        let mut row = i;
+        for j in i..n {
+            if m.data[j * n + i] > max {
+                max = m.data[j * n + i];
+                row = j;
+            }
+        }
+        if i != row {
+            let v = get_row_vector_impl(&pivot, i);
+            let w = get_row_vector_impl(&pivot, row);
+            set_row_vector_impl(&mut pivot, i, &w);
+            set_row_vector_impl(&mut pivot, row, &v);
+            swaps += 1;
+        }
+    }
+
+    (pivot, swaps)
+}
+
+pub fn scale_n_space_impl(m: &Matrix, k: f64) -> Matrix {
+    assert!(is_square_matrix_impl(m));
+    let mut n = zero_matrix_impl(m.cols, m.cols);
+    let mut v = crate::vector::zero_vector_impl(m.cols);
+    crate::vector::fill_vector_impl(&mut v, k);
+    set_main_diagonal_impl(&mut n, &v);
+    multiply_matrices_impl(m, &n)
+}
+
+pub fn reflect_axis_2d_impl(m: &Matrix, axis: i32) -> Matrix {
+    assert!(is_square_matrix_impl(m) && m.cols == 2);
+    let mut n = zero_matrix_impl(2, 2);
+    set_matrix_element_impl(&mut n, 0, 0, if axis != 0 { 1.0 } else { -1.0 });
+    set_matrix_element_impl(&mut n, 1, 1, if axis != 0 { -1.0 } else { 1.0 });
+    multiply_matrices_impl(m, &n)
+}
+
+pub fn reflect_axis_3d_impl(m: &Matrix, axis: i32) -> Matrix {
+    assert!(is_square_matrix_impl(m) && m.cols == 3 && (0..=2).contains(&axis));
+    let mut n = null_matrix_impl(3, 3);
+    if axis == 0 {
+        let data = [1.0, 0.0, 0.0];
+        let v = crate::vector::new_vector_impl(&data, 3);
+        set_main_diagonal_impl(&mut n, &v);
+    } else if axis == 1 {
+        let data = [1.0, 0.0, 0.0];
+        let v = crate::vector::new_vector_impl(&data, 3);
+        set_main_diagonal_impl(&mut n, &v);
+    } else {
+        let data = [-1.0, 0.0, 0.0];
+        let v = crate::vector::new_vector_impl(&data, 3);
+        set_main_diagonal_impl(&mut n, &v);
+    }
+    multiply_matrices_impl(m, &n)
+}
+
+pub fn orth_proj_2d_impl(m: &Matrix, axis: i32) -> Matrix {
+    assert!(is_square_matrix_impl(m) && m.cols == 2);
+    let mut n = zero_matrix_impl(2, 2);
+    set_matrix_element_impl(&mut n, axis as usize, axis as usize, 1.0);
+    multiply_matrices_impl(m, &n)
+}
+
+pub fn orth_proj_3d_impl(m: &Matrix, axis: i32) -> Matrix {
+    assert!(is_square_matrix_impl(m) && m.cols == 3);
+    let mut n = zero_matrix_impl(3, 3);
+    match axis {
+        0 => {
+            set_matrix_element_impl(&mut n, 0, 0, 1.0);
+            set_matrix_element_impl(&mut n, 1, 1, 1.0);
+        }
+        1 => {
+            set_matrix_element_impl(&mut n, 0, 0, 1.0);
+            set_matrix_element_impl(&mut n, 2, 2, 1.0);
+        }
+        2 => {
+            set_matrix_element_impl(&mut n, 1, 1, 1.0);
+            set_matrix_element_impl(&mut n, 2, 2, 1.0);
+        }
+        _ => {}
+    }
+    multiply_matrices_impl(m, &n)
+}
+
+pub fn shear_2d_impl(m: &Matrix, k: f64, axis: i32) -> Matrix {
+    assert!(is_square_matrix_impl(m) && m.cols == 2);
+    let mut n = zero_matrix_impl(2, 2);
+    set_matrix_element_impl(&mut n, 0, 0, 1.0);
+    set_matrix_element_impl(&mut n, 0, 1, if axis != 0 { k } else { 0.0 });
+    set_matrix_element_impl(&mut n, 1, 0, if axis != 0 { 0.0 } else { k });
+    set_matrix_element_impl(&mut n, 1, 1, 1.0);
+    multiply_matrices_impl(m, &n)
+}
+
+pub fn determinant_impl(m: &Matrix) -> f64 {
+    assert!(is_square_matrix_impl(m));
+    match m.rows {
+        1 => return m.data[0],
+        2 => return (m.data[0] * m.data[3]) - (m.data[1] * m.data[2]),
+        3 => {
+            return (m.data[0] * ((m.data[4] * m.data[8]) - (m.data[5] * m.data[7])))
+                - (m.data[1] * ((m.data[3] * m.data[8]) - (m.data[5] * m.data[6])))
+                + (m.data[2] * ((m.data[3] * m.data[7]) - (m.data[4] * m.data[6])));
+        }
+        _ => {}
+    }
+
+    if is_triangular_matrix_impl(m) {
+        return diagonal_product_impl(m);
+    }
+
+    let (l, u, _p, swaps) = lu_decomposition_impl(m);
+    (-1.0f64).powf((swaps - 1) as f64) * determinant_impl(&l) * determinant_impl(&u)
+}
+```
+
+{{linear_algebra.rs}}
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub struct Matrix {
+    pub rows: usize,
+    pub cols: usize,
+    pub data: Vec<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Vector {
+    pub cols: usize,
+    pub data: Vec<f64>,
+}
+
+use crate::matrix;
+use crate::vector;
+
+// --- Helper assertion functions ---
+pub fn assert_matrix(m: &Matrix) -> bool {
+    matrix::assert_matrix_impl(m)
+}
+
+pub fn assert_vector(v: &Vector) -> bool {
+    vector::assert_vector_impl(v)
+}
+
+// --- Creation functions ---
+pub fn new_matrix(d: &[f64], rows: usize, cols: usize) -> Matrix {
+    matrix::new_matrix_impl(d, rows, cols)
+}
+
+pub fn new_vector(d: &[f64], cols: usize) -> Vector {
+    vector::new_vector_impl(d, cols)
+}
+
+pub fn null_matrix(rows: usize, cols: usize) -> Matrix {
+    matrix::null_matrix_impl(rows, cols)
+}
+
+pub fn null_vector(cols: usize) -> Vector {
+    vector::null_vector_impl(cols)
+}
+
+pub fn zero_matrix(rows: usize, cols: usize) -> Matrix {
+    matrix::zero_matrix_impl(rows, cols)
+}
+
+pub fn zero_vector(cols: usize) -> Vector {
+    vector::zero_vector_impl(cols)
+}
+
+// --- Fill functions ---
+pub fn fill_matrix(m: &mut Matrix, n: f64) {
+    matrix::fill_matrix_impl(m, n)
+}
+
+pub fn fill_vector(v: &mut Vector, n: f64) {
+    vector::fill_vector_impl(v, n)
+}
+
+/// Returns an identity matrix of size n.
+pub fn identity_matrix(n: usize) -> Matrix {
+    matrix::identity_matrix_impl(n)
+}
+
+/// “Releases” a matrix (stub; memory is managed automatically in Rust).
+pub fn delete_matrix(m: Matrix) {
+    matrix::delete_matrix_impl(m)
+}
+
+/// “Releases” a vector.
+pub fn delete_vector(v: Vector) {
+    vector::delete_vector_impl(v)
+}
+
+/// Returns a copy of the given matrix.
+pub fn copy_matrix(m: &Matrix) -> Matrix {
+    matrix::copy_matrix_impl(m)
+}
+
+/// Returns a copy of the given vector.
+pub fn copy_vector(v: &Vector) -> Vector {
+    vector::copy_vector_impl(v)
+}
+
+/// Flattens the given matrix into a vector.
+pub fn flatten_matrix(m: &Matrix) -> Vector {
+    matrix::flatten_matrix_impl(m)
+}
+
+// --- Size functions ---
+pub fn matrix_size(m: &Matrix) -> usize {
+    matrix::matrix_size_impl(m)
+}
+
+pub fn vector_size(v: &Vector) -> usize {
+    vector::vector_size_impl(v)
+}
+
+pub fn matrix_size_bytes(m: &Matrix) -> usize {
+    matrix::matrix_size_bytes_impl(m)
+}
+
+pub fn vector_size_bytes(v: &Vector) -> usize {
+    vector::vector_size_bytes_impl(v)
+}
+
+// --- Element accessor/mutator functions ---
+pub fn set_matrix_element(m: &mut Matrix, i: usize, j: usize, s: f64) {
+    matrix::set_matrix_element_impl(m, i, j, s)
+}
+
+pub fn get_matrix_element(m: &Matrix, i: usize, j: usize) -> f64 {
+    matrix::get_matrix_element_impl(m, i, j)
+}
+
+pub fn set_vector_element(v: &mut Vector, i: usize, s: f64) {
+    vector::set_vector_element_impl(v, i, s)
+}
+
+pub fn get_vector_element(v: &Vector, i: usize) -> f64 {
+    vector::get_vector_element_impl(v, i)
+}
+
+// --- Row and column operations ---
+pub fn set_row_vector(m: &mut Matrix, i: usize, v: &Vector) {
+    matrix::set_row_vector_impl(m, i, v)
+}
+
+pub fn get_row_vector(m: &Matrix, i: usize) -> Vector {
+    matrix::get_row_vector_impl(m, i)
+}
+
+pub fn set_col_vector(m: &mut Matrix, j: usize, v: &Vector) {
+    matrix::set_col_vector_impl(m, j, v)
+}
+
+pub fn get_col_vector(m: &Matrix, j: usize) -> Vector {
+    matrix::get_col_vector_impl(m, j)
+}
+
+// --- Diagonal operations ---
+pub fn get_main_diagonal(m: &Matrix) -> Vector {
+    matrix::get_main_diagonal_impl(m)
+}
+
+pub fn set_main_diagonal(m: &mut Matrix, v: &Vector) {
+    matrix::set_main_diagonal_impl(m, v)
+}
+
+pub fn get_anti_diagonal(m: &Matrix) -> Vector {
+    matrix::get_anti_diagonal_impl(m)
+}
+
+pub fn set_anti_diagonal(m: &mut Matrix, v: &Vector) {
+    matrix::set_anti_diagonal_impl(m, v)
+}
+
+pub fn diagonal_product(m: &Matrix) -> f64 {
+    matrix::diagonal_product_impl(m)
+}
+
+// --- “Pretty” print functions ---
+pub fn print_matrix(m: &Matrix, include_indices: bool) {
+    matrix::print_matrix_impl(m, include_indices)
+}
+
+pub fn print_vector(v: &Vector, include_indices: bool) {
+    vector::print_vector_impl(v, include_indices)
+}
+
+// --- Comparison functions ---
+pub fn is_matrix_equal(m: &Matrix, n: &Matrix) -> bool {
+    matrix::is_matrix_equal_impl(m, n)
+}
+
+pub fn is_vector_equal(v: &Vector, w: &Vector) -> bool {
+    vector::is_vector_equal_impl(v, w)
+}
+
+pub fn has_same_dimensions(m: &Matrix, n: &Matrix) -> bool {
+    matrix::has_same_dimensions_impl(m, n)
+}
+
+// --- Property testing functions ---
+pub fn is_zero_matrix(m: &Matrix) -> bool {
+    matrix::is_zero_matrix_impl(m)
+}
+
+pub fn is_identity_matrix(m: &Matrix) -> bool {
+    matrix::is_identity_matrix_impl(m)
+}
+
+pub fn is_square_matrix(m: &Matrix) -> bool {
+    matrix::is_square_matrix_impl(m)
+}
+
+pub fn is_invertible(m: &Matrix) -> bool {
+    matrix::is_invertible_impl(m)
+}
+
+pub fn is_diagonal_matrix(m: &Matrix) -> bool {
+    matrix::is_diagonal_matrix_impl(m)
+}
+
+pub fn is_triangular_matrix(m: &Matrix) -> bool {
+    matrix::is_triangular_matrix_impl(m)
+}
+
+pub fn is_up_tri_matrix(m: &Matrix) -> bool {
+    matrix::is_up_tri_matrix_impl(m)
+}
+
+pub fn is_lo_tri_matrix(m: &Matrix) -> bool {
+    matrix::is_lo_tri_matrix_impl(m)
+}
+
+pub fn is_matrix_symmetric(m: &Matrix) -> bool {
+    matrix::is_matrix_symmetric_impl(m)
+}
+
+pub fn has_zero_row(m: &Matrix) -> bool {
+    matrix::has_zero_row_impl(m)
+}
+
+pub fn has_zero_col(m: &Matrix) -> bool {
+    matrix::has_zero_col_impl(m)
+}
+
+// --- Advanced operations ---
+pub fn transpose_matrix(m: &Matrix) -> Matrix {
+    matrix::transpose_matrix_impl(m)
+}
+
+pub fn trace_matrix(m: &Matrix) -> f64 {
+    matrix::trace_matrix_impl(m)
+}
+
+pub fn add_matrices(m1: &Matrix, m2: &Matrix) -> Matrix {
+    matrix::add_matrices_impl(m1, m2)
+}
+
+pub fn add_vectors(v1: &Vector, v2: &Vector) -> Vector {
+    vector::add_vectors_impl(v1, v2)
+}
+
+pub fn pow_matrix(m: &Matrix, k: f64) -> Matrix {
+    matrix::pow_matrix_impl(m, k)
+}
+
+pub fn pow_vector(v: &Vector, k: f64) -> Vector {
+    vector::pow_vector_impl(v, k)
+}
+
+pub fn multiply_matrices(m1: &Matrix, m2: &Matrix) -> Matrix {
+    matrix::multiply_matrices_impl(m1, m2)
+}
+
+pub fn scale_matrix(m: &Matrix, s: f64) -> Matrix {
+    matrix::scale_matrix_impl(m, s)
+}
+
+pub fn dot_product(v: &Vector, w: &Vector) -> f64 {
+    vector::dot_product_impl(v, w)
+}
+
+pub fn cross_product(v: &Vector, w: &Vector) -> Vector {
+    vector::cross_product_impl(v, w)
+}
+
+pub fn vector_magnitude(v: &Vector) -> f64 {
+    vector::vector_magnitude_impl(v)
+}
+
+pub fn vector_distance(v: &Vector, w: &Vector) -> f64 {
+    vector::vector_distance_impl(v, w)
+}
+
+pub fn scale_vector(v: &Vector, s: f64) -> Vector {
+    vector::scale_vector_impl(v, s)
+}
+
+pub fn is_unit_vector(v: &Vector) -> bool {
+    vector::is_unit_vector_impl(v)
+}
+
+pub fn is_vector_orthogonal(v1: &Vector, v2: &Vector) -> bool {
+    vector::is_vector_orthogonal_impl(v1, v2)
+}
+
+pub fn is_matrix_orthogonal(m1: &Matrix, m2: &Matrix) -> bool {
+    multiply_matrices(m1, m2) == identity_matrix(m1.rows)
+}
+
+pub fn scalar_triple_product(v1: &Vector, v2: &Vector, v3: &Vector) -> f64 {
+    vector::scalar_triple_product_impl(v1, v2, v3)
+}
+
+// --- Geometric operations ---
+pub fn reflect_axis_2d(m: &Matrix, axis: i32) -> Matrix {
+    matrix::reflect_axis_2d_impl(m, axis)
+}
+
+pub fn reflect_axis_3d(m: &Matrix, axis: i32) -> Matrix {
+    matrix::reflect_axis_3d_impl(m, axis)
+}
+
+pub fn orth_proj_2d(m: &Matrix, axis: i32) -> Matrix {
+    matrix::orth_proj_2d_impl(m, axis)
+}
+
+pub fn orth_proj_3d(m: &Matrix, axis: i32) -> Matrix {
+    matrix::orth_proj_3d_impl(m, axis)
+}
+
+pub fn rotate_2d(m: &Matrix, theta: f64) -> Matrix {
+    assert!(is_square_matrix(m) && m.cols == 2);
+    let mut n = zero_matrix(2, 2);
+    set_matrix_element(&mut n, 0, 0, theta.cos());
+    set_matrix_element(&mut n, 0, 1, -theta.sin());
+    set_matrix_element(&mut n, 1, 0, theta.sin());
+    set_matrix_element(&mut n, 1, 1, theta.cos());
+    multiply_matrices(m, &n)
+}
+
+pub fn scale_n_space(m: &Matrix, k: f64) -> Matrix {
+    matrix::scale_n_space_impl(m, k)
+}
+
+pub fn shear_2d(m: &Matrix, k: f64, axis: i32) -> Matrix {
+    matrix::shear_2d_impl(m, k, axis)
+}
+
+/// Returns the determinant of a matrix.
+pub fn determinant(m: &Matrix) -> f64 {
+    matrix::determinant_impl(m)
+}
+
+/// Performs LU decomposition. Returns (L, U, P, swaps).
+pub fn lu_decomposition(m: &Matrix) -> (Matrix, Matrix, Matrix, i32) {
+    matrix::lu_decomposition_impl(m)
+}
+
+/// Returns the submatrix of m excluding row i and column j.
+pub fn sub_matrix(m: &Matrix, i: usize, j: usize) -> Matrix {
+    matrix::sub_matrix_impl(m, i, j)
+}
+
+/// Returns the minor of m at (i,j).
+pub fn element_minor(m: &Matrix, i: usize, j: usize) -> f64 {
+    matrix::element_minor_impl(m, i, j)
+}
+
+/// Returns the matrix of minors of m.
+pub fn matrix_minor(m: &Matrix) -> Matrix {
+    matrix::matrix_minor_impl(m)
+}
+
+/// Returns the cofactor of element (i,j) in m.
+pub fn element_cofactor(m: &Matrix, i: usize, j: usize) -> f64 {
+    matrix::element_cofactor_impl(m, i, j)
+}
+
+/// Returns the matrix of cofactors of m.
+pub fn matrix_cofactor(m: &Matrix) -> Matrix {
+    matrix::matrix_cofactor_impl(m)
+}
+
+/// Returns a sign matrix of the given dimensions.
+pub fn sign_matrix(rows: usize, cols: usize) -> Matrix {
+    matrix::sign_matrix_impl(rows, cols)
+}
+
+/// Returns the adjugate matrix of m.
+pub fn adjugate_matrix(m: &Matrix) -> Matrix {
+    matrix::adjugate_matrix_impl(m)
+}
+
+/// Returns the inverse of m.
+pub fn inverse_matrix(m: &Matrix) -> Matrix {
+    matrix::inverse_matrix_impl(m)
+}
+
+/// Returns the pivot matrix of m along with the number of swaps.
+pub fn pivot_matrix(m: &Matrix) -> (Matrix, i32) {
+    matrix::pivot_matrix_impl(m)
+}
+```

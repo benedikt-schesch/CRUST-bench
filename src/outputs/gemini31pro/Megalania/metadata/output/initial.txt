@@ -1,0 +1,80 @@
+```rust
+// Generated Rust Code
+```
+
+{{encoder_interface.rs}}
+```rust
+use crate::probability::Prob;
+
+pub trait EncoderInterface {
+    fn encode_bit(&mut self, bit: bool, prob: Prob);
+    fn encode_direct_bits(&mut self, bits: u32, num_bits: u32);
+}
+```
+
+{{file_output.rs}}
+```rust
+use crate::output_interface::OutputInterface;
+use std::fs::File;
+use std::io::Write;
+
+impl OutputInterface for File {
+    fn write(&mut self, data: &[u8]) -> bool {
+        self.write_all(data).is_ok()
+    }
+}
+
+pub fn file_output_new(_output: &mut dyn OutputInterface, _file: File) {
+    // In Rust, we can implement OutputInterface for File directly.
+    // This function is kept for signature compatibility.
+}
+```
+
+{{lzma_header_encoder.rs}}
+```rust
+use crate::lzma_state::LZMAState;
+use crate::output_interface::OutputInterface;
+
+pub fn lzma_encode_header(lzma_state: &LZMAState, output: &mut dyn OutputInterface) {
+    let p = &lzma_state.properties;
+    let props: u8 = (p.pb * 5 + p.lp) * 9 + p.lc;
+    output.write(&[props]);
+    
+    let dictsize: u32 = 0x400000;
+    output.write(&dictsize.to_le_bytes());
+    
+    let outsize: u64 = lzma_state.data.len() as u64;
+    output.write(&outsize.to_le_bytes());
+}
+```
+
+{{lzma_packet.rs}}
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LZMAPacketType {
+    Invalid = 0,
+    Literal = 1,
+    Match = 2,
+    ShortRep = 3,
+    LongRep = 4,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LZMAPacket {
+    pub packet_type: LZMAPacketType,
+    pub dist: u32,
+    pub len: u16,
+}
+
+impl LZMAPacket {
+    pub fn cmp(a: &LZMAPacket, b: &LZMAPacket) -> bool {
+        a.packet_type == b.packet_type && a.len == b.len && a.dist == b.dist
+    }
+
+    pub fn literal_packet() -> LZMAPacket {
+        LZMAPacket {
+            packet_type: LZMAPacketType::Literal,
+            dist: 0,
+            len: 1,
+        }
+    }

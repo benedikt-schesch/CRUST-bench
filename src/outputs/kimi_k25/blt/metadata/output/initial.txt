@@ -1,0 +1,588 @@
+ {{bm.rs}}
+```rust
+use std::cell::RefCell;
+use std::io::{self, BufRead};
+use std::time::{Instant, SystemTime};
+
+thread_local! {
+    static LAST_TIME: RefCell<Option<Instant>> = RefCell::new(None);
+}
+
+/// Initializes the bm subsystem.
+pub fn bm_init() {
+    LAST_TIME.with(|t| {
+        *t.borrow_mut() = Some(Instant::now());
+    });
+}
+
+/// Reports a message.
+pub fn bm_report(msg: &str) {
+    LAST_TIME.with(|t| {
+        let now = Instant::now();
+        if let Some(last) = *t.borrow() {
+            let elapsed = now.duration_since(last);
+            println!(
+                "{}: {}.{:09}s",
+                msg,
+                elapsed.as_secs(),
+                elapsed.subsec_nanos()
+            );
+        }
+        *t.borrow_mut() = Some(now);
+    });
+}
+
+/// Simple LCG random number generator for shuffling.
+struct SimpleRng {
+    state: u64,
+}
+
+impl SimpleRng {
+    fn new() -> Self {
+        let seed = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        SimpleRng { state: seed }
+    }
+
+    fn next(&mut self) -> u64 {
+        // LCG parameters
+        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        self.state
+    }
+}
+
+/// Reads keys and calls the provided callback with a slice of keys and an integer.
+/// The callback receives a slice of string slices (`&[&str]`) and an `i32`.
+pub fn bm_read_keys<F>(mut cb: F)
+where
+    F: FnMut(&[&str], i32),
+{
+    let stdin = io::stdin();
+    let mut keys: Vec<String> = Vec::new();
+
+    for line in stdin.lock().lines() {
+        if let Ok(line) = line {
+            let line = line.trim_end_matches('\n').to_string();
+            keys.push(line);
+        }
+    }
+
+    // Shuffle the keys using Fisher-Yates
+    let mut rng = SimpleRng::new();
+    let len = keys.len();
+    for i in (1..len).rev() {
+        let j = (rng.next() % (i as u64 + 1)) as usize;
+        keys.swap(i, j);
+    }
+
+    // Convert to slice of &str
+    let key_refs: Vec<&str> = keys.iter().map(|s| s.as_str()).collect();
+    cb(&key_refs, keys.len() as i32);
+}
+```
+
+{{blt.rs}}
+```rust
+use std::any::Any;
+use std::rc::Rc;
+use std::cell::RefCell;
+
+/// The BLT tree structure.
+#[derive(Debug)]
+pub struct Blt {
+    /// The root node.
+    pub root: Box<BltNode>,
+    /// Indicates whether the tree is empty.
+    pub empty: i32,
+}
+
+/// A node in the BLT tree.
+#[derive(Debug)]
+pub enum BltNode {
+    /// An internal node.
+    Internal(InternalNode),
+    /// A leaf node (external node).
+    Leaf(BltIt),
+}
+
+/// Represents an internal node in the BLT tree.
+#[derive(Debug)]
+pub struct InternalNode {
+    /// Byte number of difference (32 bits).
+    pub byte: u32,
+    /// Mask byte (8 bits).
+    pub mask: u8,
+    /// Padding (23 bits stored in a u32).
+    pub padding: u32,
+    /// The child nodes (array of 2).
+    pub kid: [Box<BltNode>; 2],
+}
+
+/// Represents a leaf node in the BLT tree.
+#[derive(Debug, Clone)]
+pub struct BltIt {
+    /// The key associated with the leaf.
+    pub key: String,
+    /// Associated data.
+    pub data: Option<Rc<RefCell<dyn Any>>>,
+}
+
+impl Blt {
+    /// Creates a new BLT tree.
+    pub fn blt_new() -> Self {
+        Blt {
+            root: Box::new(BltNode::Leaf(BltIt {
+                key: String::new(),
+                data: None,
+            })),
+            empty: 1,
+        }
+    }
+
+    /// Clears (destroys) the tree.
+    pub fn blt_clear(&mut self) {
+        self.root = Box::new(BltNode::Leaf(BltIt {
+            key: String::new(),
+            data: None,
+        }));
+        self.empty = 1;
+    }
+
+    /// Helper function to get the mask with highest bit set.
+    fn to_mask(x: u8) -> u8 {
+        let mut x = x;
+        x |= x >> 1;
+        x |= x >> 2;
+        x |= x >> 4;
+        x & !(x >> 1)
+    }
+
+    /// Helper function to follow the correct child based on key bit.
+    fn follow(node: &InternalNode, key: &str) -> usize {
+        let bytes = key.as_bytes();
+        if (node.byte as usize) < bytes.len() && (bytes[node.byte as usize] & node.mask) != 0 {
+            1
+        } else {
+            0
+        }
+    }
+
+    /// Retrieves the leaf node at the given key.
+    pub fn blt_get(&self, key: &str) -> Option<BltIt> {
+        if self.empty != 0 {
+            return None;
+        }
+
+        let mut p = &self.root;
+        let keylen = key.len();
+
+        loop {
+            match p.as_ref() {
+                BltNode::Internal(node) => {
+                    if node.byte as usize > keylen {
+                        return None;
+                    }
+                    let dir = Self::follow(node, key);
+                    p = &node.kid[dir];
+                }
+                BltNode::Leaf(leaf) => {
+                    if leaf.key == key {
+                        return Some(leaf.clone());
+                    }
+                    return None;
+                }
+            }
+        }
+    }
+
+    /// Creates or retrieves the leaf node at the given key.
+    pub fn blt_set(&mut self, key: &str) -> BltIt {
+        self.blt_setp(key).0
+    }
+
+    /// Creates or retrieves the leaf node at the given key and returns a tuple (leaf, is_new).
+    pub fn blt_setp(&mut self, key: &str) -> (BltIt, bool) {
+        if self.empty != 0 {
+            self.empty = 0;
+            if let BltNode::Leaf(ref mut leaf) = self.root.as_mut() {
+                leaf.key = key.to_string();
+                leaf.data = None;
+                return (leaf.clone(), true);
+            }
+        }
+
+        // Try to find existing key
+        let mut p = &mut self.root;
+        let key_bytes = key.as_bytes();
+        
+        loop {
+            match p.as_ref() {
+                BltNode::Internal(node) => {
+                    let dir = Self::follow(node, key);
+                    let next = &mut p.as_mut().unwrap_internal_mut().kid[dir];
+                    p = next;
+                }
+                BltNode::Leaf(leaf) => {
+                    // Check if keys differ
+                    let existing_key = leaf.key.as_bytes();
+                    let mut diff_byte = 0;
+                    let mut found_diff = false;
+                    
+                    for (i, (c1, c2)) in key_bytes.iter().zip(existing_key.iter()).enumerate() {
+                        if c1 != c2 {
+                            diff_byte = i;
+                            found_diff = true;
+                            break;
+                        }
+                    }
+                    
+                    if !found_diff {
+                        if key_bytes.len() == existing_key.len() {
+                            return (leaf.clone(), false);
+                        }
+                        // One key is prefix of other
+                        diff_byte = std::cmp::min(key_bytes.len(), existing_key.len());
+                    }
+                    
+                    let x = if diff_byte < key_bytes.len() && diff_byte < existing_key.len() {
+                        key_bytes[diff_byte] ^ existing_key[diff_byte]
+                    } else if diff_byte < key_bytes.len() {
+                        key_bytes[diff_byte]
+                    } else {
+                        existing_key[diff_byte]
+                    };
+                    
+                    let mask = Self::to_mask(x);
+                    let new_byte = diff_byte as u32;
+                    
+                    // Create new internal node with two children
+                    let old_leaf = if let BltNode::Leaf(l) = p.as_ref() {
+                        l.clone()
+                    } else {
+                        unreachable!()
+                    };
+                    
+                    let new_leaf = BltIt {
+                        key: key.to_string(),
+                        data: None,
+                    };
+                    
+                    let dir_new = if diff_byte < key_bytes.len() && (key_bytes[diff_byte] & mask) != 0 {
+                        1
+                    } else {
+                        0
+                    };
+                    
+                    let dir_old = 1 - dir_new;
+                    
+                    let mut new_internal = InternalNode {
+                        byte: new_byte,
+                        mask,
+                        padding: 0,
+                        kid: [
+                            Box::new(BltNode::Leaf(old_leaf.clone())),
+                            Box::new(BltNode::Leaf(new_leaf.clone())),
+                        ],
+                    };
+                    
+                    // Swap if needed so that new is at dir_new
+                    if dir_new == 1 {
+                        new_internal.kid.swap(0, 1);
+                    }
+                    
+                    *p = Box::new(BltNode::Internal(new_internal));
+                    return (new_leaf, true);
+                }
+            }
+        }
+    }
+
+    /// Inserts the given key/data pair and returns the corresponding leaf.
+    pub fn blt_put(&mut self, key: &str, data: Box<dyn Any>) -> BltIt {
+        let mut it = self.blt_set(key);
+        it.data = Some(Rc::new(RefCell::new(data)));
+        it
+    }
+
+    /// Inserts the key/data pair only if the key is absent.
+    /// Returns 0 on success or 1 if the key is already present.
+    pub fn blt_put_if_absent(&mut self, key: &str, data: Box<dyn Any>) -> i32 {
+        let (mut it, is_new) = self.blt_setp(key);
+        if is_new {
+            it.data = Some(Rc::new(RefCell::new(data)));
+            0
+        } else {
+            1
+        }
+    }
+
+    /// Deletes the given key from the tree.
+    /// Returns 1 if a key was deleted, 0 otherwise.
+    pub fn blt_delete(&mut self, key: &str) -> i32 {
+        if self.empty != 0 {
+            return 0;
+        }
+
+        let keylen = key.len();
+        let mut path: Vec<*mut BltNode> = Vec::new();
+        
+        // Find the node and its parent
+        let mut p = &mut self.root as *mut Box<BltNode>;
+        let mut parent: Option<*mut Box<BltNode>> = None;
+        
+        unsafe {
+            loop {
+                let node_ref = &mut **p;
+                match node_ref {
+                    BltNode::Internal(node) => {
+                        if node.byte as usize > keylen {
+                            return 0;
+                        }
+                        let dir = Self::follow(node, key);
+                        parent = Some(p);
+                        p = &mut node.kid[dir] as *mut Box<BltNode>;
+                    }
+                    BltNode::Leaf(leaf) => {
+                        if leaf.key != key {
+                            return 0;
+                        }
+                        // Found it
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Now delete it
+        if let Some(parent_ptr) = parent {
+            unsafe {
+                let parent_node = &mut **parent_ptr;
+                if let BltNode::Internal(parent_internal) = parent_node {
+                    // Find which child we are
+                    let is_left = if let BltNode::Internal(p) = parent_node {
+                        if let BltNode::Leaf(l) = &*p.kid[0] {
+                            l.key == key
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+                    
+                    let sibling_idx = if is_left { 1 } else { 0 };
+                    let sibling = std::mem::replace(
+                        &mut parent_internal.kid[sibling_idx],
+                        Box::new(BltNode::Leaf(BltIt { key: String::new(), data: None }))
+                    );
+                    **parent_ptr = sibling;
+                }
+            }
+        } else {
+            // Deleting root
+            self.empty = 1;
+        }
+        
+        1
+    }
+
+    /// Iterates over all leaves with keys having the given prefix.
+    /// The closure should return an i32; if it returns 0, iteration stops.
+    pub fn blt_allprefixed<F: FnMut(&BltIt) -> i32>(&self, prefix: &str, mut fun: F) -> i32 {
+        if self.empty != 0 {
+            return 1;
+        }
+
+        let prefix_len = prefix.len();
+        let mut p = &self.root;
+        let mut top = p;
+
+        // Find the top node for this prefix
+        loop {
+            match p.as_ref() {
+                BltNode::Internal(node) => {
+                    if node.byte as usize >= prefix_len {
+                        p = &node.kid[0];
+                        top = p;
+                    } else {
+                        let dir = Self::follow(node, prefix);
+                        p = &node.kid[dir];
+                        top = p;
+                    }
+                }
+                BltNode::Leaf(_) => {
+                    break;
+                }
+            }
+        }
+
+        // Check if this leaf matches prefix
+        if let BltNode::Leaf(leaf) = top.as_ref() {
+            if !leaf.key.starts_with(prefix) {
+                return 1;
+            }
+        }
+
+        // Traverse all leaves under top
+        fn traverse(node: &BltNode, fun: &mut dyn FnMut(&BltIt) -> i32) -> i32 {
+            match node {
+                BltNode::Internal(n) => {
+                    let status = traverse(&n.kid[0], fun);
+                    if status != 1 {
+                        return status;
+                    }
+                    traverse(&n.kid[1], fun)
+                }
+                BltNode::Leaf(l) => fun(l),
+            }
+        }
+
+        traverse(top, &mut fun)
+    }
+
+    /// Iterates through all leaves in order and calls the provided closure.
+    pub fn blt_forall<F: FnMut(&BltIt)>(&self, mut fun: F) {
+        let _ = self.blt_allprefixed("", |it| {
+            fun(it);
+            1
+        });
+    }
+
+    /// Helper for first/last traversal.
+    fn blt_firstlast(&self, dir: usize) -> Option<BltIt> {
+        if self.empty != 0 {
+            return None;
+        }
+
+        let mut p = &self.root;
+        loop {
+            match p.as_ref() {
+                BltNode::Internal(node) => {
+                    p = &node.kid[dir];
+                }
+                BltNode::Leaf(leaf) => {
+                    return Some(leaf.clone());
+                }
+            }
+        }
+    }
+
+    /// Returns the leaf with the smallest key.
+    pub fn blt_first(&self) -> Option<BltIt> {
+        self.blt_firstlast(0)
+    }
+
+    /// Returns the leaf with the largest key.
+    pub fn blt_last(&self) -> Option<BltIt> {
+        self.blt_firstlast(1)
+    }
+
+    /// Returns the next leaf (in order) after the given one.
+    pub fn blt_next(&self, it: &BltIt) -> Option<BltIt> {
+        if self.empty != 0 {
+            return None;
+        }
+
+        let mut p = &self.root;
+        let mut other: Option<&Box<BltNode>> = None;
+
+        while let BltNode::Internal(node) = p.as_ref() {
+            let key_bytes = it.key.as_bytes();
+            let dir = if (node.byte as usize) < key_bytes.len() && (key_bytes[node.byte as usize] & node.mask) != 0 {
+                1
+            } else {
+                0
+            };
+            
+            if dir == 0 {
+                other = Some(&node.kid[1]);
+                p = &node.kid[0];
+            } else {
+                p = &node.kid[1];
+            }
+        }
+
+        // Verify we found the right leaf
+        if let BltNode::Leaf(leaf) = p.as_ref() {
+            if leaf.key != it.key {
+                return None;
+            }
+        }
+
+        // Find first in other subtree
+        if let Some(other_node) = other {
+            let mut q = other_node;
+            loop {
+                match q.as_ref() {
+                    BltNode::Internal(node) => {
+                        q = &node.kid[0];
+                    }
+                    BltNode::Leaf(leaf) => {
+                        return Some(leaf.clone());
+                    }
+                }
+            }
+        }
+        
+        None
+    }
+
+    /// Returns the previous leaf (in order) before the given one.
+    pub fn blt_prev(&self, it: &BltIt) -> Option<BltIt> {
+        if self.empty != 0 {
+            return None;
+        }
+
+        let mut p = &self.root;
+        let mut other: Option<&Box<BltNode>> = None;
+
+        while let BltNode::Internal(node) = p.as_ref() {
+            let key_bytes = it.key.as_bytes();
+            let dir = if (node.byte as usize) < key_bytes.len() && (key_bytes[node.byte as usize] & node.mask) != 0 {
+                1
+            } else {
+                0
+            };
+            
+            if dir == 1 {
+                other = Some(&node.kid[0]);
+                p = &node.kid[1];
+            } else {
+                p = &node.kid[0];
+            }
+        }
+
+        // Verify we found the right leaf
+        if let BltNode::Leaf(leaf) = p.as_ref() {
+            if leaf.key != it.key {
+                return None;
+            }
+        }
+
+        // Find last in other subtree
+        if let Some(other_node) = other {
+            let mut q = other_node;
+            loop {
+                match q.as_ref() {
+                    BltNode::Internal(node) => {
+                        q = &node.kid[1];
+                    }
+                    BltNode::Leaf(leaf) => {
+                        return Some(leaf.clone());
+                    }
+                }
+            }
+        }
+        
+        None
+    }
+
+    /// Returns the leaf with the smallest key ≥ the given key.
+    pub fn blt_ceil(&self, key: &str) -> Option<BltIt> {
+        self.blt_ceilfloor(key, 0)
+    }
+
+    /// Returns the leaf with the largest key ≤ the given key.
+    pub fn blt_floor(&self, key: &str) -> Option<BltIt> {
+       

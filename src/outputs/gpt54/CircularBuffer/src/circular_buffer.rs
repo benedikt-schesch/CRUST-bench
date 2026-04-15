@@ -1,0 +1,240 @@
+use std::vec::Vec;
+
+pub struct CircularBuffer {
+size: usize,
+data_size: usize,
+tail_offset: usize,
+head_offset: usize,
+buffer: Vec<u8>,
+}
+
+impl CircularBuffer {
+pub fn new(size: usize) -> Self {
+let mut buf = CircularBuffer {
+size,
+data_size: 0,
+tail_offset: usize::MAX,
+head_offset: usize::MAX,
+buffer: vec![0; size],
+};
+buf.reset();
+buf
+}
+
+pub fn pop(&mut self, length: usize, data_out: &mut [u8]) -> usize {
+self.inter_read(length, data_out, true)
+}
+
+pub fn read(&self, length: usize, data_out: &mut [u8]) -> usize {
+let mut clone = CircularBuffer {
+size: self.size,
+data_size: self.data_size,
+tail_offset: self.tail_offset,
+head_offset: self.head_offset,
+buffer: self.buffer.clone(),
+};
+clone.inter_read(length, data_out, false)
+}
+
+pub fn get_size(&self) -> usize {
+self.size
+}
+
+pub fn print(&self, hex: bool) {
+let c_size = self.get_size();
+let mut out = String::new();
+
+for i in 0..c_size {
+let c = if self.get_data_size() == 0 {
+b'_'
+} else if self.tail_offset < self.head_offset {
+if i > self.tail_offset && i < self.head_offset {
+b'_'
+} else {
+self.buffer[i]
+}
+} else if i > self.tail_offset || i < self.head_offset {
+b'_'
+} else {
+self.buffer[i]
+};
+
+if hex {
+out.push_str(&format!("{:02X}|", c));
+} else {
+out.push(c as char);
+out.push('|');
+}
+}
+
+println!(
+"CircularBuffer: {} <size {} dataSize:{}>",
+out,
+self.get_size(),
+self.get_data_size()
+);
+}
+
+pub fn free(self) {}
+
+pub fn reset(&mut self) {
+self.head_offset = usize::MAX;
+self.tail_offset = usize::MAX;
+self.data_size = 0;
+}
+
+pub fn get_capacity(&self) -> usize {
+self.size
+}
+
+pub fn push(&mut self, src: &[u8], length: usize) {
+if length == 0 || self.size == 0 {
+return;
+}
+
+let available = src.len().min(length);
+if available == 0 {
+return;
+}
+
+let mut writable_len = available;
+let mut start = 0usize;
+
+if writable_len > self.size {
+let overflow_len = writable_len - self.size;
+writable_len = self.size;
+start = overflow_len;
+}
+
+let psrc = &src[start..start + writable_len];
+let mut reset_head = false;
+
+if self.tail_offset.wrapping_add(writable_len) < self.size {
+let dst_start = self.tail_offset + 1;
+let dst_end = dst_start + writable_len;
+self.buffer[dst_start..dst_end].copy_from_slice(psrc);
+
+if self.tail_offset < self.head_offset
+&& self.tail_offset + writable_len >= self.head_offset
+{
+reset_head = true;
+}
+
+self.tail_offset += writable_len;
+} else {
+let remain_size = self.size - self.tail_offset - 1;
+if remain_size > 0 {
+self.buffer[self.tail_offset + 1..self.tail_offset + 1 + remain_size]
+.copy_from_slice(&psrc[..remain_size]);
+}
+
+let cover_size = writable_len - remain_size;
+if cover_size > 0 {
+self.buffer[..cover_size].copy_from_slice(&psrc[remain_size..remain_size + cover_size]);
+}
+
+if self.tail_offset < self.head_offset {
+reset_head = true;
+} else if cover_size > self.head_offset {
+reset_head = true;
+}
+
+self.tail_offset = cover_size - 1;
+}
+
+if self.head_offset == usize::MAX {
+self.head_offset = 0;
+}
+
+if reset_head {
+if self.tail_offset + 1 < self.size {
+self.head_offset = self.tail_offset + 1;
+} else {
+self.head_offset = 0;
+}
+self.data_size = self.size;
+} else if self.tail_offset >= self.head_offset {
+self.data_size = self.tail_offset - self.head_offset + 1;
+} else {
+self.data_size = self.size - (self.head_offset - self.tail_offset - 1);
+}
+}
+
+pub fn inter_read(&mut self, length: usize, data_out: &mut [u8], reset_head: bool) -> usize {
+if self.data_size == 0 || length == 0 {
+return 0;
+}
+
+let mut rd_len = length;
+if self.data_size < rd_len {
+rd_len = self.data_size;
+}
+
+let out_len = data_out.len().min(rd_len);
+
+if self.head_offset <= self.tail_offset {
+if out_len > 0 {
+data_out[..out_len]
+.copy_from_slice(&self.buffer[self.head_offset..self.head_offset + out_len]);
+}
+
+if reset_head {
+self.head_offset += rd_len;
+if self.head_offset > self.tail_offset {
+self.head_offset = usize::MAX;
+self.tail_offset = usize::MAX;
+}
+}
+} else if self.head_offset + rd_len <= self.size {
+if out_len > 0 {
+data_out[..out_len]
+.copy_from_slice(&self.buffer[self.head_offset..self.head_offset + out_len]);
+}
+
+if reset_head {
+self.head_offset += rd_len;
+if self.head_offset == self.size {
+self.head_offset = 0;
+}
+}
+} else {
+let frg1_len = self.size - self.head_offset;
+let frg2_len = rd_len - frg1_len;
+
+if out_len > 0 {
+let first_copy = out_len.min(frg1_len);
+if first_copy > 0 {
+data_out[..first_copy].copy_from_slice(
+&self.buffer[self.head_offset..self.head_offset + first_copy],
+);
+}
+
+if out_len > first_copy {
+let second_copy = (out_len - first_copy).min(frg2_len);
+if second_copy > 0 {
+data_out[first_copy..first_copy + second_copy]
+.copy_from_slice(&self.buffer[..second_copy]);
+}
+}
+}
+
+if reset_head {
+self.head_offset = frg2_len;
+if self.head_offset > self.tail_offset {
+self.head_offset = usize::MAX;
+self.tail_offset = usize::MAX;
+}
+}
+}
+
+if reset_head {
+self.data_size -= rd_len;
+}
+
+rd_len
+}
+
+pub fn get_data_size(&self) -> usize {
+self.data_size
+}
+}

@@ -1,0 +1,394 @@
+{{xalloc.rs}}
+```rust
+/// Allocates a new vector of bytes of the specified size.
+/// In C, this was 'void* xmalloc(size_t size)'.
+pub fn xmalloc(size: usize) -> Vec<u8> {
+    let mut vec = Vec::with_capacity(size);
+    vec.resize(size, 0);
+    vec
+}
+
+/// Reallocates a vector of bytes to a new size.
+/// In C, this was 'void* xrealloc(void* ptr, size_t size)'.
+pub fn xrealloc(mut data: Vec<u8>, new_size: usize) -> Vec<u8> {
+    data.resize(new_size, 0);
+    data
+}
+```
+
+{{dynamicarr.rs}}
+```rust
+use crate::xalloc;
+
+pub const DA_BUFFER_SIZE: usize = 16;
+
+/// Represents a dynamic list of strings in an idiomatic, safe Rust form.
+#[derive(Debug, Default)]
+pub struct ArgList {
+    pub items: Vec<String>,
+    pub position: usize,
+    pub bufsize: usize,
+}
+
+/// Represents a dynamic string in an idiomatic, safe Rust form.
+#[derive(Debug, Default)]
+pub struct Str {
+    pub items: String,
+    pub position: usize,
+    pub bufsize: usize,
+}
+
+/// Returns a new vector of strings derived from the given ArgList.
+/// In C, this was returning a 'char**'.
+pub fn get_args(l: &ArgList) -> Vec<String> {
+    l.items.clone()
+}
+
+/// Returns a new String derived from the given Str.
+/// In C, this was returning a 'char*'.
+pub fn get_string(s: &Str) -> String {
+    s.items.clone()
+}
+
+/// Destroys / frees the given vector of strings.
+/// In C, this was taking 'char** args'.
+pub fn destroy_args(_args: Vec<String>) {
+    // Vec and its contents are dropped automatically when they go out of scope
+}
+```
+
+{{input.rs}}
+```rust
+use crate::dynamicarr::{ArgList, Str, get_string, get_args};
+
+/// Represents a command, including its arguments, pipe-arguments,
+/// and redirection information, in a safe Rust form.
+#[derive(Debug, Default)]
+pub struct Command {
+    pub args: Vec<String>,
+    pub pipe_args: Vec<String>,
+    pub redirect_file_name: Option<String>,
+}
+
+/// Reads a line of input from the user.
+/// In C, this was returning a 'char*'.
+pub fn bhshell_read_line() -> String {
+    let mut line = String::new();
+    std::io::stdin().read_line(&mut line).expect("Failed to read line");
+    // Remove trailing newline to match C behavior
+    if line.ends_with('\n') {
+        line.pop();
+    }
+    line
+}
+
+/// Parses a given line into a Command structure.
+/// In C, this was returning a 'command*' for the allocated command.
+pub fn bhshell_parse(line: &str) -> Command {
+    let mut cmd = new_command();
+    let mut arg_list = ArgList::default();
+    let mut pipe_list = ArgList::default();
+    let mut current_str = Str::default();
+    let mut state = 0; // 0 = ARG, 1 = PIPE_ARG, 2 = REDIRECT
+    let mut has_error = false;
+    
+    let chars: Vec<char> = line.chars().collect();
+    let mut i = 0;
+    
+    while i < chars.len() {
+        let c = chars[i];
+        
+        if c == ' ' || c == '\t' || c == '\n' {
+            if current_str.position > 0 {
+                let string = get_string(&current_str);
+                match state {
+                    0 => arg_list.items.push(string),
+                    1 => pipe_list.items.push(string),
+                    2 => cmd.redirect_file_name = Some(string),
+                    _ => {}
+                }
+                current_str = Str::default();
+            }
+            i += 1;
+            continue;
+        } else if c == '|' {
+            if current_str.position > 0 {
+                if state == 0 {
+                    arg_list.items.push(get_string(&current_str));
+                    current_str = Str::default();
+                } else {
+                    has_error = true;
+                    break;
+                }
+            }
+            // Check for invalid |> sequence
+            if i + 1 < chars.len() && chars[i + 1] == '>' {
+                has_error = true;
+                break;
+            }
+            state = 1;
+            i += 1;
+            continue;
+        } else if c == '>' {
+            if current_str.position > 0 {
+                let string = get_string(&current_str);
+                match state {
+                    0 => arg_list.items.push(string),
+                    1 => pipe_list.items.push(string),
+                    _ => {}
+                }
+                current_str = Str::default();
+            }
+            state = 2;
+            i += 1;
+            continue;
+        } else {
+            current_str.items.push(c);
+            current_str.position += 1;
+            i += 1;
+        }
+    }
+    
+    // Handle last token
+    if current_str.position > 0 {
+        let string = get_string(&current_str);
+        match state {
+            0 => arg_list.items.push(string),
+            1 => pipe_list.items.push(string),
+            2 => cmd.redirect_file_name = Some(string),
+            _ => {}
+        }
+    }
+    
+    // Check for errors or empty args
+    if has_error || arg_list.items.is_empty() {
+        return new_command();
+    }
+    
+    cmd.args = get_args(&arg_list);
+    if !pipe_list.items.is_empty() {
+        cmd.pipe_args = get_args(&pipe_list);
+    }
+    
+    cmd
+}
+
+/// Cleans up and destroys a Command structure.
+/// In C, this took 'command* cmd' and freed its data.
+pub fn destroy_command(_cmd: Command) {
+    // Command and its Vec fields are dropped automatically
+}
+
+/// Creates and returns a new Command structure.
+/// In C, this was returning a 'command*'.
+pub fn new_command() -> Command {
+    Command::default()
+}
+```
+
+{{bhshell.rs}}
+```rust
+use crate::input::Command;
+use std::env;
+use std::fs::File;
+use std::io::{self, Write};
+use std::process::{Command as ProcessCommand, Stdio};
+
+pub const BUF_SIZE: usize = 64;
+
+/// Runs the main bhshell loop.
+pub fn bhshell_loop() {
+    loop {
+        let dir = env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("?"));
+        print!("[{}] $ ", dir.display());
+        io::stdout().flush().unwrap();
+        
+        let line = crate::input::bhshell_read_line();
+        let mut cmd = crate::input::bhshell_parse(&line);
+        
+        // Check for invalid command (empty args)
+        if cmd.args.is_empty() {
+            println!("Invalid Command");
+            continue;
+        }
+        
+        let status = bhshell_execute(&mut cmd);
+        crate::input::destroy_command(cmd);
+        
+        if status == 0 {
+            break;
+        }
+    }
+}
+
+/// Executes the given command.
+/// Returns an integer status code (C equivalent of int).
+pub fn bhshell_execute(cmd: &mut Command) -> i32 {
+    if cmd.args.is_empty() {
+        return 1;
+    }
+    
+    let builtin_str = ["cd", "help", "exit"];
+    
+    if let Some(first_arg) = cmd.args.get(0) {
+        for (i, builtin) in builtin_str.iter().enumerate() {
+            if first_arg == *builtin {
+                return match i {
+                    0 => bhshell_cd(&cmd.args),
+                    1 => bhshell_help(&cmd.args),
+                    2 => bhshell_exit(&cmd.args),
+                    _ => 1,
+                };
+            }
+        }
+    }
+    
+    bhshell_launch(cmd)
+}
+
+/// Launches the given command.
+/// Returns an integer status code (C equivalent of int).
+pub fn bhshell_launch(cmd: &mut Command) -> i32 {
+    // Handle piped command
+    if !cmd.pipe_args.is_empty() {
+        let mut first_process = ProcessCommand::new(&cmd.args[0]);
+        first_process.args(&cmd.args[1..]).stdout(Stdio::piped());
+        
+        let mut first_child = match first_process.spawn() {
+            Ok(child) => child,
+            Err(e) => {
+                eprintln!("bhshell: {}", e);
+                return 1;
+            }
+        };
+        
+        let stdout = first_child.stdout.take().expect("Failed to capture stdout");
+        
+        let mut second_process = ProcessCommand::new(&cmd.pipe_args[0]);
+        second_process.args(&cmd.pipe_args[1..]).stdin(stdout);
+        
+        // Handle redirection for the second command
+        if let Some(ref filename) = cmd.redirect_file_name {
+            match File::create(filename) {
+                Ok(file) => {
+                    second_process.stdout(file);
+                }
+                Err(e) => {
+                    eprintln!("Could not open file: {}", e);
+                    return 1;
+                }
+            }
+        }
+        
+        let mut second_child = match second_process.spawn() {
+            Ok(child) => child,
+            Err(e) => {
+                eprintln!("bhshell: {}", e);
+                return 1;
+            }
+        };
+        
+        let _ = first_child.wait();
+        let _ = second_child.wait();
+        
+    } else if let Some(ref filename) = cmd.redirect_file_name {
+        // Handle redirection only
+        let file = match File::create(filename) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("Could not open file: {}", e);
+                return 1;
+            }
+        };
+        
+        let mut process = ProcessCommand::new(&cmd.args[0]);
+        process.args(&cmd.args[1..]).stdout(file);
+        
+        match process.spawn() {
+            Ok(mut child) => {
+                let _ = child.wait();
+            }
+            Err(e) => {
+                eprintln!("bhshell: {}", e);
+            }
+        }
+        
+    } else {
+        // Simple command execution
+        let mut process = ProcessCommand::new(&cmd.args[0]);
+        process.args(&cmd.args[1..]);
+        
+        match process.spawn() {
+            Ok(mut child) => {
+                let _ = child.wait();
+            }
+            Err(e) => {
+                eprintln!("bhshell: {}", e);
+            }
+        }
+    }
+    
+    1
+}
+
+/// Changes the current directory.
+/// Returns an integer status code (C equivalent of int).
+pub fn bhshell_cd(args: &[String]) -> i32 {
+    if args.len() < 2 {
+        eprintln!("bhshell: expected argument to \"cd\" into");
+    } else {
+        if let Err(e) = env::set_current_dir(&args[1]) {
+            eprintln!("bhshell: {}", e);
+        }
+    }
+    1
+}
+
+/// Prints help information.
+/// Returns an integer status code (C equivalent of int).
+pub fn bhshell_help(_args: &[String]) -> i32 {
+    println!("A simple shell built to understand how processes work.");
+    println!("The following functions are builtin:");
+    let builtin_str = ["cd", "help", "exit"];
+    for (i, builtin) in builtin_str.iter().enumerate() {
+        println!("\t {}. {}", i + 1, builtin);
+    }
+    1
+}
+
+/// Handles exit request.
+/// Returns an integer status code (C equivalent of int).
+pub fn bhshell_exit(_args: &[String]) -> i32 {
+    0
+}
+
+/// Returns the number of built-in commands.
+pub fn bhshell_num_builtins() -> i32 {
+    3
+}
+
+/// Writes to a redirected file descriptor array.
+/// In C, this took an array 'int redirect_fd[2]' and a pointer to 'command'.
+/// In this safe Rust implementation, redirection is handled directly in bhshell_launch
+/// using std::process::Command and std::fs::File, so this manual write is not needed.
+pub fn write_to_redirect(_redirect_fd: &mut [i32; 2], _cmd: &mut Command) {
+    // This function is kept for interface compatibility.
+    // The functionality is implemented via std::process::Command stdout redirection.
+}
+```
+
+{{main.rs}}
+```rust
+mod bhshell;
+mod dynamicarr;
+mod input;
+mod xalloc;
+
+use crate::bhshell::bhshell_loop;
+
+/// Entry point of the application.
+/// In C, this was 'int main(void)'.
+pub fn main() {
+    bhshell_loop();
+}
+```

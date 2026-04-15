@@ -1,0 +1,357 @@
+{{hamta.rs}}
+```rust
+// Generated Rust Code
+
+// Constants
+pub const FNV_PRIME: u64 = 1099511628211;
+pub const FNV_BASE: u64 = 14695981039346656037;
+pub const HAMT_NODE_T_FLAG: u32 = 1;
+pub const KEY_VALUE_T_FLAG: u32 = 0;
+pub const CHUNK_SIZE: usize = 6;
+
+// Type Definitions
+pub type HashFn<T> = fn(&T) -> u32;
+pub type EqualsFn<T> = fn(&T, &T) -> bool;
+pub type StrFn<T> = fn(&T) -> String;
+
+#[derive(Clone)]
+pub struct KeyValue<T, U> {
+    pub key: T,
+    pub value: U,
+}
+
+impl<T, U> KeyValue<T, U> {}
+
+#[derive(Clone)]
+pub enum HamtNode<T, U> {
+    Leaf(Option<KeyValue<T, U>>),
+    Sub(SubNode<T, U>),
+}
+
+impl<T: Clone, U: Clone> HamtNode<T, U> {
+    pub fn hamt_node_search(
+        &self,
+        hash: u32,
+        lvl: i32,
+        key: &T,
+        equals_fn: EqualsFn<T>,
+    ) -> Option<&KeyValue<T, U>> {
+        match self {
+            HamtNode::Leaf(Some(kv)) => {
+                if equals_fn(&kv.key, key) {
+                    Some(kv)
+                } else {
+                    None
+                }
+            }
+            HamtNode::Leaf(None) => None,
+            HamtNode::Sub(sub) => {
+                let symbol = hamt_get_symbol(hash, lvl) as u32;
+                let shifted = sub.bitmap >> symbol;
+                let child_exists = (shifted & 1) != 0;
+                if child_exists {
+                    let child_position = (shifted >> 1).count_ones() as usize;
+                    sub.children[child_position].hamt_node_search(hash, lvl + 1, key, equals_fn)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    pub fn hamt_node_insert(
+        &mut self,
+        hash: u32,
+        lvl: i32,
+        key: T,
+        value: U,
+        hash_fn: HashFn<T>,
+        equals_fn: EqualsFn<T>,
+    ) -> (bool, Option<KeyValue<T, U>>) {
+        assert!((lvl as usize) * CHUNK_SIZE <= 32);
+
+        match self {
+            HamtNode::Leaf(slot) => {
+                if let Some(existing) = slot {
+                    if equals_fn(&existing.key, &key) {
+                        let conflict = KeyValue {
+                            key: existing.key.clone(),
+                            value: existing.value.clone(),
+                        };
+                        existing.key = key;
+                        existing.value = value;
+                        return (false, Some(conflict));
+                    }
+
+                    let original_hash = hash_fn(&existing.key);
+                    let original_next_symbol = hamt_get_symbol(original_hash, lvl) as u32;
+                    let old_kv = existing.clone();
+
+                    *self = HamtNode::Sub(SubNode {
+                        bitmap: 1u32 << original_next_symbol,
+                        children: vec![HamtNode::Leaf(Some(old_kv))],
+                    });
+
+                    self.hamt_node_insert(hash, lvl, key, value, hash_fn, equals_fn)
+                } else {
+                    *slot = Some(KeyValue { key, value });
+                    (true, None)
+                }
+            }
+            HamtNode::Sub(sub) => {
+                let symbol = hamt_get_symbol(hash, lvl) as u32;
+                let shifted = sub.bitmap >> symbol;
+                let child_exists = (shifted & 1) != 0;
+
+                if child_exists {
+                    let child_position = (shifted >> 1).count_ones() as usize;
+                    sub.children[child_position]
+                        .hamt_node_insert(hash, lvl + 1, key, value, hash_fn, equals_fn)
+                } else {
+                    let children_size = sub.bitmap.count_ones() as usize;
+                    let children_before = (shifted >> 1).count_ones() as usize;
+                    assert!(children_size > 0);
+
+                    sub.bitmap |= 1u32 << symbol;
+                    sub.children.insert(
+                        children_before,
+                        HamtNode::Leaf(Some(KeyValue { key, value })),
+                    );
+                    (true, None)
+                }
+            }
+        }
+    }
+
+    pub fn hamt_node_remove(
+        &mut self,
+        hash: u32,
+        lvl: i32,
+        key: &T,
+        equals_fn: EqualsFn<T>,
+    ) -> Option<KeyValue<T, U>> {
+        match self {
+            HamtNode::Leaf(_) => None,
+            HamtNode::Sub(sub) => {
+                let symbol = hamt_get_symbol(hash, lvl) as u32;
+                let shifted = sub.bitmap >> symbol;
+                let child_exists = (shifted & 1) != 0;
+
+                if !child_exists {
+                    return None;
+                }
+
+                let child_position = (shifted >> 1).count_ones() as usize;
+                let removed = match &mut sub.children[child_position] {
+                    HamtNode::Leaf(Some(kv)) => {
+                        if equals_fn(&kv.key, key) {
+                            let removed_kv = kv.clone();
+                            sub.bitmap &= !(1u32 << symbol);
+                            sub.children.remove(child_position);
+                            Some(removed_kv)
+                        } else {
+                            None
+                        }
+                    }
+                    HamtNode::Leaf(None) => None,
+                    child @ HamtNode::Sub(_) => child.hamt_node_remove(hash, lvl + 1, key, equals_fn),
+                };
+
+                let children_size = sub.bitmap.count_ones() as usize;
+                if children_size == 1 {
+                    let only_remaining_child = sub.children[0].clone();
+                    if let HamtNode::Leaf(_) = only_remaining_child {
+                        *self = only_remaining_child;
+                    }
+                }
+
+                removed
+            }
+        }
+    }
+
+    pub fn hamt_node_destroy(self) {
+        match self {
+            HamtNode::Leaf(_) => {}
+            HamtNode::Sub(sub) => {
+                for child in sub.children {
+                    child.hamt_node_destroy();
+                }
+            }
+        }
+    }
+
+    pub fn hamt_node_print(&self, lvl: i32, str_fn_key: StrFn<T>, str_fn_val: StrFn<U>) {
+        for _ in 0..(lvl * 2) {
+            print!(" ");
+        }
+
+        match self {
+            HamtNode::Leaf(Some(leaf)) => {
+                println!(
+                    "{{{} -> {}}}",
+                    str_fn_key(&leaf.key),
+                    str_fn_val(&leaf.value)
+                );
+            }
+            HamtNode::Leaf(None) => {
+                println!("{{}}");
+            }
+            HamtNode::Sub(sub) => {
+                println!("bitmap: {:08x}", sub.bitmap);
+                for child in &sub.children {
+                    child.hamt_node_print(lvl + 1, str_fn_key, str_fn_val);
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct SubNode<T, U> {
+    pub bitmap: u32,
+    pub children: Vec<HamtNode<T, U>>,
+}
+
+pub struct Hamt<T, U> {
+    pub root: Option<Box<HamtNode<T, U>>>,
+    pub size: i32,
+    pub hash_fn: HashFn<T>,
+    pub equals_fn: EqualsFn<T>,
+}
+
+impl<T: Clone, U: Clone> Hamt<T, U> {
+    pub fn new_hamt(hash_fn: HashFn<T>, equals_fn: EqualsFn<T>) -> Self {
+        Self {
+            root: Some(Box::new(HamtNode::Leaf(None))),
+            size: 0,
+            hash_fn,
+            equals_fn,
+        }
+    }
+
+    pub fn hamt_size(&self) -> i32 {
+        self.size
+    }
+
+    pub fn hamt_set(&mut self, key: T, value: U) -> Option<KeyValue<T, U>> {
+        let hash = (self.hash_fn)(&key);
+
+        if self.size == 0 {
+            if let Some(root) = self.root.as_mut() {
+                *root = Box::new(HamtNode::Leaf(Some(KeyValue { key, value })));
+            } else {
+                self.root = Some(Box::new(HamtNode::Leaf(Some(KeyValue { key, value }))));
+            }
+            self.size = 1;
+            return None;
+        }
+
+        let root = self.root.as_mut().expect("root must exist");
+        let (inserted, conflict) =
+            root.hamt_node_insert(hash, 0, key, value, self.hash_fn, self.equals_fn);
+        if inserted {
+            self.size += 1;
+            None
+        } else {
+            conflict
+        }
+    }
+
+    pub fn hamt_search(&self, key: &T) -> Option<&KeyValue<T, U>> {
+        let hash = (self.hash_fn)(key);
+        self.root
+            .as_ref()
+            .and_then(|root| root.hamt_node_search(hash, 0, key, self.equals_fn))
+    }
+
+    pub fn hamt_remove(&mut self, key: &T) -> Option<KeyValue<T, U>> {
+        let hash = (self.hash_fn)(key);
+        if self.size == 0 {
+            return None;
+        }
+
+        let removed = if self.size == 1 {
+            match self.root.as_mut() {
+                Some(root) => match &mut **root {
+                    HamtNode::Leaf(Some(kv)) => Some(kv.clone()),
+                    _ => None,
+                },
+                None => None,
+            }
+        } else {
+            self.root
+                .as_mut()
+                .and_then(|root| root.hamt_node_remove(hash, 0, key, self.equals_fn))
+        };
+
+        if removed.is_some() {
+            self.size -= 1;
+            if self.size == 0 {
+                self.root = Some(Box::new(HamtNode::Leaf(None)));
+            }
+        }
+
+        removed
+    }
+
+    pub fn hamt_destroy(self) {
+        if let Some(root) = self.root {
+            root.hamt_node_destroy();
+        }
+    }
+
+    pub fn hamt_print(&self, str_fn_key: StrFn<T>, str_fn_val: StrFn<U>) {
+        if self.size > 0 {
+            if let Some(root) = &self.root {
+                root.hamt_node_print(0, str_fn_key, str_fn_val);
+            }
+        } else {
+            println!("{{}}");
+        }
+        println!("---\n");
+    }
+}
+
+// Function Declarations
+pub fn hamt_int_hash(key: &i32) -> u32 {
+    hamt_fnv1_hash(&key.to_ne_bytes())
+}
+
+pub fn hamt_str_hash(key: &str) -> u32 {
+    let mut hash = FNV_BASE;
+    for b in key.as_bytes() {
+        hash = hash.wrapping_mul(FNV_PRIME);
+        hash ^= *b as u64;
+    }
+    hash as u32
+}
+
+pub fn hamt_int_equals(a: &i32, b: &i32) -> bool {
+    a == b
+}
+
+pub fn hamt_str_equals(a: &str, b: &str) -> bool {
+    a == b
+}
+
+pub fn hamt_fnv1_hash(key: &[u8]) -> u32 {
+    let mut hash = FNV_BASE;
+    for b in key {
+        hash = hash.wrapping_mul(FNV_PRIME);
+        hash ^= *b as u64;
+    }
+    hash as u32
+}
+
+pub fn hamt_get_symbol(hash: u32, lvl: i32) -> i32 {
+    let left = (lvl as usize) * CHUNK_SIZE;
+    let left_plus_chunk = left + CHUNK_SIZE;
+    let mut right = 32usize.saturating_sub(left_plus_chunk);
+    if left_plus_chunk > 32 {
+        right = 0;
+    }
+    let symbol = hash << left;
+    (symbol >> (right + left)) as i32
+}
+```

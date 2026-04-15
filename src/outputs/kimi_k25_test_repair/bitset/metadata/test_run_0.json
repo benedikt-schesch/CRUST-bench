@@ -1,0 +1,64 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 12 tests
+test test_bitset_all ... FAILED
+test test_bitset_any ... FAILED
+test test_bitset_count ... FAILED
+test test_bitset_flip ... ok
+test test_bitset_new ... ok
+test test_bitset_none ... FAILED
+test test_bitset_reset ... ok
+test test_bitset_set ... FAILED
+test test_bitset_size ... ok
+test test_bitset_read_write ... ok
+test test_bitset_test ... FAILED
+test test_bitset_to_string ... ok
+
+failures:
+
+---- test_bitset_all stdout ----
+
+thread 'test_bitset_all' (562096) panicked at bitset/src/bitset.rs:94:15:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_bitset_any stdout ----
+
+thread 'test_bitset_any' (562097) panicked at bitset/src/bitset.rs:94:15:
+attempt to subtract with overflow
+
+---- test_bitset_count stdout ----
+
+thread 'test_bitset_count' (562098) panicked at bitset/src/bitset.rs:94:15:
+attempt to subtract with overflow
+
+---- test_bitset_none stdout ----
+
+thread 'test_bitset_none' (562101) panicked at bitset/src/bitset.rs:94:15:
+attempt to subtract with overflow
+
+---- test_bitset_set stdout ----
+
+thread 'test_bitset_set' (562104) panicked at bitset/src/bitset.rs:94:15:
+attempt to subtract with overflow
+
+---- test_bitset_test stdout ----
+
+thread 'test_bitset_test' (562106) panicked at bitset/src/bitset.rs:94:15:
+attempt to subtract with overflow
+
+
+failures:
+    test_bitset_all
+    test_bitset_any
+    test_bitset_count
+    test_bitset_none
+    test_bitset_set
+    test_bitset_test
+
+test result: FAILED. 6 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

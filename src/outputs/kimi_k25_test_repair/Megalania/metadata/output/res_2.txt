@@ -1,0 +1,54 @@
+ {{lzma_packet.rs}}
+```rust
+//! LZMA Packet definitions and types.
+
+/// Types of LZMA packets used in the compression algorithm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LZMAPacketType {
+    /// Literal byte packet (single uncompressed byte).
+    Literal,
+    /// Match packet (backward reference with length and distance).
+    Match,
+    /// Short repeat packet (short distance repeat).
+    ShortRep,
+    /// Long repeat packet (long distance repeat).
+    LongRep,
+}
+
+/// Represents a single LZMA packet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LZMAPacket {
+    pub packet_type: LZMAPacketType,
+    pub length: usize,
+    pub distance: u32,
+}
+
+impl LZMAPacket {
+    /// Creates a new literal packet.
+    pub fn literal() -> Self {
+        Self {
+            packet_type: LZMAPacketType::Literal,
+            length: 1,
+            distance: 0,
+        }
+    }
+
+    /// Creates a new match packet.
+    pub fn match_packet(length: usize, distance: u32) -> Self {
+        Self {
+            packet_type: LZMAPacketType::Match,
+            length,
+            distance,
+        }
+    }
+
+    /// Creates a new short repeat packet.
+    pub fn short_rep_packet() -> Self {
+        Self {
+            packet_type: LZMAPacketType::ShortRep,
+            length: 1,
+            distance: 0,
+        }
+    }
+}
+```

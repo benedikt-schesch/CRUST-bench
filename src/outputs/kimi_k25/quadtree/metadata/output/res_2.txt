@@ -1,0 +1,89 @@
+ {{quadtree.rs}}
+```rust
+/// Represents a point in 2D space
+#[derive(Debug, Clone)]
+pub struct QuadtreePoint {
+    pub x: f64,
+    pub y: f64,
+}
+
+impl QuadtreePoint {
+    /// Creates a new QuadtreePoint
+    pub fn quadtree_point_new(x: f64, y: f64) -> Self {
+        Self { x, y }
+    }
+}
+
+/// Represents the bounds of a quadtree node
+#[derive(Debug, Clone)]
+pub struct QuadtreeBounds {
+    pub min_x: f64,
+    pub min_y: f64,
+    pub max_x: f64,
+    pub max_y: f64,
+}
+
+impl QuadtreeBounds {
+    /// Creates a new QuadtreeBounds with default values
+    pub fn quadtree_bounds_new() -> Self {
+        Self {
+            min_x: 0.0,
+            min_y: 0.0,
+            max_x: 0.0,
+            max_y: 0.0,
+        }
+    }
+}
+
+/// Represents a node in the quadtree
+pub struct QuadtreeNode<T> {
+    pub bounds: QuadtreeBounds,
+    pub points: Vec<(QuadtreePoint, T)>,
+    pub children: [Option<Box<QuadtreeNode<T>>>; 4],
+}
+
+impl<T> QuadtreeNode<T> {
+    /// Creates a new QuadtreeNode
+    pub fn quadtree_node_new() -> Self {
+        Self {
+            bounds: QuadtreeBounds::quadtree_bounds_new(),
+            points: Vec::new(),
+            children: [None, None, None, None],
+        }
+    }
+}
+
+/// Represents the quadtree data structure
+pub struct Quadtree<T> {
+    pub root: Option<Box<QuadtreeNode<T>>>,
+    pub bounds: QuadtreeBounds,
+}
+
+impl<T> Quadtree<T> {
+    /// Creates a new Quadtree with the specified bounds
+    pub fn quadtree_new(min_x: f64, min_y: f64, max_x: f64, max_y: f64) -> Self {
+        let bounds = QuadtreeBounds {
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+        };
+        let mut root = Box::new(QuadtreeNode::quadtree_node_new());
+        root.bounds = bounds.clone();
+        Self {
+            root: Some(root),
+            bounds,
+        }
+    }
+}
+
+/// Nested module to satisfy the expected import path `quadtree::quadtree::quadtree::*`
+pub mod quadtree {
+    pub use super::*;
+}
+```
+
+{{lib.rs}}
+```rust
+pub mod quadtree;
+```

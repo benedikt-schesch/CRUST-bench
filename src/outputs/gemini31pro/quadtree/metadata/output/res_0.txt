@@ -1,0 +1,13 @@
+```rust
+// Generated Rust Code
+#[path = "quadtree.rs"]
+pub mod quadtree_impl;
+
+pub mod quadtree {
+    pub use crate::quadtree_impl::*;
+    
+    pub mod quadtree {
+        pub use crate::quadtree_impl::*;
+    }
+}
+```

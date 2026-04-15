@@ -1,0 +1,195 @@
+ {{coroutine.rs}}
+```rust
+use std::any::Any;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::thread::{self, Thread, park, unpark};
+
+pub const COROUTINE_DEAD: i32 = 0;
+pub const COROUTINE_READY: i32 = 1;
+pub const COROUTINE_RUNNING: i32 = 2;
+pub const COROUTINE_SUSPEND: i32 = 3;
+pub const STACK_SIZE: usize = 1024 * 1024;
+pub const DEFAULT_COROUTINE: usize = 16;
+
+pub type CoroutineFunc = fn(schedule: &mut Schedule, data: &mut dyn Any);
+
+pub struct Coroutine {
+    pub func: CoroutineFunc,
+    pub data: Box<dyn Any>,
+    pub cap: isize,
+    pub size: isize,
+    pub status: i32,
+    pub stack: Option<Box<[u8]>>,
+}
+
+pub struct Schedule {
+    pub stack: Box<[u8]>,
+    pub nco: usize,
+    pub cap: usize,
+    pub running: i32,
+    pub co: Vec<Option<Box<Coroutine>>>,
+}
+
+// Global state to store thread handles since we cannot add fields to the structs
+lazy_static::lazy_static! {
+    static ref COROUTINE_THREADS: Mutex<HashMap<usize, Thread>> = Mutex::new(HashMap::new());
+    static ref MAIN_THREAD: Mutex<Option<Thread>> = Mutex::new(None);
+}
+
+pub fn coroutine_open() -> Box<Schedule> {
+    *MAIN_THREAD.lock().unwrap() = Some(thread::current());
+    Box::new(Schedule {
+        stack: vec![0u8; STACK_SIZE].into_boxed_slice(),
+        nco: 0,
+        cap: DEFAULT_COROUTINE,
+        running: -1,
+        co: vec![None; DEFAULT_COROUTINE],
+    })
+}
+
+pub fn coroutine_close(schedule: Box<Schedule>) {
+    // Clean up any remaining threads
+    let mut threads = COROUTINE_THREADS.lock().unwrap();
+    for (_id, thread) in threads.drain() {
+        // We can't easily join here since threads might be parked,
+        // but dropping the schedule will allow the program to exit
+        let _ = thread;
+    }
+    drop(threads);
+    // Drop the schedule
+    drop(schedule);
+    *MAIN_THREAD.lock().unwrap() = None;
+}
+
+pub fn coroutine_new(schedule: &mut Schedule, func: CoroutineFunc, data: Box<dyn Any>) -> i32 {
+    let co = Box::new(Coroutine {
+        func,
+        data,
+        cap: 0,
+        size: 0,
+        status: COROUTINE_READY,
+        stack: None,
+    });
+
+    let id: i32;
+    if schedule.nco >= schedule.cap {
+        // Expand capacity
+        id = schedule.cap as i32;
+        let new_cap = schedule.cap * 2;
+        schedule.co.resize(new_cap, None);
+        schedule.co[id as usize] = Some(co);
+        schedule.cap = new_cap;
+    } else {
+        // Find empty slot
+        let mut found = false;
+        for i in 0..schedule.cap {
+            let idx = (i + schedule.nco) % schedule.cap;
+            if schedule.co[idx].is_none() {
+                id = idx as i32;
+                schedule.co[idx] = Some(co);
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            panic!("Failed to find empty slot for coroutine");
+        }
+        id = (schedule.nco % schedule.cap) as i32;
+    }
+    
+    schedule.nco += 1;
+    
+    // Create thread for this coroutine
+    let schedule_ptr = schedule as *mut Schedule;
+    let id_usize = id as usize;
+    
+    let handle = thread::spawn(move || {
+        // Wait until first resume
+        park();
+        
+        // SAFETY: We assume the schedule is valid and the main thread is parked
+        // while this coroutine is running, ensuring exclusive access
+        unsafe {
+            let s = &mut *schedule_ptr;
+            if let Some(ref mut co) = s.co[id_usize] {
+                if co.status == COROUTINE_READY {
+                    co.status = COROUTINE_RUNNING;
+                    (co.func)(s, &mut *co.data);
+                    co.status = COROUTINE_DEAD;
+                    s.nco -= 1;
+                }
+            }
+            s.running = -1;
+            if let Some(ref main) = *MAIN_THREAD.lock().unwrap() {
+                unpark(main.clone());
+            }
+        }
+    });
+    
+    COROUTINE_THREADS.lock().unwrap().insert(id as usize, handle.thread().clone());
+    
+    id
+}
+
+pub fn coroutine_resume(schedule: &mut Schedule, id: i32) {
+    assert!(schedule.running == -1);
+    assert!(id >= 0 && id < schedule.cap as i32);
+    
+    let id_usize = id as usize;
+    if schedule.co[id_usize].is_none() {
+        return;
+    }
+    
+    let status = schedule.co[id_usize].as_ref().unwrap().status;
+    
+    match status {
+        COROUTINE_READY | COROUTINE_SUSPEND => {
+            schedule.running = id;
+            schedule.co[id_usize].as_mut().unwrap().status = COROUTINE_RUNNING;
+            
+            // Unpark the coroutine thread
+            if let Some(thread) = COROUTINE_THREADS.lock().unwrap().get(&id_usize) {
+                unpark(thread.clone());
+            }
+            
+            // Park the main thread until coroutine yields or finishes
+            park();
+        }
+        _ => {
+            panic!("Invalid coroutine status");
+        }
+    }
+}
+
+pub fn coroutine_yield(schedule: &mut Schedule) {
+    let id = schedule.running;
+    assert!(id >= 0);
+    
+    let id_usize = id as usize;
+    if let Some(ref mut co) = schedule.co[id_usize] {
+        co.status = COROUTINE_SUSPEND;
+    }
+    schedule.running = -1;
+    
+    // Unpark main thread
+    if let Some(ref main) = *MAIN_THREAD.lock().unwrap() {
+        unpark(main.clone());
+    }
+    
+    // Park this coroutine thread
+    park();
+}
+
+pub fn coroutine_status(schedule: &Schedule, id: i32) -> i32 {
+    assert!(id >= 0 && id < schedule.cap as i32);
+    if schedule.co[id as usize].is_none() {
+        return COROUTINE_DEAD;
+    }
+    schedule.co[id as usize].as_ref().unwrap().status
+}
+
+pub fn coroutine_running(schedule: &Schedule) -> i32 {
+    schedule.running
+}
+```

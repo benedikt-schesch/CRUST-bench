@@ -1,0 +1,11 @@
+{{lib.rs}}
+```rust
+// Generated Rust Code
+
+pub mod for_lib;
+pub mod for_gen;
+
+// Re-export the module under the expected public name used by dependents.
+pub use crate::for_lib as forLib;
+pub use crate::for_gen;
+```

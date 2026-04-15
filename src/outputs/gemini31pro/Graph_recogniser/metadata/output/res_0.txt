@@ -1,0 +1,11 @@
+```rust
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod check;
+pub mod cuckoohash;
+pub mod defs;
+pub mod hash;
+pub mod openhash;
+pub mod log;
+```

@@ -1,0 +1,35 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test test_clear ... ok
+test test_create ... ok
+test test_clear_all ... ok
+test test_set_all ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test test_fst_compile ... FAILED
+test test_test_equal ... ok
+
+failures:
+
+---- test_fst_compile stdout ----
+
+thread 'test_fst_compile' (212387) panicked at fslib/src/bin/test_compile.rs:32:5:
+assertion `left == right` failed
+  left: 0
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_fst_compile
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

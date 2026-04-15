@@ -1,0 +1,412 @@
+project,error_code,error_message,file_path,row,col
+proj_2DPartInt,E0433,failed to resolve: use of unresolved module or unlinked crate `twoDPartInt`,proj_2DPartInt/src/test.rs,1,5
+proj_2DPartInt,E0433,failed to resolve: use of unresolved module or unlinked crate `twoDPartInt`,proj_2DPartInt/src/test.rs,2,5
+proj_42_Kocaeli_Printf,No errors,No errors,No errors,No errors,No errors
+aes128_SIMD,No errors,No errors,No errors,No errors,No errors
+amp,No errors,No errors,No errors,No errors,No errors
+approxidate,E0432,unresolved import `approxidate::approxidate`,approxidate/src/bin/test.rs,1,5
+avalanche,No errors,No errors,No errors,No errors,No errors
+bhshell,No errors,No errors,No errors,No errors,No errors
+bigint,E0599,no function or associated item named `from_int` found for struct `BigInt` in the current scope,bigint/src/bin/test1.rs,4,30
+bigint,E0599,no function or associated item named `from_int` found for struct `BigInt` in the current scope,bigint/src/bin/test1.rs,5,25
+bigint,E0599,no function or associated item named `from_int` found for struct `BigInt` in the current scope,bigint/src/bin/test1.rs,9,28
+bitset,No errors,No errors,No errors,No errors,No errors
+blt,E0308,mismatched types,blt/src/bin/blt_test.rs,64,34
+bostree,E0282,type annotations needed,bostree/src/timing.rs,12,37
+bostree,E0432,unresolved import `Bostree`,bostree/src/remove_bug.rs,1,5
+bostree,E0432,unresolved import `Bostree`,bostree/src/remove_bug_2.rs,1,5
+bostree,E0432,unresolved import `Bostree`,bostree/src/timing.rs,1,5
+bostree,E0433,failed to resolve: use of undeclared type `Bostree`,bostree/src/remove_bug.rs,2,5
+bostree,E0433,failed to resolve: use of undeclared type `Bostree`,bostree/src/remove_bug_2.rs,2,5
+bostree,E0433,failed to resolve: use of undeclared type `Bostree`,bostree/src/timing.rs,2,5
+btree_map,No errors,No errors,No errors,No errors,No errors
+c_aces,No errors,No errors,No errors,No errors,No errors
+carrays,No errors,No errors,No errors,No errors,No errors
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSAContext` in this scope",c_blind_rsa_signatures/src/test.rs,3,19
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindMessage` in this scope",c_blind_rsa_signatures/src/test.rs,8,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindingSecret` in this scope",c_blind_rsa_signatures/src/test.rs,12,25
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindSignature` in this scope",c_blind_rsa_signatures/src/test.rs,16,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSASignature` in this scope",c_blind_rsa_signatures/src/test.rs,20,15
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSASerializedKey` in this scope",c_blind_rsa_signatures/src/test.rs,27,18
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSASerializedKey` in this scope",c_blind_rsa_signatures/src/test.rs,31,18
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSAContext` in this scope",c_blind_rsa_signatures/src/test.rs,38,19
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindMessage` in this scope",c_blind_rsa_signatures/src/test.rs,43,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindingSecret` in this scope",c_blind_rsa_signatures/src/test.rs,47,25
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindSignature` in this scope",c_blind_rsa_signatures/src/test.rs,51,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSASignature` in this scope",c_blind_rsa_signatures/src/test.rs,55,15
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindSignature` in this scope",c_blind_rsa_signatures/src/test.rs,59,22
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSAContext` in this scope",c_blind_rsa_signatures/src/test.rs,63,19
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindMessage` in this scope",c_blind_rsa_signatures/src/test.rs,68,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindingSecret` in this scope",c_blind_rsa_signatures/src/test.rs,72,25
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSABlindSignature` in this scope",c_blind_rsa_signatures/src/test.rs,76,21
+c_blind_rsa_signatures,E0422,"cannot find struct, variant or union type `BRSASignature` in this scope",c_blind_rsa_signatures/src/test.rs,80,15
+c_blind_rsa_signatures,E0433,failed to resolve: use of unresolved module or unlinked crate `c_blind_rsa_signatures`,c_blind_rsa_signatures/src/test.rs,1,5
+c_blind_rsa_signatures,E0433,failed to resolve: use of undeclared type `BRSAHashFunction`,c_blind_rsa_signatures/src/test.rs,5,16
+c_blind_rsa_signatures,E0433,failed to resolve: use of undeclared type `BRSAPublicKey`,c_blind_rsa_signatures/src/test.rs,25,14
+c_blind_rsa_signatures,E0433,failed to resolve: use of undeclared type `BRSASecretKey`,c_blind_rsa_signatures/src/test.rs,35,14
+c_blind_rsa_signatures,E0433,failed to resolve: use of undeclared type `BRSAHashFunction`,c_blind_rsa_signatures/src/test.rs,40,16
+c_blind_rsa_signatures,E0433,failed to resolve: use of undeclared type `BRSAHashFunction`,c_blind_rsa_signatures/src/test.rs,65,16
+cfsm,No errors,No errors,No errors,No errors,No errors
+chtrie,No errors,No errors,No errors,No errors,No errors
+CircularBuffer,No errors,No errors,No errors,No errors,No errors
+cissy,E0432,unresolved import `cissy::range::range`,cissy/src/bin/test_range.rs,1,19
+cJSON,No errors,No errors,No errors,No errors,No errors
+clhash,E0432,"unresolved imports `clhash::clhash::get_random_key_for_clhash`, `clhash::clhash::get_random_key_for_clhash`",clhash/src/example.rs,1,30
+clhash,E0433,failed to resolve: use of unresolved module or unlinked crate `clhash`,clhash/src/example.rs,1,5
+clhash,E0433,failed to resolve: use of unresolved module or unlinked crate `clhash`,clhash/src/unit.rs,1,5
+clog,E0432,unresolved import `clog::clog`,clog/src/bin/test.rs,1,5
+coroutine,No errors,No errors,No errors,No errors,No errors
+cset,E0432,unresolved import `cset`,cset/src/test.rs,1,5
+c_string,No errors,No errors,No errors,No errors,No errors
+csyncmers,No errors,No errors,No errors,No errors,No errors
+dict,E0282,type annotations needed,dict/src/test2.rs,6,9
+dict,E0282,type annotations needed,dict/src/test2.rs,6,30
+dict,E0433,failed to resolve: use of unresolved module or unlinked crate `dict`,dict/src/test0.rs,1,5
+dict,E0433,failed to resolve: use of unresolved module or unlinked crate `dict`,dict/src/test1.rs,1,5
+dict,E0433,failed to resolve: use of unresolved module or unlinked crate `dict`,dict/src/test2.rs,1,5
+dict,E0433,failed to resolve: use of unresolved module or unlinked crate `dict`,dict/src/test3.rs,1,5
+dict,E0433,failed to resolve: use of unresolved module or unlinked crate `dict`,dict/src/test4.rs,1,5
+dict,E0433,failed to resolve: use of unresolved module or unlinked crate `dict`,dict/src/test5.rs,1,5
+emlang,No errors,No errors,No errors,No errors,No errors
+expr,No errors,No errors,No errors,No errors,No errors
+FastHamming,No errors,No errors,No errors,No errors,No errors
+fft,No errors,No errors,No errors,No errors,No errors
+file2str,No errors,No errors,No errors,No errors,No errors
+fleur,No errors,No errors,No errors,No errors,No errors
+fs_c,No errors,No errors,No errors,No errors,No errors
+fslib,No errors,No errors,No errors,No errors,No errors
+Genetic_neural_network_for_simple_control,E0599,no function or associated item named `default` found for struct `NeuralNetwork` in the current scope,Genetic_neural_network_for_simple_control/src/test_neural_network.rs,20,30
+geofence,No errors,No errors,No errors,No errors,No errors
+gfc,No errors,No errors,No errors,No errors,No errors
+gorilla_paper_encode,No errors,No errors,No errors,No errors,No errors
+Graph_recogniser,No errors,No errors,No errors,No errors,No errors
+hamta,No errors,No errors,No errors,No errors,No errors
+Holdem_Odds,No errors,No errors,No errors,No errors,No errors
+hydra,No errors,No errors,No errors,No errors,No errors
+impcheck,No errors,No errors,No errors,No errors,No errors
+inversion_list,No errors,No errors,No errors,No errors,No errors
+jccc,E0432,unresolved import `jccc`,jccc/src/test_main.rs,1,5
+jccc,E0433,failed to resolve: use of unresolved module or unlinked crate `jccc`,jccc/src/test_main.rs,1,5
+jccc,E0433,failed to resolve: use of unresolved module or unlinked crate `jccc`,jccc/src/test_main.rs,2,5
+jccc,E0433,failed to resolve: use of unresolved module or unlinked crate `jccc`,jccc/src/test_main.rs,3,5
+jccc,E0433,failed to resolve: use of unresolved module or unlinked crate `jccc`,jccc/src/test_main.rs,4,5
+jccc,E0433,failed to resolve: use of unresolved module or unlinked crate `jccc`,jccc/src/test_main.rs,5,5
+kairoCompiler,No errors,No errors,No errors,No errors,No errors
+kd3,E0308,mismatched types,kd3/src/bin/test.rs,42,22
+lambda_calculus_eval,No errors,No errors,No errors,No errors,No errors
+leftpad,No errors,No errors,No errors,No errors,No errors
+lib2bit,No errors,No errors,No errors,No errors,No errors
+libbase122,No errors,No errors,No errors,No errors,No errors
+libbeaufort,E0432,unresolved import `crate::BEAUFORT_ALPHA`,libbeaufort/src/decrypt.rs,2,5
+libbeaufort,E0432,unresolved import `crate::BEAUFORT_ALPHA`,libbeaufort/src/encrypt.rs,2,5
+libfor,E0425,cannot find function `for_compressed_size_sorted` in module `forLib`,libfor/src/bin/test.rs,45,18
+libfor,E0425,cannot find function `for_compress_sorted` in module `forLib`,libfor/src/bin/test.rs,47,18
+libfor,E0425,cannot find function `for_uncompress` in module `forLib`,libfor/src/bin/test.rs,49,18
+libfor,E0425,cannot find function `for_select` in module `forLib`,libfor/src/bin/test.rs,54,39
+libfor,E0425,cannot find function `for_linear_search` in module `forLib`,libfor/src/bin/test.rs,57,21
+libfor,E0425,cannot find function `for_lower_bound_search` in module `forLib`,libfor/src/bin/test.rs,61,21
+libfor,E0425,cannot find function `for_compressed_size_unsorted` in module `forLib`,libfor/src/bin/test.rs,81,18
+libfor,E0425,cannot find function `for_compress_unsorted` in module `forLib`,libfor/src/bin/test.rs,83,18
+libfor,E0425,cannot find function `for_uncompress` in module `forLib`,libfor/src/bin/test.rs,84,18
+libfor,E0425,cannot find function `for_select` in module `forLib`,libfor/src/bin/test.rs,90,39
+libfor,E0425,cannot find function `for_linear_search` in module `forLib`,libfor/src/bin/test.rs,93,21
+libfor,E0425,cannot find function `for_append_sorted` in module `forLib`,libfor/src/bin/test.rs,105,18
+libfor,E0425,cannot find function `for_compress_sorted` in module `forLib`,libfor/src/bin/test.rs,106,18
+libfor,E0425,cannot find function `for_append_unsorted` in module `forLib`,libfor/src/bin/test.rs,119,18
+libfor,E0425,cannot find function `for_compress_unsorted` in module `forLib`,libfor/src/bin/test.rs,120,18
+libfor,E0425,cannot find function `for_append_sorted` in module `forLib`,libfor/src/bin/test.rs,133,18
+libfor,E0425,cannot find function `for_compress_sorted` in module `forLib`,libfor/src/bin/test.rs,134,18
+libfor,E0425,cannot find function `for_select_bits` in module `forLib`,libfor/src/bin/test.rs,147,39
+libfor,E0425,cannot find function `for_linear_search_bits` in module `forLib`,libfor/src/bin/test.rs,150,21
+libfor,E0425,cannot find function `for_select_bits` in module `forLib`,libfor/src/bin/test.rs,162,39
+libfor,E0425,cannot find function `for_linear_search_bits` in module `forLib`,libfor/src/bin/test.rs,165,21
+libfor,E0425,cannot find value `pack0_32` in module `for_gen`,libfor/src/bin/test.rs,172,36
+libfor,E0425,cannot find value `unpack0_32` in module `for_gen`,libfor/src/bin/test.rs,172,55
+libfor,E0425,cannot find value `pack0_16` in module `for_gen`,libfor/src/bin/test.rs,177,36
+libfor,E0425,cannot find value `unpack0_16` in module `for_gen`,libfor/src/bin/test.rs,177,55
+libfor,E0425,cannot find value `pack0_8` in module `for_gen`,libfor/src/bin/test.rs,182,36
+libfor,E0425,cannot find value `unpack0_8` in module `for_gen`,libfor/src/bin/test.rs,182,54
+libfor,E0425,cannot find value `pack0_x` in module `for_gen`,libfor/src/bin/test.rs,187,37
+libfor,E0425,cannot find value `unpack0_x` in module `for_gen`,libfor/src/bin/test.rs,187,55
+libm17,No errors,No errors,No errors,No errors,No errors
+libpgn,No errors,No errors,No errors,No errors,No errors
+libpsbt,E0277,the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`),libpsbt/src/psbt.rs,229,38
+libpsbt,E0277,the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`),libpsbt/src/psbt.rs,230,42
+libpsbt,E0277,the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`),libpsbt/src/psbt.rs,240,42
+libpsbt,E0277,the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`),libpsbt/src/psbt.rs,250,42
+libpsbt,E0425,cannot find value `input_len` in this scope,libpsbt/src/psbt.rs,181,15
+libqueue,No errors,No errors,No errors,No errors,No errors
+libtinyfseq,No errors,No errors,No errors,No errors,No errors
+libutf,No errors,No errors,No errors,No errors,No errors
+libvcd,E0282,type annotations needed,libvcd/src/bin/test_vcd.rs,113,34
+libvcd,E0425,cannot find type `VCD` in this scope,libvcd/src/bin/test_vcd.rs,12,24
+libvcd,E0425,cannot find type `Timestamp` in this scope,libvcd/src/bin/test_vcd.rs,104,24
+libvcd,E0433,failed to resolve: use of undeclared type `VCD`,libvcd/src/bin/test_vcd.rs,91,21
+libwecan,No errors,No errors,No errors,No errors,No errors
+Linear_Algebra_C,No errors,No errors,No errors,No errors,No errors
+ljmm,No errors,No errors,No errors,No errors,No errors
+LTRE,No errors,No errors,No errors,No errors,No errors
+Math_Library_in_C,No errors,No errors,No errors,No errors,No errors
+matrix_multiplication,No errors,No errors,No errors,No errors,No errors
+mdb,E0432,unresolved import `mdb::mdb`,mdb/src/bin/tests.rs,4,10
+Megalania,No errors,No errors,No errors,No errors,No errors
+merkle_tree_c,No errors,No errors,No errors,No errors,No errors
+morton,No errors,No errors,No errors,No errors,No errors
+murmurhash_c,No errors,No errors,No errors,No errors,No errors
+mvptree,No errors,No errors,No errors,No errors,No errors
+NandC,No errors,No errors,No errors,No errors,No errors
+Phills_DHT,No errors,No errors,No errors,No errors,No errors
+quadtree,E0659,`quadtree` is ambiguous,quadtree/src/bin/test.rs,1,5
+razz_simulation,E0425,cannot find type `CardSuitRank` in this scope,razz_simulation/src/test.rs,2,30
+razz_simulation,E0425,cannot find type `Card` in this scope,razz_simulation/src/test.rs,17,62
+razz_simulation,E0425,cannot find type `ItrAction` in this scope,razz_simulation/src/test.rs,17,72
+razz_simulation,E0425,cannot find type `Card` in this scope,razz_simulation/src/test.rs,28,62
+razz_simulation,E0425,cannot find type `ItrAction` in this scope,razz_simulation/src/test.rs,28,72
+razz_simulation,E0425,cannot find type `Card` in this scope,razz_simulation/src/test.rs,38,62
+razz_simulation,E0425,cannot find type `ItrAction` in this scope,razz_simulation/src/test.rs,38,72
+razz_simulation,E0425,cannot find type `Card` in this scope,razz_simulation/src/test.rs,48,62
+razz_simulation,E0425,cannot find type `ItrAction` in this scope,razz_simulation/src/test.rs,48,72
+razz_simulation,E0425,cannot find type `Card` in this scope,razz_simulation/src/test.rs,57,54
+razz_simulation,E0425,cannot find type `ItrAction` in this scope,razz_simulation/src/test.rs,57,64
+razz_simulation,E0425,cannot find type `Card` in this scope,razz_simulation/src/test.rs,61,19
+razz_simulation,E0425,cannot find type `CardDeck` in this scope,razz_simulation/src/test.rs,62,19
+razz_simulation,E0425,cannot find type `CardHand` in this scope,razz_simulation/src/test.rs,63,19
+razz_simulation,E0425,cannot find value `sort_card_by_rank` in this scope,razz_simulation/src/test.rs,135,30
+razz_simulation,E0425,cannot find value `sort_card_by_rank` in this scope,razz_simulation/src/test.rs,152,30
+razz_simulation,E0425,cannot find value `sort_card_by_rank` in this scope,razz_simulation/src/test.rs,158,30
+razz_simulation,E0433,failed to resolve: use of unresolved module or unlinked crate `razz_simulation`,razz_simulation/src/test.rs,1,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,3,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,3,23
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,3,47
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,3,70
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,4,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,4,25
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,4,47
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,4,71
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,5,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,5,23
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,5,45
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,5,66
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,6,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,6,22
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,6,44
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,6,66
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,7,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,7,26
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,7,47
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,7,69
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,8,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,8,23
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,8,47
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,8,69
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,9,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,9,22
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,9,46
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,9,67
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,10,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,10,23
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,10,44
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,10,68
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,11,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,11,25
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,11,47
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,11,69
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,12,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,12,23
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,12,45
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,12,67
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,13,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,13,25
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,13,47
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,13,69
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,14,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,14,22
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,14,46
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,14,67
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,15,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,15,23
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,15,45
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,15,68
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,20,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,20,46
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,20,80
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,21,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,21,43
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,21,75
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,22,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/test.rs,23,8
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/test.rs,26,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,31,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,31,46
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,31,80
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,32,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,32,41
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,32,74
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/test.rs,33,8
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/test.rs,36,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,41,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,41,46
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,41,80
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,42,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,42,41
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/test.rs,43,8
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/test.rs,46,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,51,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,51,44
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/test.rs,52,8
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/test.rs,55,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `ItrAction`,razz_simulation/src/test.rs,58,1
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,64,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,64,34
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,65,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,65,32
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,66,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,66,25
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,67,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,67,23
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,69,54
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,70,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuit`,razz_simulation/src/test.rs,71,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,72,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,72,23
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,74,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,74,23
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,76,54
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,77,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuit`,razz_simulation/src/test.rs,78,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,79,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,81,54
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,82,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuit`,razz_simulation/src/test.rs,83,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,84,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,86,54
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,87,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuit`,razz_simulation/src/test.rs,88,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,89,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,91,54
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,92,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuit`,razz_simulation/src/test.rs,93,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,94,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,96,54
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,97,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuit`,razz_simulation/src/test.rs,98,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,99,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,101,54
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,102,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuit`,razz_simulation/src/test.rs,103,49
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,104,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,106,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,108,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `Card`,razz_simulation/src/test.rs,110,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,112,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,112,40
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,113,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,113,38
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,114,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,114,38
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,115,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,115,39
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,116,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,116,38
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,117,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,118,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,119,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,120,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,121,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,122,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,123,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,124,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,125,12
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,126,9
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardDeck`,razz_simulation/src/test.rs,127,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,129,48
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,130,42
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,131,48
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,132,42
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,133,48
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardDeck`,razz_simulation/src/test.rs,134,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardHand`,razz_simulation/src/test.rs,135,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,137,56
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,138,30
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,139,56
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,140,30
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,141,56
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,142,30
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,143,56
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,144,38
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,145,56
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,146,38
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,147,56
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,148,38
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,149,38
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,150,56
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardDeck`,razz_simulation/src/test.rs,151,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardHand`,razz_simulation/src/test.rs,152,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,153,30
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,154,56
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,155,38
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,156,38
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardDeck`,razz_simulation/src/test.rs,157,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardHand`,razz_simulation/src/test.rs,158,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,159,30
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,160,56
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,161,30
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,162,56
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,163,30
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardRank`,razz_simulation/src/test.rs,164,56
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,165,29
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,166,11
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardDeck`,razz_simulation/src/test.rs,168,5
+razz_simulation,E0433,failed to resolve: use of undeclared type `CardSuitRank`,razz_simulation/src/test.rs,177,13
+rbtree_lab,No errors,No errors,No errors,No errors,No errors
+recordManager,E0432,unresolved import `crate::buffer_mgr`,recordManager/src/test.rs,1,5
+recordManager,E0432,unresolved import `crate::buffer_mgr_stat`,recordManager/src/test.rs,2,5
+recordManager,E0432,unresolved import `crate::dberror`,recordManager/src/test.rs,3,5
+recordManager,E0432,unresolved import `crate::dt`,recordManager/src/test.rs,4,5
+recordManager,E0432,unresolved import `crate::expr`,recordManager/src/test.rs,5,5
+recordManager,E0432,unresolved import `crate::record_mgr`,recordManager/src/test.rs,6,5
+recordManager,E0432,unresolved import `crate::rm_serializer`,recordManager/src/test.rs,7,5
+recordManager,E0432,unresolved import `crate::storage_mgr`,recordManager/src/test.rs,8,5
+recordManager,E0432,unresolved import `crate::tables`,recordManager/src/test.rs,9,5
+rect_pack_h,No errors,No errors,No errors,No errors,No errors
+Remimu,No errors,No errors,No errors,No errors,No errors
+rhbloom,No errors,No errors,No errors,No errors,No errors
+roaring_bitmap,E0432,unresolved import `crate::rset`,roaring_bitmap/src/tests.rs,1,12
+rubiksolver,No errors,No errors,No errors,No errors,No errors
+satc,E0432,unresolved import `satc::satc`,satc/src/bin/satc_test.rs,1,5
+Simple_Config,E0425,cannot find function `cfg_parse` in this scope,Simple_Config/src/test_load_print.rs,3,7
+Simple_Config,E0433,failed to resolve: use of undeclared type `Simple_Config`,Simple_Config/src/test_get.rs,1,5
+Simple_Config,E0433,failed to resolve: use of undeclared type `Cfg`,Simple_Config/src/test_get.rs,3,11
+Simple_Config,E0433,failed to resolve: use of undeclared type `Simple_Config`,Simple_Config/src/test_load_print.rs,1,5
+Simple_Config,E0433,failed to resolve: use of undeclared type `Simple_Config`,Simple_Config/src/test_parse.rs,1,5
+simple_lang,E0433,failed to resolve: use of unresolved module or unlinked crate `simple_lang`,simple_lang/src/test_compile.rs,1,5
+simple_lang,E0433,failed to resolve: use of unresolved module or unlinked crate `simple_lang`,simple_lang/src/test_compile.rs,2,5
+simple_lang,E0433,failed to resolve: use of unresolved module or unlinked crate `simple_lang`,simple_lang/src/test_compile.rs,3,5
+simple_lang,E0433,failed to resolve: use of unresolved module or unlinked crate `simple_lang`,simple_lang/src/test_compile.rs,4,5
+simple_lang,E0433,failed to resolve: use of unresolved module or unlinked crate `simple_lang`,simple_lang/src/test_parser.rs,1,5
+simple_lang,E0433,failed to resolve: use of unresolved module or unlinked crate `simple_lang`,simple_lang/src/test_parser.rs,2,5
+simple_lang,E0433,failed to resolve: use of unresolved module or unlinked crate `simple_lang`,simple_lang/src/test_parser.rs,3,5
+simple_lang,E0433,failed to resolve: use of unresolved module or unlinked crate `simple_lang`,simple_lang/src/test_tokenize.rs,1,5
+simple_lang,E0433,failed to resolve: use of unresolved module or unlinked crate `simple_lang`,simple_lang/src/test_tokenize.rs,2,5
+Simple_Sparsehash,No errors,No errors,No errors,No errors,No errors
+SimpleXML,No errors,No errors,No errors,No errors,No errors
+skp,E0433,failed to resolve: use of unresolved module or unlinked crate `skp`,skp/src/ut_test1.rs,1,5
+skp,E0433,failed to resolve: use of unresolved module or unlinked crate `skp`,skp/src/ut_test2.rs,1,5
+skp,E0433,failed to resolve: use of unresolved module or unlinked crate `skp`,skp/src/ut_test3.rs,1,5
+SlothLang,No errors,No errors,No errors,No errors,No errors
+ted,No errors,No errors,No errors,No errors,No errors
+tisp,No errors,No errors,No errors,No errors,No errors
+totp,No errors,No errors,No errors,No errors,No errors
+ulidgen,No errors,No errors,No errors,No errors,No errors
+utf8,No errors,No errors,No errors,No errors,No errors
+VaultSync,E0063,missing fields `path` and `staged_changes` in initializer of `Repository`,VaultSync/src/bin/main_test.rs,46,16
+VaultSync,E0063,missing fields `path` and `staged_changes` in initializer of `Repository`,VaultSync/src/bin/main_test.rs,70,20
+VaultSync,E0063,missing fields `message` and `timestamp` in initializer of `Commit`,VaultSync/src/bin/main_test.rs,74,27
+VaultSync,E0063,missing fields `message` and `timestamp` in initializer of `Commit`,VaultSync/src/bin/main_test.rs,81,22
+VaultSync,E0308,mismatched types,VaultSync/src/bin/main_test.rs,49,22
+VaultSync,E0308,mismatched types,VaultSync/src/bin/main_test.rs,74,22
+vec,No errors,No errors,No errors,No errors,No errors
+worsp,E0432,unresolved import `worsp`,worsp/src/test.rs,1,5
+worsp,E0432,unresolved import `worsp`,worsp/src/test.rs,2,5
+worsp,E0432,unresolved import `worsp`,worsp/src/test.rs,3,5
+XOpt,E0432,unresolved import `crate::xopt`,XOpt/src/test.rs,1,12

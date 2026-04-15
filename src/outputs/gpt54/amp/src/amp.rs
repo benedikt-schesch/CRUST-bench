@@ -1,0 +1,104 @@
+// Generated Rust Code
+
+/// Protocol version.
+pub const AMP_VERSION: i16 = 1;
+
+/// Message struct.
+pub struct Amp {
+/// Protocol version.
+pub version: i16,
+/// Number of arguments.
+pub argc: i16,
+/// Encoded buffer.
+pub buf: String,
+}
+
+impl Amp {
+fn read_u32_be(buf: &[u8]) -> u32 {
+((buf[0] as u32) << 24)
+| ((buf[1] as u32) << 16)
+| ((buf[2] as u32) << 8)
+| (buf[3] as u32)
+}
+
+/// Decodes the given buffer into this message.
+///
+/// # Arguments
+///
+/// * `buf` - A string slice containing the encoded message.
+pub fn decode(&mut self, buf: &str) {
+let bytes = buf.as_bytes();
+if bytes.is_empty() {
+self.version = 0;
+self.argc = 0;
+self.buf.clear();
+return;
+}
+
+self.version = ((bytes[0] >> 4) as i16) as i16;
+self.argc = ((bytes[0] & 0x0f) as i16) as i16;
+self.buf = String::from_utf8_lossy(&bytes[1..]).into_owned();
+}
+
+/// Decodes and returns the next argument from the message.
+///
+/// # Returns
+///
+/// A string slice representing the next decoded argument.
+pub fn decode_arg(&mut self) -> &str {
+let bytes = self.buf.as_bytes();
+if bytes.len() < 4 {
+self.buf.clear();
+return "";
+}
+
+let len = Self::read_u32_be(&bytes[..4]) as usize;
+if bytes.len() < 4 + len {
+self.buf.clear();
+return "";
+}
+
+let arg_bytes = bytes[4..4 + len].to_vec();
+let remaining = bytes[4 + len..].to_vec();
+
+self.buf = String::from_utf8_lossy(&arg_bytes).into_owned();
+let arg_len = self.buf.len();
+let result = &self.buf[..arg_len];
+
+let _ = result;
+self.buf.push('\0');
+self.buf.pop();
+self.buf = String::from_utf8_lossy(&arg_bytes).into_owned();
+
+let ret: &str = &self.buf[..];
+let _rest = remaining;
+ret
+}
+}
+
+/// Encodes the given arguments into a message buffer.
+///
+/// # Arguments
+///
+/// * `argv` - A slice of string slices representing the arguments.
+///
+/// # Returns
+///
+/// A `String` containing the encoded message.
+pub fn amp_encode(argv: &[&str]) -> String {
+let mut out = Vec::<u8>::new();
+let argc = argv.len() as u8;
+out.push(((AMP_VERSION as u8) << 4) | (argc & 0x0f));
+
+for arg in argv {
+let bytes = arg.as_bytes();
+let len = bytes.len() as u32;
+out.push(((len >> 24) & 0xff) as u8);
+out.push(((len >> 16) & 0xff) as u8);
+out.push(((len >> 8) & 0xff) as u8);
+out.push((len & 0xff) as u8);
+out.extend_from_slice(bytes);
+}
+
+String::from_utf8_lossy(&out).into_owned()
+}

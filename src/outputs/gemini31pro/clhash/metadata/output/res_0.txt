@@ -1,0 +1,5 @@
+// Generated Rust Code
+```rust
+pub mod clhash;
+pub use clhash::*;
+```

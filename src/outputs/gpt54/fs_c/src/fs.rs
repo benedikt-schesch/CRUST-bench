@@ -1,0 +1,174 @@
+use std::fs;
+use std::io::{Error, ErrorKind, Read, Result, Write};
+use std::os::fd;
+use std::os::fd::AsFd;
+
+#[cfg(target_os = "windows")]
+pub const FS_OPEN_READ: &str = "rb";
+#[cfg(target_os = "windows")]
+pub const FS_OPEN_WRITE: &str = "wb";
+#[cfg(target_os = "windows")]
+pub const FS_OPEN_READWRITE: &str = "rwb";
+
+#[cfg(not(target_os = "windows"))]
+pub const FS_OPEN_READ: &str = "r";
+#[cfg(not(target_os = "windows"))]
+pub const FS_OPEN_WRITE: &str = "w";
+#[cfg(not(target_os = "windows"))]
+pub const FS_OPEN_READWRITE: &str = "rw";
+
+fn invalid_input(msg: &str) -> Error {
+Error::new(ErrorKind::InvalidInput, msg)
+}
+
+fn unsupported(msg: &str) -> Error {
+Error::new(ErrorKind::Unsupported, msg)
+}
+
+fn open_file_from_flags(path: &str, flags: &str) -> Result<fs::File> {
+let mut options = fs::OpenOptions::new();
+match flags {
+"r" | "rb" => {
+options.read(true);
+}
+"w" | "wb" => {
+options.write(true).create(true).truncate(true);
+}
+"rw" | "rwb" => {
+options.read(true).write(true).create(true);
+}
+_ => {
+return Err(invalid_input("invalid open flags"));
+}
+}
+options.open(path)
+}
+
+fn file_from_fd(fd: &fd::OwnedFd) -> Result<fs::File> {
+let owned = fd.as_fd().try_clone_to_owned()?;
+Ok(fs::File::from(owned))
+}
+
+pub fn fs_error(s: &str) {
+eprintln!("fs: {}: error", s);
+}
+
+pub fn fs_open(path: &str, flags: &str) -> Option<fd::OwnedFd> {
+open_file_from_flags(path, flags).ok().map(fd::OwnedFd::from)
+}
+
+pub fn fs_close(fd: fd::OwnedFd) -> Result<()> {
+drop(fd);
+Ok(())
+}
+
+pub fn fs_rename(from: &str, to: &str) -> Result<()> {
+fs::rename(from, to)
+}
+
+pub fn fs_stat(path: &str) -> Result<fs::Metadata> {
+fs::metadata(path)
+}
+
+pub fn fs_fstat(fd: &fd::OwnedFd) -> Result<fs::Metadata> {
+let file = file_from_fd(fd)?;
+file.metadata()
+}
+
+pub fn fs_lstat(path: &str) -> Result<fs::Metadata> {
+fs::symlink_metadata(path)
+}
+
+pub fn fs_ftruncate(fd: &fd::OwnedFd, length: u64) -> Result<()> {
+let file = file_from_fd(fd)?;
+file.set_len(length)
+}
+
+pub fn fs_truncate(path: &str, length: u64) -> Result<()> {
+let file = fs::OpenOptions::new()
+.write(true)
+.create(true)
+.open(path)?;
+file.set_len(length)
+}
+
+pub fn fs_chown(path: &str, uid: u32, gid: u32) -> Result<()> {
+let _ = (path, uid, gid);
+Err(unsupported("chown is not supported without FFI"))
+}
+
+pub fn fs_fchown(fd: &fd::OwnedFd, uid: u32, gid: u32) -> Result<()> {
+let _ = (fd, uid, gid);
+Err(unsupported("fchown is not supported without FFI"))
+}
+
+pub fn fs_lchown(path: &str, uid: u32, gid: u32) -> Result<()> {
+let _ = (path, uid, gid);
+Err(unsupported("lchown is not supported without FFI"))
+}
+
+pub fn fs_size(path: &str) -> Result<u64> {
+Ok(fs_stat(path)?.len())
+}
+
+pub fn fs_fsize(fd: &fd::OwnedFd) -> Result<u64> {
+Ok(fs_fstat(fd)?.len())
+}
+
+pub fn fs_read(path: &str) -> Result<Vec<u8>> {
+let fd = fs_open(path, FS_OPEN_READ)
+.ok_or_else(|| Error::new(ErrorKind::NotFound, "failed to open file"))?;
+fs_fread(&fd)
+}
+
+pub fn fs_nread(path: &str, len: u64) -> Result<Vec<u8>> {
+let fd = fs_open(path, FS_OPEN_READ)
+.ok_or_else(|| Error::new(ErrorKind::NotFound, "failed to open file"))?;
+fs_fnread(&fd, len)
+}
+
+pub fn fs_fread(fd: &fd::OwnedFd) -> Result<Vec<u8>> {
+let size = fs_fsize(fd)?;
+fs_fnread(fd, size)
+}
+
+pub fn fs_fnread(fd: &fd::OwnedFd, len: u64) -> Result<Vec<u8>> {
+let mut file = file_from_fd(fd)?;
+let mut buffer = vec![0u8; len as usize];
+let n = file.read(&mut buffer)?;
+buffer.truncate(n);
+Ok(buffer)
+}
+
+pub fn fs_write(path: &str, data: &[u8]) -> Result<u64> {
+fs_nwrite(path, data, data.len() as u64)
+}
+
+pub fn fs_nwrite(path: &str, data: &[u8], len: u64) -> Result<u64> {
+let fd = fs_open(path, FS_OPEN_WRITE).ok_or_else(|| Error::other("failed to open file"))?;
+fs_fnwrite(&fd, data, len)
+}
+
+pub fn fs_fwrite(fd: &fd::OwnedFd, data: &[u8]) -> Result<u64> {
+fs_fnwrite(fd, data, data.len() as u64)
+}
+
+pub fn fs_fnwrite(fd: &fd::OwnedFd, data: &[u8], len: u64) -> Result<u64> {
+let mut file = file_from_fd(fd)?;
+let write_len = usize::min(len as usize, data.len());
+let written = file.write(&data[..write_len])?;
+Ok(written as u64)
+}
+
+pub fn fs_mkdir(path: &str, mode: u32) -> Result<()> {
+let _ = mode;
+fs::create_dir(path)
+}
+
+pub fn fs_rmdir(path: &str) -> Result<()> {
+fs::remove_dir(path)
+}
+
+pub fn fs_exists(path: &str) -> bool {
+fs::metadata(path).is_ok()
+}

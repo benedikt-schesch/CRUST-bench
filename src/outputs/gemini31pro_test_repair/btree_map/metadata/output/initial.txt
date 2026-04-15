@@ -1,0 +1,82 @@
+```rust
+// Generated Rust Code
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::any::Any;
+
+pub const BTREE_KEY_SIZE: usize = 10;
+
+#[derive(Clone)]
+pub struct BTreeKey {
+    pub key: Vec<u8>,
+    pub len: usize,
+}
+
+#[derive(Clone)]
+pub struct Value {
+    pub value: Vec<u8>,
+    pub len: usize,
+}
+
+#[derive(Clone)]
+pub struct Entry {
+    pub key: BTreeKey,
+    pub value: Value,
+}
+
+#[derive(Clone)]
+pub struct EntryList {
+    pub entries: Vec<Entry>,
+    pub len: usize,
+    pub cap: usize,
+}
+
+#[derive(Clone)]
+pub struct Node {
+    pub key_hash: u32,
+    pub p_key: [u8; BTREE_KEY_SIZE],
+    pub key_len: usize,
+    pub value: Value,
+    pub child_left: Option<Arc<Node>>,
+    pub child_right: Option<Arc<Node>>,
+}
+
+pub struct BTree {
+    pub node: Option<Arc<Node>>,
+}
+
+impl BTree {
+    pub fn new_btree() -> Self {
+        BTree { node: None }
+    }
+
+    pub fn add_entry(&mut self, key: Vec<u8>, key_len: usize, value: Vec<u8>, value_len: usize) {
+        let n_node = Node::new_node(key, key_len, value, value_len);
+        if self.node.is_none() {
+            self.node = Some(n_node);
+            return;
+        }
+        if let Some(ref mut root) = self.node {
+            Arc::make_mut(root).add_node(n_node);
+        }
+    }
+
+    pub fn list_entries(&self) -> EntryList {
+        let cap = self.get_entry_count();
+        let mut list = EntryList {
+            entries: Vec::with_capacity(cap),
+            len: 0,
+            cap,
+        };
+        if let Some(ref root) = self.node {
+            root.list_node_entries(&mut list);
+        }
+        list
+    }
+
+    pub fn remove_entry(&mut self, key: &Vec<u8>, key_len: usize) {
+        let actual_key_len = min_size(BTREE_KEY_SIZE, key_len);
+        let mut padded_key = vec![0u8; actual_key_len];
+        let copy_len = min_size(key.len(), actual_key_len);
+        padded_key[..copy_len].copy_from_slice(&key[..copy_len]);
+        

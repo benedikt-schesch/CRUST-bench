@@ -1,0 +1,167 @@
+ {{bostree.rs}}
+```rust
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
+
+#[derive(Debug)]
+pub struct BOSTree {
+    /// The root node of the tree.
+    pub root_node: Option<Rc<RefCell<BOSNode>>>,
+    /// The key comparison function.
+    pub cmp_function: BOSTreeCmpFunction,
+    /// The optional free function for node data.
+    pub free_function: Option<BOSTreeFreeFunction>,
+}
+
+/// The node structure.
+#[derive(Debug)]
+pub struct BOSNode {
+    /// Number of nodes in the left subtree.
+    pub left_child_count: u32,
+    /// Number of nodes in the right subtree.
+    pub right_child_count: u32,
+    /// Cached depth of the node.
+    pub depth: u32,
+    /// Left child node.
+    pub left_child_node: Option<Rc<RefCell<BOSNode>>>,
+    /// Right child node.
+    pub right_child_node: Option<Rc<RefCell<BOSNode>>>,
+    /// Parent node (using a weak reference to avoid cycles).
+    pub parent_node: Option<Weak<RefCell<BOSNode>>>,
+    /// The key for this node.
+    pub key: String,
+    /// The associated data.
+    pub data: Option<String>,
+    /// Internal weak reference counter.
+    pub weak_ref_count: u8,
+    /// Validity flag for the weak reference.
+    pub weak_ref_node_valid: u8,
+}
+
+/// Type alias for a key comparison function.
+/// Should return a positive value if `b` is larger than `a`,
+/// a negative value if `a` is larger, and zero if equal.
+pub type BOSTreeCmpFunction = fn(&str, &str) -> i32;
+
+/// Type alias for a free function which will be called on nodes
+/// that are removed.
+pub type BOSTreeFreeFunction = fn(&Rc<RefCell<BOSNode>>);
+
+impl BOSTree {
+    /// Create a new tree with a mandatory comparison function and an optional free function.
+    pub fn bostree_new(
+        cmp_function: BOSTreeCmpFunction,
+        free_function: Option<BOSTreeFreeFunction>,
+    ) -> Self {
+        BOSTree {
+            root_node: None,
+            cmp_function,
+            free_function,
+        }
+    }
+
+    /// Return the number of nodes in the tree.
+    pub fn bostree_node_count(&self) -> u32 {
+        match &self.root_node {
+            Some(root) => {
+                let root_ref = root.borrow();
+                root_ref.left_child_count + root_ref.right_child_count + 1
+            }
+            None => 0,
+        }
+    }
+
+    /// Helper: return the maximum of two u32 values.
+    fn imax(i1: u32, i2: u32) -> u32 {
+        if i1 > i2 { i1 } else { i2 }
+    }
+
+    /// Helper: calculate the balance factor of a node.
+    fn bostree_balance(node: &BOSNode) -> i32 {
+        let left_depth = node
+            .left_child_node
+            .as_ref()
+            .map(|n| n.borrow().depth + 1)
+            .unwrap_or(0);
+        let right_depth = node
+            .right_child_node
+            .as_ref()
+            .map(|n| n.borrow().depth + 1)
+            .unwrap_or(0);
+        right_depth as i32 - left_depth as i32
+    }
+
+    /// Perform a right rotation around node P.
+    fn bostree_rotate_right(&mut self, p_rc: &Rc<RefCell<BOSNode>>) -> Rc<RefCell<BOSNode>> {
+        let l_rc = p_rc.borrow().left_child_node.clone().unwrap();
+        let p_parent_weak = p_rc.borrow().parent_node.clone();
+        let l_right = l_rc.borrow().right_child_node.clone();
+        let l_right_count = l_rc.borrow().right_child_count;
+
+        // Update L's parent to be P's parent
+        l_rc.borrow_mut().parent_node = p_parent_weak.clone();
+
+        // Update P's parent's child pointer to point to L
+        if let Some(p_parent_weak) = p_parent_weak {
+            if let Some(p_parent_rc) = p_parent_weak.upgrade() {
+                let mut p_parent = p_parent_rc.borrow_mut();
+                let is_left = p_parent
+                    .left_child_node
+                    .as_ref()
+                    .map_or(false, |left| Rc::ptr_eq(left, p_rc));
+                if is_left {
+                    p_parent.left_child_node = Some(l_rc.clone());
+                } else {
+                    p_parent.right_child_node = Some(l_rc.clone());
+                }
+            }
+        } else {
+            // P was root
+            self.root_node = Some(l_rc.clone());
+        }
+
+        // Move L's right child to P's left
+        p_rc.borrow_mut().left_child_node = l_right.clone();
+        p_rc.borrow_mut().left_child_count = l_right_count;
+
+        if let Some(ref l_right_rc) = l_right {
+            l_right_rc.borrow_mut().parent_node = Some(Rc::downgrade(p_rc));
+        }
+
+        // Update P's depth
+        let p_left_depth = p_rc
+            .borrow()
+            .left_child_node
+            .as_ref()
+            .map(|n| n.borrow().depth + 1)
+            .unwrap_or(0);
+        let p_right_depth = p_rc
+            .borrow()
+            .right_child_node
+            .as_ref()
+            .map(|n| n.borrow().depth + 1)
+            .unwrap_or(0);
+        p_rc.borrow_mut().depth = Self::imax(p_left_depth, p_right_depth);
+
+        // P becomes right child of L
+        p_rc.borrow_mut().parent_node = Some(Rc::downgrade(&l_rc));
+        l_rc.borrow_mut().right_child_node = Some(p_rc.clone());
+
+        // Update L's right_child_count and depth
+        let p_left_count = p_rc.borrow().left_child_count;
+        let p_right_count = p_rc.borrow().right_child_count;
+        l_rc.borrow_mut().right_child_count = p_left_count + p_right_count + 1;
+
+        let l_left_depth = l_rc
+            .borrow()
+            .left_child_node
+            .as_ref()
+            .map(|n| n.borrow().depth + 1)
+            .unwrap_or(0);
+        let l_right_depth = p_rc.borrow().depth + 1;
+        l_rc.borrow_mut().depth = Self::imax(l_left_depth, l_right_depth);
+
+        l_rc
+    }
+
+    /// Perform a left rotation around

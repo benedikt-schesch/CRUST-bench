@@ -1,0 +1,60 @@
+ {{hash.rs}}
+```rust
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
+pub struct HashTable<T> {
+    buckets: Vec<Vec<T>>,
+    capacity: usize,
+}
+
+impl<T: Hash + PartialEq> HashTable<T> {
+    pub fn new(capacity: usize) -> Self {
+        let capacity = if capacity == 0 { 1 } else { capacity };
+        let mut buckets = Vec::with_capacity(capacity);
+        for _ in 0..capacity {
+            buckets.push(Vec::new());
+        }
+        Self {
+            buckets,
+            capacity,
+        }
+    }
+    
+    fn hash_index(&self, value: &T) -> usize {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        (hasher.finish() as usize) % self.capacity
+    }
+    
+    pub fn insert(&mut self, value: T) {
+        let index = self.hash_index(&value);
+        if !self.buckets[index].contains(&value) {
+            self.buckets[index].push(value);
+        }
+    }
+    
+    pub fn contains(&self, value: &T) -> bool {
+        let index = self.hash_index(value);
+        self.buckets[index].contains(value)
+    }
+    
+    pub fn remove(&mut self, value: &T) -> bool {
+        let index = self.hash_index(value);
+        if let Some(pos) = self.buckets[index].iter().position(|x| x == value) {
+            self.buckets[index].remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+    
+    pub fn is_empty(&self) -> bool {
+        self.buckets.iter().all(|bucket| bucket.is_empty())
+    }
+    
+    pub fn len(&self) -> usize {
+        self.buckets.iter().map(|bucket| bucket.len()).sum()
+    }
+}
+```

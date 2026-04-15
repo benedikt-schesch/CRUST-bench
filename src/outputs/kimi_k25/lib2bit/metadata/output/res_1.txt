@@ -1,0 +1,21 @@
+ {{lib.rs}}
+```rust
+pub mod twobit;
+```
+
+{{twobit.rs}}
+```rust
+//! Module for working with 2bit file format.
+
+/// Main structure for handling TwoBit files.
+pub struct TwoBit;
+
+/// Header structure for TwoBit format.
+pub struct TwoBitHeader;
+
+/// Chromosome/Contig Length structure.
+pub struct TwoBitCL;
+
+/// Masked index structure for TwoBit format.
+pub struct TwoBitMaskedIdx;
+```

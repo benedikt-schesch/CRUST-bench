@@ -1,0 +1,122 @@
+ {{core.rs}}
+```rust
+use crate::tisp::Tsp;
+
+pub fn init(_st: &mut Tsp) {
+    // Initialize core built-in functions in the environment
+}
+```
+
+{{io.rs}}
+```rust
+use std::io::{self, Read, Write};
+
+pub fn read_line() -> io::Result<String> {
+    let mut buffer = String::new();
+    io::stdin().read_line(&mut buffer)?;
+    Ok(buffer)
+}
+
+pub fn write_output<W: Write>(writer: &mut W, output: &str) -> io::Result<()> {
+    writer.write_all(output.as_bytes())?;
+    Ok(())
+}
+```
+
+{{lib.rs}}
+```rust
+pub mod core;
+pub mod io;
+pub mod math;
+pub mod os;
+pub mod string;
+pub mod tisp;
+```
+
+{{tisp.rs}}
+```rust
+use std::io::Write;
+use crate::core;
+use crate::math;
+use crate::string;
+
+pub struct Tsp {
+    // Environment state for the TISP interpreter
+    memory_size: usize,
+    pub file: String,
+    pub filec: usize,
+}
+
+pub struct Value {
+    // Represents a TISP value
+    data: String,
+}
+
+impl Tsp {
+    pub fn new(size: usize) -> Self {
+        Tsp {
+            memory_size: size,
+            file: String::new(),
+            filec: 0,
+        }
+    }
+}
+
+pub fn tisp_env_init(size: usize) -> Tsp {
+    Tsp::new(size)
+}
+
+pub fn tisp_read(_st: &mut Tsp) -> Option<Value> {
+    // Read and parse input into a Value
+    None
+}
+
+pub fn tisp_eval(_st: &mut Tsp, val: Value) -> Option<Value> {
+    // Evaluate the given value in the environment
+    Some(val)
+}
+
+pub fn tisp_print<W: Write>(_writer: &mut W, _val: &Value) {
+    // Print the value to the given writer
+}
+
+pub fn tib_env_core(st: &mut Tsp) {
+    core::init(st);
+}
+
+pub fn tib_env_math(st: &mut Tsp) {
+    math::init(st);
+}
+
+pub fn tib_env_string(st: &mut Tsp) {
+    string::init(st);
+}
+
+pub fn tisp_env_lib(_st: &mut Tsp, _path: &str) {
+    // Load external library from path
+}
+```
+
+{{math.rs}}
+```rust
+use crate::tisp::Tsp;
+
+pub fn init(_st: &mut Tsp) {
+    // Initialize math built-in functions in the environment
+}
+```
+
+{{string.rs}}
+```rust
+use crate::tisp::Tsp;
+
+pub fn init(_st: &mut Tsp) {
+    // Initialize string built-in functions in the environment
+}
+```
+
+{{os.rs}}
+```rust
+// OS module implementation
+// Platform-specific functionality
+```

@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `Remimu::my_regex`", "file_path": "Remimu/src/bin/my_regex_test.rs", "row": "2", "col": "13", "error_snippet": "|\n2 | use Remimu::my_regex::{\n  |             ^^^^^^^^ could not find `my_regex` in `Remimu`\n\nFor more information about this error, try `rustc --explain E0432`."}]

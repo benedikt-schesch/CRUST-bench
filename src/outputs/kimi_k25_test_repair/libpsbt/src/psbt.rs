@@ -1,0 +1,312 @@
+use std::any::Any;
+use std::io::Write;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PsbtResult {
+Ok,
+InvalidState,
+InvalidParameter,
+BufferTooSmall,
+ParseError,
+EncodingError,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum PsbtScope {
+#[default]
+Global,
+Inputs,
+Outputs,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PsbtRecord {
+pub scope: PsbtScope,
+pub record_type: u8,
+pub key: Vec<u8>,
+pub val: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub enum PsbtElem {
+Record { record: PsbtRecord, index: usize },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PsbtEncoding {
+Hex,
+Binary,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum PsbtState {
+Empty,
+Initialized,
+HasGlobal,
+Finalized,
+}
+
+#[derive(Debug, Clone)]
+pub struct Psbt {
+pub global_records: Vec<PsbtRecord>,
+pub input_records: Vec<Vec<PsbtRecord>>,
+pub output_records: Vec<Vec<PsbtRecord>>,
+buffer: Vec<u8>,
+state: PsbtState,
+current_input: usize,
+current_output: usize,
+}
+
+impl Psbt {
+pub fn new(capacity: usize) -> Self {
+Psbt {
+global_records: Vec::new(),
+input_records: Vec::new(),
+output_records: Vec::new(),
+buffer: Vec::with_capacity(capacity),
+state: PsbtState::Empty,
+current_input: 0,
+current_output: 0,
+}
+}
+}
+
+#[derive(Debug)]
+pub enum PsbtError {
+Generic(String),
+}
+
+impl std::fmt::Display for PsbtError {
+fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+match self {
+PsbtError::Generic(msg) => write!(f, "PSBT error: {}", msg),
+}
+}
+}
+
+impl std::error::Error for PsbtError {}
+
+pub fn psbt_init(psbt: &mut Psbt, buffer: &mut [u8], size: usize) -> PsbtResult {
+if buffer.len() < size {
+return PsbtResult::BufferTooSmall;
+}
+psbt.buffer.clear();
+psbt.buffer.extend_from_slice(&buffer[..size]);
+psbt.state = PsbtState::Initialized;
+PsbtResult::Ok
+}
+
+pub fn psbt_write_input_record(psbt: &mut Psbt, record: &PsbtRecord) -> PsbtResult {
+match psbt.state {
+PsbtState::Empty => return PsbtResult::InvalidState,
+PsbtState::Initialized => return PsbtResult::InvalidState,
+PsbtState::HasGlobal | PsbtState::Finalized => {},
+}
+if psbt.state == PsbtState::Finalized {
+return PsbtResult::InvalidState;
+}
+if psbt.current_input >= psbt.input_records.len() {
+psbt.input_records.resize(psbt.current_input + 1, Vec::new());
+}
+psbt.input_records[psbt.current_input].push(record.clone());
+PsbtResult::Ok
+}
+
+pub fn psbt_write_global_record(psbt: &mut Psbt, record: &PsbtRecord) -> PsbtResult {
+match psbt.state {
+PsbtState::Empty => return PsbtResult::InvalidState,
+PsbtState::Finalized => return PsbtResult::InvalidState,
+_ => {},
+}
+psbt.global_records.push(record.clone());
+psbt.state = PsbtState::HasGlobal;
+PsbtResult::Ok
+}
+
+pub fn psbt_new_output_record_set(psbt: &mut Psbt) -> PsbtResult {
+match psbt.state {
+PsbtState::Empty | PsbtState::Initialized => return PsbtResult::InvalidState,
+PsbtState::Finalized => return PsbtResult::InvalidState,
+_ => {},
+}
+psbt.output_records.push(Vec::new());
+psbt.current_output = psbt.output_records.len() - 1;
+PsbtResult::Ok
+}
+
+pub fn psbt_print(psbt: &Psbt, writer: &mut dyn Write) -> PsbtResult {
+if psbt.state != PsbtState::Finalized {
+return PsbtResult::InvalidState;
+}
+let output = format!("{:?}", psbt);
+if writer.write_all(output.as_bytes()).is_err() {
+return PsbtResult::InvalidState;
+}
+PsbtResult::Ok
+}
+
+pub fn psbt_finalize(psbt: &mut Psbt) -> PsbtResult {
+match psbt.state {
+PsbtState::Empty | PsbtState::Initialized => return PsbtResult::InvalidState,
+PsbtState::Finalized => return PsbtResult::Ok,
+_ => {},
+}
+psbt.state = PsbtState::Finalized;
+PsbtResult::Ok
+}
+
+fn decode_base64_char(c: u8) -> Result<u8, PsbtResult> {
+match c {
+b'A'..=b'Z' => Ok(c - b'A'),
+b'a'..=b'z' => Ok(c - b'a' + 26),
+b'0'..=b'9' => Ok(c - b'0' + 52),
+b'+' => Ok(62),
+b'/' => Ok(63),
+_ => Err(PsbtResult::ParseError),
+}
+}
+
+pub fn psbt_decode(hex: &str, hex_len: usize, buf: &mut [u8], buf_size: usize, psbt_len: &mut usize) -> PsbtResult {
+if hex_len > hex.len() {
+return PsbtResult::InvalidParameter;
+}
+
+let input_str = &hex[..hex_len];
+
+// Check if input is valid hex (contains only 0-9, a-f, A-F)
+let is_hex = input_str.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F'));
+
+if is_hex {
+// Hex decoding
+if buf_size < input_len / 2 {
+return PsbtResult::BufferTooSmall;
+}
+let mut byte_idx = 0;
+for i in (0..input_str.len()).step_by(2) {
+if i + 1 >= input_str.len() {
+break;
+}
+let high = input_str.as_bytes()[i];
+let low = input_str.as_bytes()[i + 1];
+let high_val = match high {
+b'0'..=b'9' => high - b'0',
+b'a'..=b'f' => high - b'a' + 10,
+b'A'..=b'F' => high - b'A' + 10,
+_ => return PsbtResult::ParseError,
+};
+let low_val = match low {
+b'0'..=b'9' => low - b'0',
+b'a'..=b'f' => low - b'a' + 10,
+b'A'..=b'F' => low - b'A' + 10,
+_ => return PsbtResult::ParseError,
+};
+if byte_idx < buf.len() {
+buf[byte_idx] = (high_val << 4) | low_val;
+byte_idx += 1;
+} else {
+return PsbtResult::BufferTooSmall;
+}
+}
+*psbt_len = byte_idx;
+PsbtResult::Ok
+} else {
+// Base64 decoding
+let mut byte_idx = 0;
+let bytes = input_str.as_bytes();
+let mut i = 0;
+
+while i < bytes.len() {
+// Skip if we hit padding
+if bytes[i] == b'=' {
+break;
+}
+
+// Need at least 2 characters to produce one byte
+if i + 1 >= bytes.len() {
+return PsbtResult::ParseError;
+}
+
+let c1 = decode_base64_char(bytes[i])?;
+let c2 = decode_base64_char(bytes[i + 1])?;
+
+if byte_idx >= buf.len() {
+return PsbtResult::BufferTooSmall;
+}
+buf[byte_idx] = (c1 << 2) | (c2 >> 4);
+byte_idx += 1;
+
+// Check for third character (not padding)
+if i + 2 < bytes.len() && bytes[i + 2] != b'=' {
+let c3 = decode_base64_char(bytes[i + 2])?;
+
+if byte_idx >= buf.len() {
+return PsbtResult::BufferTooSmall;
+}
+buf[byte_idx] = (c2 << 4) | (c3 >> 2);
+byte_idx += 1;
+
+// Check for fourth character (not padding)
+if i + 3 < bytes.len() && bytes[i + 3] != b'=' {
+let c4 = decode_base64_char(bytes[i + 3])?;
+
+if byte_idx >= buf.len() {
+return PsbtResult::BufferTooSmall;
+}
+buf[byte_idx] = (c3 << 6) | c4;
+byte_idx += 1;
+}
+}
+
+i += 4;
+}
+
+*psbt_len = byte_idx;
+PsbtResult::Ok
+}
+}
+
+pub fn psbt_read(buf: &[u8], psbt_len: usize, psbt: &mut Psbt, callback: Option<fn(&mut PsbtElem, &mut dyn Any)>, user_data: &mut dyn Any) -> PsbtResult {
+if psbt_len > buf.len() {
+return PsbtResult::InvalidParameter;
+}
+psbt.buffer.clear();
+psbt.buffer.extend_from_slice(&buf[..psbt_len]);
+psbt.state = PsbtState::HasGlobal;
+if let Some(cb) = callback {
+for (i, record) in psbt.global_records.iter().enumerate() {
+let mut elem = PsbtElem::Record { record: record.clone(), index: i };
+cb(&mut elem, user_data);
+}
+}
+PsbtResult::Ok
+}
+
+pub fn psbt_encode(psbt: &Psbt, encoding: PsbtEncoding, buf: &mut [u8], buf_size: usize, out_len: &mut usize) -> PsbtResult {
+let data = &psbt.buffer;
+match encoding {
+PsbtEncoding::Binary => {
+if buf_size < data.len() {
+return PsbtResult::BufferTooSmall;
+}
+buf[..data.len()].copy_from_slice(data);
+*out_len = data.len();
+}
+PsbtEncoding::Hex => {
+let hex_len = data.len() * 2;
+// +1 for null terminator
+if buf_size < hex_len + 1 {
+return PsbtResult::BufferTooSmall;
+}
+for (i, byte) in data.iter().enumerate() {
+let high = (byte >> 4) & 0xf;
+let low = byte & 0xf;
+buf[i * 2] = if high < 10 { b'0' + high } else { b'a' + high - 10 };
+buf[i * 2 + 1] = if low < 10 { b'0' + low } else { b'a' + low - 10 };
+}
+// Add null terminator
+buf[hex_len] = 0;
+*out_len = hex_len + 1;
+}
+}
+PsbtResult::Ok
+}

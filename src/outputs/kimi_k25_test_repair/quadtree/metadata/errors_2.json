@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `quadtree::quadtree::quadtree`", "file_path": "quadtree/src/bin/test.rs", "row": "1", "col": "25", "error_snippet": "|\n1 | use quadtree::quadtree::quadtree::*;\n  |                         ^^^^^^^^ could not find `quadtree` in `quadtree`"}]

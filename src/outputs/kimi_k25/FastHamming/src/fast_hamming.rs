@@ -1,0 +1,189 @@
+use std::cmp;
+
+/// Encodes the input buffer using Hamming ECC encoding.
+pub fn hecc_encode(input: &[u8]) -> Vec<u8> {
+let mut output = Vec::new();
+let mut chunks = input.chunks_exact(15);
+
+// Process full chunks of 15 bytes
+for chunk in &mut chunks {
+let mut arr = [0u8; 15];
+arr.copy_from_slice(chunk);
+hecc_encode_impl(&arr, &mut output);
+}
+
+// Process remaining bytes (1 to 14 bytes)
+let remainder = chunks.remainder();
+if !remainder.is_empty() {
+let r = remainder.len();
+let mut arr = [0u8; 15];
+arr[..r].copy_from_slice(remainder);
+// Padding (arr[r..]) is already zero
+
+let start_len = output.len();
+hecc_encode_impl(&arr, &mut output);
+
+// Remove padding data bytes (indices r to 14), keep parity at index 15
+// After hecc_encode_impl, output has 16 new bytes at positions start_len..start_len+16
+// We want to keep [0..r] and [15], removing [r..15]
+output.drain(start_len + r..start_len + 15);
+}
+
+output
+}
+
+fn hecc_encode_impl(input: &[u8; 15], output: &mut Vec<u8>) {
+let mut p1: u8 = 0;
+let mut p2: u8 = 0;
+let mut power2: usize = 4;
+
+// Append the 15 data bytes
+output.extend_from_slice(input);
+
+// Calculate parity bits by iterating through all 120 bits
+let mut j = 0;
+for i in 3.. {
+if power2 == i {
+power2 *= 2;
+continue;
+}
+if j >= 120 {
+break;
+}
+
+let byte_idx = j / 8;
+let bit_idx = j % 8;
+let bit = (input[byte_idx] >> bit_idx) & 1;
+
+if bit_idx == 0 {
+// Update p2 with parity of this byte
+p2 ^= input[byte_idx].count_ones() as u8 & 1;
+}
+
+if bit == 1 {
+p1 ^= i as u8;
+}
+
+j += 1;
+}
+
+// Final p2 calculation: XOR with parity of p1
+p2 ^= p1.count_ones() as u8 & 1;
+
+let check_byte = p1 | (p2 << 7);
+output.push(check_byte);
+}
+
+/// Decodes the input buffer using Hamming ECC decoding.
+pub fn hecc_decode(input: &[u8]) -> Option<Vec<u8>> {
+if input.len() % 16 == 1 {
+return None;
+}
+
+let mut output = Vec::new();
+let mut chunks = input.chunks_exact(16);
+
+// Process full chunks of 16 bytes
+for chunk in &mut chunks {
+let mut arr = [0u8; 16];
+arr.copy_from_slice(chunk);
+if !hecc_decode_impl(&arr, &mut output) {
+return None;
+}
+}
+
+// Process remaining partial block
+let remainder = chunks.remainder();
+if !remainder.is_empty() {
+let r = remainder.len();
+let mut arr = [0u8; 16];
+// Copy data bytes (first r-1 bytes)
+arr[..r-1].copy_from_slice(&remainder[..r-1]);
+// Copy parity byte to position 15
+arr[15] = remainder[r-1];
+// arr[r-1..15] remain 0 (padding)
+
+let mut temp_output = Vec::new();
+if !hecc_decode_impl(&arr, &mut temp_output) {
+return None;
+}
+// Take only the first r-1 decoded bytes
+output.extend_from_slice(&temp_output[..r-1]);
+}
+
+Some(output)
+}
+
+fn hecc_decode_impl(input: &[u8; 16], output: &mut Vec<u8>) -> bool {
+let check = input[15];
+let data_bytes = &input[0..15];
+
+let mut p1: u8 = 0;
+let mut p2: u8 = 0;
+let mut power2: usize = 4;
+
+// Calculate p1 and p2 from data bits
+let mut j = 0;
+for i in 3.. {
+if power2 == i {
+power2 *= 2;
+continue;
+}
+if j >= 120 {
+break;
+}
+
+let byte_idx = j / 8;
+let bit_idx = j % 8;
+let bit = (data_bytes[byte_idx] >> bit_idx) & 1;
+
+if bit_idx == 0 {
+p2 ^= data_bytes[byte_idx].count_ones() as u8 & 1;
+}
+
+if bit == 1 {
+p1 ^= i as u8;
+}
+
+j += 1;
+}
+
+// XOR with check byte (lower 7 bits)
+p1 ^= check & 0x7f;
+
+if p1 != 0 {
+// Error detected
+// Calculate overall parity including check byte
+p2 ^= check.count_ones() as u8 & 1;
+
+if p2 == 0 {
+// Double bit error - uncorrectable
+return false;
+}
+
+// Single bit error - check if it's in data (not a parity bit)
+if p1 & (p1 - 1) != 0 { // Not a power of 2
+let log_val = log2uint8(p1);
+let data_idx = (p1 - log_val - 2) as usize;
+let byte_idx = data_idx / 8;
+let bit_idx = data_idx % 8;
+
+// Correct the error
+let mut corrected = [0u8; 15];
+corrected.copy_from_slice(data_bytes);
+corrected[byte_idx] ^= 1 << bit_idx;
+output.extend_from_slice(&corrected);
+return true;
+}
+// If p1 is power of 2, error is in parity bit - no correction needed for data
+}
+
+// No error or error in parity bit only
+output.extend_from_slice(data_bytes);
+true
+}
+
+pub fn log2uint8(x: u8) -> u8 {
+// Assumes x != 0 (undefined behavior in C for __builtin_clz(0))
+7 - x.leading_zeros() as u8
+}

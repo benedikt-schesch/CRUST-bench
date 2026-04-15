@@ -1,0 +1,11 @@
+pub mod token;
+pub mod simple_lang/src/bin/test_parser;
+pub mod parser;
+pub mod vm;
+pub mod simple_lang/src/bin/test_tokenize;
+pub mod ast;
+pub mod compiler;
+pub mod simple_lang/src/bin/test_compile;
+pub mod lexer;
+pub mod utils;
+pub mod settings;

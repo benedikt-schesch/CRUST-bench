@@ -1,0 +1,32 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test test2 ... FAILED
+test test1 ... FAILED
+
+failures:
+
+---- test2 stdout ----
+Parsing: y=26.0*2.0/2.0 + x*30.0/(20.0*1.0)
+
+thread 'test2' (210639) panicked at expr/src/bin/test.rs:21:37:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test1 stdout ----
+Expected '}'.
+
+thread 'test1' (210638) panicked at expr/src/bin/test.rs:11:33:
+called `Option::unwrap()` on a `None` value
+
+
+failures:
+    test1
+    test2
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

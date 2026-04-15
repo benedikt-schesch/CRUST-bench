@@ -1,0 +1,903 @@
+{{for_gen.rs}}
+```rust
+// Generated Rust Code
+
+fn read_u32_le(input: &[u8], offset: usize) -> u32 {
+    let mut b = [0u8; 4];
+    let available = input.len().saturating_sub(offset).min(4);
+    b[..available].copy_from_slice(&input[offset..offset + available]);
+    u32::from_le_bytes(b)
+}
+
+fn write_u32_le(output: &mut [u8], offset: usize, value: u32) {
+    let bytes = value.to_le_bytes();
+    let available = output.len().saturating_sub(offset).min(4);
+    output[offset..offset + available].copy_from_slice(&bytes[..available]);
+}
+
+fn mask(bits: u32) -> u32 {
+    if bits >= 32 { u32::MAX } else if bits == 0 { 0 } else { (1u32 << bits) - 1 }
+}
+
+fn pack_generic(base: u32, input: &[u32], output: &mut [u8], count: usize, bits: u32) -> u32 {
+    if bits == 0 {
+        return 0;
+    }
+    if bits == 32 {
+        for i in 0..count {
+            write_u32_le(output, i * 4, input[i].wrapping_sub(base));
+        }
+        return (count * 4) as u32;
+    }
+    let mut bitpos = 0usize;
+    for i in 0..count {
+        let mut v = input[i].wrapping_sub(base) & mask(bits);
+        let mut rem = bits as usize;
+        while rem > 0 {
+            let byte_index = bitpos / 8;
+            let bit_in_byte = bitpos % 8;
+            let take = rem.min(8 - bit_in_byte);
+            let part = (v & ((1u32 << take) - 1)) as u8;
+            output[byte_index] &= !(((1u16 << take) - 1) as u8 << bit_in_byte);
+            output[byte_index] |= part << bit_in_byte;
+            v >>= take;
+            rem -= take;
+            bitpos += take;
+        }
+    }
+    bitpos.div_ceil(8) as u32
+}
+
+fn unpack_generic(base: u32, input: &[u8], output: &mut [u32], count: usize, bits: u32) -> u32 {
+    if bits == 0 {
+        for o in output.iter_mut().take(count) {
+            *o = base;
+        }
+        return 0;
+    }
+    if bits == 32 {
+        for i in 0..count {
+            output[i] = base.wrapping_add(read_u32_le(input, i * 4));
+        }
+        return (count * 4) as u32;
+    }
+    let mut bitpos = 0usize;
+    for i in 0..count {
+        let mut v = 0u32;
+        let mut filled = 0usize;
+        while filled < bits as usize {
+            let byte_index = bitpos / 8;
+            let bit_in_byte = bitpos % 8;
+            let take = ((bits as usize) - filled).min(8 - bit_in_byte);
+            let part = ((input.get(byte_index).copied().unwrap_or(0) >> bit_in_byte) & (((1u16 << take) - 1) as u8)) as u32;
+            v |= part << filled;
+            filled += take;
+            bitpos += take;
+        }
+        output[i] = base.wrapping_add(v);
+    }
+    bitpos.div_ceil(8) as u32
+}
+
+fn linsearch_generic(base: u32, input: &[u8], count: usize, bits: u32, value: u32, found: &mut i32) -> u32 {
+    if bits == 0 {
+        if count > 0 && value == base {
+            *found = 0;
+        }
+        return 0;
+    }
+    let target = value.wrapping_sub(base);
+    let mut tmp = vec![0u32; count];
+    let consumed = unpack_generic(base, input, &mut tmp, count, bits);
+    for (i, v) in tmp.iter().enumerate() {
+        if v.wrapping_sub(base) == target {
+            *found = i as i32;
+            return i as u32;
+        }
+    }
+    consumed
+}
+
+pub fn pack0_32(_base: u32, _input: &[u32], _output: &mut [u8]) -> u32 { 0 }
+pub fn pack0_16(_base: u32, _input: &[u32], _output: &mut [u8]) -> u32 { 0 }
+pub fn pack0_8(_base: u32, _input: &[u32], _output: &mut [u8]) -> u32 { 0 }
+
+pub fn unpack0_32(base: u32, _input: &[u8], output: &mut [u32]) -> u32 {
+    for o in output.iter_mut().take(32) { *o = base; }
+    0
+}
+pub fn unpack0_16(base: u32, _input: &[u8], output: &mut [u32]) -> u32 {
+    for o in output.iter_mut().take(16) { *o = base; }
+    0
+}
+pub fn unpack0_8(base: u32, _input: &[u8], output: &mut [u32]) -> u32 {
+    for o in output.iter_mut().take(8) { *o = base; }
+    0
+}
+
+pub fn pack0_x(_base: u32, _input: &[u32], _output: &mut [u8], _length: u32) -> u32 { 0 }
+pub fn unpack0_x(base: u32, _input: &[u8], output: &mut [u32], length: u32) -> u32 {
+    for o in output.iter_mut().take(length as usize) { *o = base; }
+    0
+}
+
+pub fn linsearch0_32(base: u32, _input: &[u8], value: u32, found: &mut i32) -> u32 {
+    if base == value { *found = 0; }
+    0
+}
+pub fn linsearch0_16(base: u32, _input: &[u8], value: u32, found: &mut i32) -> u32 {
+    if base == value { *found = 0; }
+    0
+}
+pub fn linsearch0_8(base: u32, _input: &[u8], value: u32, found: &mut i32) -> u32 {
+    if base == value { *found = 0; }
+    0
+}
+pub fn linsearch0_x(base: u32, _input: &[u8], length: u32, value: u32, found: &mut i32) -> u32 {
+    if base == value && length > 0 { *found = 0; }
+    0
+}
+
+macro_rules! def_pack_unpack_lin {
+    ($pname:ident, $uname:ident, $lname:ident, $count:expr, $bits:expr) => {
+        pub fn $pname(base: u32, input: &[u32], output: &mut [u8]) -> u32 {
+            pack_generic(base, input, output, $count, $bits)
+        }
+        pub fn $uname(base: u32, input: &[u32], output: &mut [u8]) -> u32 {
+            let mut tmp = vec![0u32; $count];
+            let consumed = unpack_generic(base, bytemuck_input(input), &mut tmp, $count, $bits);
+            for (i, v) in tmp.iter().enumerate() {
+                let b = v.to_le_bytes();
+                let off = i * 4;
+                if off + 4 <= output.len() {
+                    output[off..off + 4].copy_from_slice(&b);
+                }
+            }
+            consumed
+        }
+        pub fn $lname(base: u32, input: &[u8], value: u32, found: &mut i32) -> u32 {
+            linsearch_generic(base, input, $count, $bits, value, found)
+        }
+    };
+}
+
+fn bytemuck_input(input: &[u32]) -> &[u8] {
+    let mut bytes = Vec::with_capacity(input.len() * 4);
+    for v in input {
+        bytes.extend_from_slice(&v.to_le_bytes());
+    }
+    Box::leak(bytes.into_boxed_slice())
+}
+
+def_pack_unpack_lin!(pack1_32, unpack1_32, linsearch1_32, 32, 1);
+def_pack_unpack_lin!(pack2_32, unpack2_32, linsearch2_32, 32, 2);
+def_pack_unpack_lin!(pack3_32, unpack3_32, linsearch3_32, 32, 3);
+def_pack_unpack_lin!(pack4_32, unpack4_32, linsearch4_32, 32, 4);
+def_pack_unpack_lin!(pack5_32, unpack5_32, linsearch5_32, 32, 5);
+def_pack_unpack_lin!(pack6_32, unpack6_32, linsearch6_32, 32, 6);
+def_pack_unpack_lin!(pack7_32, unpack7_32, linsearch7_32, 32, 7);
+def_pack_unpack_lin!(pack8_32, unpack8_32, linsearch8_32, 32, 8);
+def_pack_unpack_lin!(pack9_32, unpack9_32, linsearch9_32, 32, 9);
+def_pack_unpack_lin!(pack10_32, unpack10_32, linsearch10_32, 32, 10);
+def_pack_unpack_lin!(pack11_32, unpack11_32, linsearch11_32, 32, 11);
+def_pack_unpack_lin!(pack12_32, unpack12_32, linsearch12_32, 32, 12);
+def_pack_unpack_lin!(pack13_32, unpack13_32, linsearch13_32, 32, 13);
+def_pack_unpack_lin!(pack14_32, unpack14_32, linsearch14_32, 32, 14);
+def_pack_unpack_lin!(pack15_32, unpack15_32, linsearch15_32, 32, 15);
+def_pack_unpack_lin!(pack16_32, unpack16_32, linsearch16_32, 32, 16);
+def_pack_unpack_lin!(pack17_32, unpack17_32, linsearch17_32, 32, 17);
+def_pack_unpack_lin!(pack18_32, unpack18_32, linsearch18_32, 32, 18);
+def_pack_unpack_lin!(pack19_32, unpack19_32, linsearch19_32, 32, 19);
+def_pack_unpack_lin!(pack20_32, unpack20_32, linsearch20_32, 32, 20);
+def_pack_unpack_lin!(pack21_32, unpack21_32, linsearch21_32, 32, 21);
+def_pack_unpack_lin!(pack22_32, unpack22_32, linsearch22_32, 32, 22);
+def_pack_unpack_lin!(pack23_32, unpack23_32, linsearch23_32, 32, 23);
+def_pack_unpack_lin!(pack24_32, unpack24_32, linsearch24_32, 32, 24);
+def_pack_unpack_lin!(pack25_32, unpack25_32, linsearch25_32, 32, 25);
+def_pack_unpack_lin!(pack26_32, unpack26_32, linsearch26_32, 32, 26);
+def_pack_unpack_lin!(pack27_32, unpack27_32, linsearch27_32, 32, 27);
+def_pack_unpack_lin!(pack28_32, unpack28_32, linsearch28_32, 32, 28);
+def_pack_unpack_lin!(pack29_32, unpack29_32, linsearch29_32, 32, 29);
+def_pack_unpack_lin!(pack30_32, unpack30_32, linsearch30_32, 32, 30);
+def_pack_unpack_lin!(pack31_32, unpack31_32, linsearch31_32, 32, 31);
+def_pack_unpack_lin!(pack32_32, unpack32_32, linsearch32_32, 32, 32);
+
+def_pack_unpack_lin!(pack1_16, unpack1_16, linsearch1_16, 16, 1);
+def_pack_unpack_lin!(pack2_16, unpack2_16, linsearch2_16, 16, 2);
+def_pack_unpack_lin!(pack3_16, unpack3_16, linsearch3_16, 16, 3);
+def_pack_unpack_lin!(pack4_16, unpack4_16, linsearch4_16, 16, 4);
+def_pack_unpack_lin!(pack5_16, unpack5_16, linsearch5_16, 16, 5);
+def_pack_unpack_lin!(pack6_16, unpack6_16, linsearch6_16, 16, 6);
+def_pack_unpack_lin!(pack7_16, unpack7_16, linsearch7_16, 16, 7);
+def_pack_unpack_lin!(pack8_16, unpack8_16, linsearch8_16, 16, 8);
+def_pack_unpack_lin!(pack9_16, unpack9_16, linsearch9_16, 16, 9);
+def_pack_unpack_lin!(pack10_16, unpack10_16, linsearch10_16, 16, 10);
+def_pack_unpack_lin!(pack11_16, unpack11_16, linsearch11_16, 16, 11);
+def_pack_unpack_lin!(pack12_16, unpack12_16, linsearch12_16, 16, 12);
+def_pack_unpack_lin!(pack13_16, unpack13_16, linsearch13_16, 16, 13);
+def_pack_unpack_lin!(pack14_16, unpack14_16, linsearch14_16, 16, 14);
+def_pack_unpack_lin!(pack15_16, unpack15_16, linsearch15_16, 16, 15);
+def_pack_unpack_lin!(pack16_16, unpack16_16, linsearch16_16, 16, 16);
+def_pack_unpack_lin!(pack17_16, unpack17_16, linsearch17_16, 16, 17);
+def_pack_unpack_lin!(pack18_16, unpack18_16, linsearch18_16, 16, 18);
+def_pack_unpack_lin!(pack19_16, unpack19_16, linsearch19_16, 16, 19);
+def_pack_unpack_lin!(pack20_16, unpack20_16, linsearch20_16, 16, 20);
+def_pack_unpack_lin!(pack21_16, unpack21_16, linsearch21_16, 16, 21);
+def_pack_unpack_lin!(pack22_16, unpack22_16, linsearch22_16, 16, 22);
+def_pack_unpack_lin!(pack23_16, unpack23_16, linsearch23_16, 16, 23);
+def_pack_unpack_lin!(pack24_16, unpack24_16, linsearch24_16, 16, 24);
+def_pack_unpack_lin!(pack25_16, unpack25_16, linsearch25_16, 16, 25);
+def_pack_unpack_lin!(pack26_16, unpack26_16, linsearch26_16, 16, 26);
+def_pack_unpack_lin!(pack27_16, unpack27_16, linsearch27_16, 16, 27);
+def_pack_unpack_lin!(pack28_16, unpack28_16, linsearch28_16, 16, 28);
+def_pack_unpack_lin!(pack29_16, unpack29_16, linsearch29_16, 16, 29);
+def_pack_unpack_lin!(pack30_16, unpack30_16, linsearch30_16, 16, 30);
+def_pack_unpack_lin!(pack31_16, unpack31_16, linsearch31_16, 16, 31);
+def_pack_unpack_lin!(pack32_16, unpack32_16, linsearch32_16, 16, 32);
+
+def_pack_unpack_lin!(pack1_8, unpack1_8, linsearch1_8, 8, 1);
+def_pack_unpack_lin!(pack2_8, unpack2_8, linsearch2_8, 8, 2);
+def_pack_unpack_lin!(pack3_8, unpack3_8, linsearch3_8, 8, 3);
+def_pack_unpack_lin!(pack4_8, unpack4_8, linsearch4_8, 8, 4);
+def_pack_unpack_lin!(pack5_8, unpack5_8, linsearch5_8, 8, 5);
+def_pack_unpack_lin!(pack6_8, unpack6_8, linsearch6_8, 8, 6);
+def_pack_unpack_lin!(pack7_8, unpack7_8, linsearch7_8, 8, 7);
+def_pack_unpack_lin!(pack8_8, unpack8_8, linsearch8_8, 8, 8);
+def_pack_unpack_lin!(pack9_8, unpack9_8, linsearch9_8, 8, 9);
+def_pack_unpack_lin!(pack10_8, unpack10_8, linsearch10_8, 8, 10);
+def_pack_unpack_lin!(pack11_8, unpack11_8, linsearch11_8, 8, 11);
+def_pack_unpack_lin!(pack12_8, unpack12_8, linsearch12_8, 8, 12);
+def_pack_unpack_lin!(pack13_8, unpack13_8, linsearch13_8, 8, 13);
+def_pack_unpack_lin!(pack14_8, unpack14_8, linsearch14_8, 8, 14);
+def_pack_unpack_lin!(pack15_8, unpack15_8, linsearch15_8, 8, 15);
+def_pack_unpack_lin!(pack16_8, unpack16_8, linsearch16_8, 8, 16);
+def_pack_unpack_lin!(pack17_8, unpack17_8, linsearch17_8, 8, 17);
+def_pack_unpack_lin!(pack18_8, unpack18_8, linsearch18_8, 8, 18);
+def_pack_unpack_lin!(pack19_8, unpack19_8, linsearch19_8, 8, 19);
+def_pack_unpack_lin!(pack20_8, unpack20_8, linsearch20_8, 8, 20);
+def_pack_unpack_lin!(pack21_8, unpack21_8, linsearch21_8, 8, 21);
+def_pack_unpack_lin!(pack22_8, unpack22_8, linsearch22_8, 8, 22);
+def_pack_unpack_lin!(pack23_8, unpack23_8, linsearch23_8, 8, 23);
+def_pack_unpack_lin!(pack24_8, unpack24_8, linsearch24_8, 8, 24);
+def_pack_unpack_lin!(pack25_8, unpack25_8, linsearch25_8, 8, 25);
+def_pack_unpack_lin!(pack26_8, unpack26_8, linsearch26_8, 8, 26);
+def_pack_unpack_lin!(pack27_8, unpack27_8, linsearch27_8, 8, 27);
+def_pack_unpack_lin!(pack28_8, unpack28_8, linsearch28_8, 8, 28);
+def_pack_unpack_lin!(pack29_8, unpack29_8, linsearch29_8, 8, 29);
+def_pack_unpack_lin!(pack30_8, unpack30_8, linsearch30_8, 8, 30);
+def_pack_unpack_lin!(pack31_8, unpack31_8, linsearch31_8, 8, 31);
+def_pack_unpack_lin!(pack32_8, unpack32_8, linsearch32_8, 8, 32);
+
+macro_rules! def_pack_unpackx_linx {
+    ($pname:ident, $uname:ident, $lname:ident, $bits:expr) => {
+        pub fn $pname(base: u32, input: &[u32], output: &mut [u8], length: u32) -> u32 {
+            pack_generic(base, input, output, length as usize, $bits)
+        }
+        pub fn $uname(base: u32, input: &[u32], output: &mut [u8], length: u32) -> u32 {
+            let mut tmp = vec![0u32; length as usize];
+            let consumed = unpack_generic(base, bytemuck_input(input), &mut tmp, length as usize, $bits);
+            for (i, v) in tmp.iter().enumerate() {
+                let b = v.to_le_bytes();
+                let off = i * 4;
+                if off + 4 <= output.len() {
+                    output[off..off + 4].copy_from_slice(&b);
+                }
+            }
+            consumed
+        }
+        pub fn $lname(base: u32, input: &[u8], length: u32, value: u32, found: &mut i32) -> u32 {
+            linsearch_generic(base, input, length as usize, $bits, value, found)
+        }
+    };
+}
+
+def_pack_unpackx_linx!(pack1_x, unpack1_x, linsearch1_x, 1);
+def_pack_unpackx_linx!(pack2_x, unpack2_x, linsearch2_x, 2);
+def_pack_unpackx_linx!(pack3_x, unpack3_x, linsearch3_x, 3);
+def_pack_unpackx_linx!(pack4_x, unpack4_x, linsearch4_x, 4);
+def_pack_unpackx_linx!(pack5_x, unpack5_x, linsearch5_x, 5);
+def_pack_unpackx_linx!(pack6_x, unpack6_x, linsearch6_x, 6);
+def_pack_unpackx_linx!(pack7_x, unpack7_x, linsearch7_x, 7);
+def_pack_unpackx_linx!(pack8_x, unpack8_x, linsearch8_x, 8);
+def_pack_unpackx_linx!(pack9_x, unpack9_x, linsearch9_x, 9);
+def_pack_unpackx_linx!(pack10_x, unpack10_x, linsearch10_x, 10);
+def_pack_unpackx_linx!(pack11_x, unpack11_x, linsearch11_x, 11);
+def_pack_unpackx_linx!(pack12_x, unpack12_x, linsearch12_x, 12);
+def_pack_unpackx_linx!(pack13_x, unpack13_x, linsearch13_x, 13);
+def_pack_unpackx_linx!(pack14_x, unpack14_x, linsearch14_x, 14);
+def_pack_unpackx_linx!(pack15_x, unpack15_x, linsearch15_x, 15);
+def_pack_unpackx_linx!(pack16_x, unpack16_x, linsearch16_x, 16);
+def_pack_unpackx_linx!(pack17_x, unpack17_x, linsearch17_x, 17);
+def_pack_unpackx_linx!(pack18_x, unpack18_x, linsearch18_x, 18);
+def_pack_unpackx_linx!(pack19_x, unpack19_x, linsearch19_x, 19);
+def_pack_unpackx_linx!(pack20_x, unpack20_x, linsearch20_x, 20);
+def_pack_unpackx_linx!(pack21_x, unpack21_x, linsearch21_x, 21);
+def_pack_unpackx_linx!(pack22_x, unpack22_x, linsearch22_x, 22);
+def_pack_unpackx_linx!(pack23_x, unpack23_x, linsearch23_x, 23);
+def_pack_unpackx_linx!(pack24_x, unpack24_x, linsearch24_x, 24);
+def_pack_unpackx_linx!(pack25_x, unpack25_x, linsearch25_x, 25);
+def_pack_unpackx_linx!(pack26_x, unpack26_x, linsearch26_x, 26);
+def_pack_unpackx_linx!(pack27_x, unpack27_x, linsearch27_x, 27);
+def_pack_unpackx_linx!(pack28_x, unpack28_x, linsearch28_x, 28);
+def_pack_unpackx_linx!(pack29_x, unpack29_x, linsearch29_x, 29);
+def_pack_unpackx_linx!(pack30_x, unpack30_x, linsearch30_x, 30);
+def_pack_unpackx_linx!(pack31_x, unpack31_x, linsearch31_x, 31);
+def_pack_unpackx_linx!(pack32_x, unpack32_x, linsearch32_x, 32);
+```
+
+{{forLib.rs}}
+```rust
+// Generated Rust Code
+
+use crate::for_gen;
+
+pub const METADATA: i32 = 5;
+
+pub fn required_bits(v: u32) -> u32 {
+    if v == 0 { 0 } else { 32 - v.leading_zeros() }
+}
+
+pub fn for_compressed_size_bits(mut length: u32, bits: u32) -> u32 {
+    assert!(bits <= 32);
+    let mut c = 0;
+    if length >= 32 {
+        let b = length / 32;
+        c += ((b * 32 * bits) + 7) / 8;
+        length %= 32;
+    }
+    if length >= 16 {
+        let b = length / 16;
+        c += ((b * 16 * bits) + 7) / 8;
+        length %= 16;
+    }
+    if length >= 8 {
+        let b = length / 8;
+        c += ((b * 8 * bits) + 7) / 8;
+        length %= 8;
+    }
+    c + ((length * bits) + 7) / 8
+}
+
+pub fn for_compressed_size_unsorted(input: &[u32], length: u32) -> u32 {
+    if length == 0 {
+        return 0;
+    }
+    let slice = &input[..length as usize];
+    let mut m = slice[0];
+    let mut max_v = m;
+    for &v in &slice[1..] {
+        if v < m { m = v; }
+        if v > max_v { max_v = v; }
+    }
+    let b = required_bits(max_v - m);
+    METADATA as u32 + for_compressed_size_bits(length, b)
+}
+
+pub fn for_compressed_size_sorted(input: &[u32], length: u32) -> u32 {
+    if length == 0 {
+        return 0;
+    }
+    let m = input[0];
+    let max_v = input[length as usize - 1];
+    let b = required_bits(max_v - m);
+    METADATA as u32 + for_compressed_size_bits(length, b)
+}
+
+pub fn for_compress_bits(input: &[u32], output: &mut [u8], length: u32, base: u32, bits: u32) -> u32 {
+    assert!(bits <= 32);
+    let mut i = 0u32;
+    let mut written = 0u32;
+    while i + 32 <= length {
+        written += match bits {
+            0 => for_gen::pack0_32(base, &input[i as usize..], &mut output[written as usize..]),
+            1 => for_gen::pack1_32(base, &input[i as usize..], &mut output[written as usize..]),
+            2 => for_gen::pack2_32(base, &input[i as usize..], &mut output[written as usize..]),
+            3 => for_gen::pack3_32(base, &input[i as usize..], &mut output[written as usize..]),
+            4 => for_gen::pack4_32(base, &input[i as usize..], &mut output[written as usize..]),
+            5 => for_gen::pack5_32(base, &input[i as usize..], &mut output[written as usize..]),
+            6 => for_gen::pack6_32(base, &input[i as usize..], &mut output[written as usize..]),
+            7 => for_gen::pack7_32(base, &input[i as usize..], &mut output[written as usize..]),
+            8 => for_gen::pack8_32(base, &input[i as usize..], &mut output[written as usize..]),
+            9 => for_gen::pack9_32(base, &input[i as usize..], &mut output[written as usize..]),
+            10 => for_gen::pack10_32(base, &input[i as usize..], &mut output[written as usize..]),
+            11 => for_gen::pack11_32(base, &input[i as usize..], &mut output[written as usize..]),
+            12 => for_gen::pack12_32(base, &input[i as usize..], &mut output[written as usize..]),
+            13 => for_gen::pack13_32(base, &input[i as usize..], &mut output[written as usize..]),
+            14 => for_gen::pack14_32(base, &input[i as usize..], &mut output[written as usize..]),
+            15 => for_gen::pack15_32(base, &input[i as usize..], &mut output[written as usize..]),
+            16 => for_gen::pack16_32(base, &input[i as usize..], &mut output[written as usize..]),
+            17 => for_gen::pack17_32(base, &input[i as usize..], &mut output[written as usize..]),
+            18 => for_gen::pack18_32(base, &input[i as usize..], &mut output[written as usize..]),
+            19 => for_gen::pack19_32(base, &input[i as usize..], &mut output[written as usize..]),
+            20 => for_gen::pack20_32(base, &input[i as usize..], &mut output[written as usize..]),
+            21 => for_gen::pack21_32(base, &input[i as usize..], &mut output[written as usize..]),
+            22 => for_gen::pack22_32(base, &input[i as usize..], &mut output[written as usize..]),
+            23 => for_gen::pack23_32(base, &input[i as usize..], &mut output[written as usize..]),
+            24 => for_gen::pack24_32(base, &input[i as usize..], &mut output[written as usize..]),
+            25 => for_gen::pack25_32(base, &input[i as usize..], &mut output[written as usize..]),
+            26 => for_gen::pack26_32(base, &input[i as usize..], &mut output[written as usize..]),
+            27 => for_gen::pack27_32(base, &input[i as usize..], &mut output[written as usize..]),
+            28 => for_gen::pack28_32(base, &input[i as usize..], &mut output[written as usize..]),
+            29 => for_gen::pack29_32(base, &input[i as usize..], &mut output[written as usize..]),
+            30 => for_gen::pack30_32(base, &input[i as usize..], &mut output[written as usize..]),
+            31 => for_gen::pack31_32(base, &input[i as usize..], &mut output[written as usize..]),
+            _ => for_gen::pack32_32(base, &input[i as usize..], &mut output[written as usize..]),
+        };
+        i += 32;
+    }
+    while i + 16 <= length {
+        written += match bits {
+            0 => for_gen::pack0_16(base, &input[i as usize..], &mut output[written as usize..]),
+            1 => for_gen::pack1_16(base, &input[i as usize..], &mut output[written as usize..]),
+            2 => for_gen::pack2_16(base, &input[i as usize..], &mut output[written as usize..]),
+            3 => for_gen::pack3_16(base, &input[i as usize..], &mut output[written as usize..]),
+            4 => for_gen::pack4_16(base, &input[i as usize..], &mut output[written as usize..]),
+            5 => for_gen::pack5_16(base, &input[i as usize..], &mut output[written as usize..]),
+            6 => for_gen::pack6_16(base, &input[i as usize..], &mut output[written as usize..]),
+            7 => for_gen::pack7_16(base, &input[i as usize..], &mut output[written as usize..]),
+            8 => for_gen::pack8_16(base, &input[i as usize..], &mut output[written as usize..]),
+            9 => for_gen::pack9_16(base, &input[i as usize..], &mut output[written as usize..]),
+            10 => for_gen::pack10_16(base, &input[i as usize..], &mut output[written as usize..]),
+            11 => for_gen::pack11_16(base, &input[i as usize..], &mut output[written as usize..]),
+            12 => for_gen::pack12_16(base, &input[i as usize..], &mut output[written as usize..]),
+            13 => for_gen::pack13_16(base, &input[i as usize..], &mut output[written as usize..]),
+            14 => for_gen::pack14_16(base, &input[i as usize..], &mut output[written as usize..]),
+            15 => for_gen::pack15_16(base, &input[i as usize..], &mut output[written as usize..]),
+            16 => for_gen::pack16_16(base, &input[i as usize..], &mut output[written as usize..]),
+            17 => for_gen::pack17_16(base, &input[i as usize..], &mut output[written as usize..]),
+            18 => for_gen::pack18_16(base, &input[i as usize..], &mut output[written as usize..]),
+            19 => for_gen::pack19_16(base, &input[i as usize..], &mut output[written as usize..]),
+            20 => for_gen::pack20_16(base, &input[i as usize..], &mut output[written as usize..]),
+            21 => for_gen::pack21_16(base, &input[i as usize..], &mut output[written as usize..]),
+            22 => for_gen::pack22_16(base, &input[i as usize..], &mut output[written as usize..]),
+            23 => for_gen::pack23_16(base, &input[i as usize..], &mut output[written as usize..]),
+            24 => for_gen::pack24_16(base, &input[i as usize..], &mut output[written as usize..]),
+            25 => for_gen::pack25_16(base, &input[i as usize..], &mut output[written as usize..]),
+            26 => for_gen::pack26_16(base, &input[i as usize..], &mut output[written as usize..]),
+            27 => for_gen::pack27_16(base, &input[i as usize..], &mut output[written as usize..]),
+            28 => for_gen::pack28_16(base, &input[i as usize..], &mut output[written as usize..]),
+            29 => for_gen::pack29_16(base, &input[i as usize..], &mut output[written as usize..]),
+            30 => for_gen::pack30_16(base, &input[i as usize..], &mut output[written as usize..]),
+            31 => for_gen::pack31_16(base, &input[i as usize..], &mut output[written as usize..]),
+            _ => for_gen::pack32_16(base, &input[i as usize..], &mut output[written as usize..]),
+        };
+        i += 16;
+    }
+    while i + 8 <= length {
+        written += match bits {
+            0 => for_gen::pack0_8(base, &input[i as usize..], &mut output[written as usize..]),
+            1 => for_gen::pack1_8(base, &input[i as usize..], &mut output[written as usize..]),
+            2 => for_gen::pack2_8(base, &input[i as usize..], &mut output[written as usize..]),
+            3 => for_gen::pack3_8(base, &input[i as usize..], &mut output[written as usize..]),
+            4 => for_gen::pack4_8(base, &input[i as usize..], &mut output[written as usize..]),
+            5 => for_gen::pack5_8(base, &input[i as usize..], &mut output[written as usize..]),
+            6 => for_gen::pack6_8(base, &input[i as usize..], &mut output[written as usize..]),
+            7 => for_gen::pack7_8(base, &input[i as usize..], &mut output[written as usize..]),
+            8 => for_gen::pack8_8(base, &input[i as usize..], &mut output[written as usize..]),
+            9 => for_gen::pack9_8(base, &input[i as usize..], &mut output[written as usize..]),
+            10 => for_gen::pack10_8(base, &input[i as usize..], &mut output[written as usize..]),
+            11 => for_gen::pack11_8(base, &input[i as usize..], &mut output[written as usize..]),
+            12 => for_gen::pack12_8(base, &input[i as usize..], &mut output[written as usize..]),
+            13 => for_gen::pack13_8(base, &input[i as usize..], &mut output[written as usize..]),
+            14 => for_gen::pack14_8(base, &input[i as usize..], &mut output[written as usize..]),
+            15 => for_gen::pack15_8(base, &input[i as usize..], &mut output[written as usize..]),
+            16 => for_gen::pack16_8(base, &input[i as usize..], &mut output[written as usize..]),
+            17 => for_gen::pack17_8(base, &input[i as usize..], &mut output[written as usize..]),
+            18 => for_gen::pack18_8(base, &input[i as usize..], &mut output[written as usize..]),
+            19 => for_gen::pack19_8(base, &input[i as usize..], &mut output[written as usize..]),
+            20 => for_gen::pack20_8(base, &input[i as usize..], &mut output[written as usize..]),
+            21 => for_gen::pack21_8(base, &input[i as usize..], &mut output[written as usize..]),
+            22 => for_gen::pack22_8(base, &input[i as usize..], &mut output[written as usize..]),
+            23 => for_gen::pack23_8(base, &input[i as usize..], &mut output[written as usize..]),
+            24 => for_gen::pack24_8(base, &input[i as usize..], &mut output[written as usize..]),
+            25 => for_gen::pack25_8(base, &input[i as usize..], &mut output[written as usize..]),
+            26 => for_gen::pack26_8(base, &input[i as usize..], &mut output[written as usize..]),
+            27 => for_gen::pack27_8(base, &input[i as usize..], &mut output[written as usize..]),
+            28 => for_gen::pack28_8(base, &input[i as usize..], &mut output[written as usize..]),
+            29 => for_gen::pack29_8(base, &input[i as usize..], &mut output[written as usize..]),
+            30 => for_gen::pack30_8(base, &input[i as usize..], &mut output[written as usize..]),
+            31 => for_gen::pack31_8(base, &input[i as usize..], &mut output[written as usize..]),
+            _ => for_gen::pack32_8(base, &input[i as usize..], &mut output[written as usize..]),
+        };
+        i += 8;
+    }
+    written + match bits {
+        0 => for_gen::pack0_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        1 => for_gen::pack1_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        2 => for_gen::pack2_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        3 => for_gen::pack3_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        4 => for_gen::pack4_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        5 => for_gen::pack5_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        6 => for_gen::pack6_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        7 => for_gen::pack7_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        8 => for_gen::pack8_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        9 => for_gen::pack9_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        10 => for_gen::pack10_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        11 => for_gen::pack11_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        12 => for_gen::pack12_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        13 => for_gen::pack13_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        14 => for_gen::pack14_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        15 => for_gen::pack15_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        16 => for_gen::pack16_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        17 => for_gen::pack17_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        18 => for_gen::pack18_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        19 => for_gen::pack19_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        20 => for_gen::pack20_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        21 => for_gen::pack21_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        22 => for_gen::pack22_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        23 => for_gen::pack23_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        24 => for_gen::pack24_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        25 => for_gen::pack25_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        26 => for_gen::pack26_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        27 => for_gen::pack27_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        28 => for_gen::pack28_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        29 => for_gen::pack29_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        30 => for_gen::pack30_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        31 => for_gen::pack31_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+        _ => for_gen::pack32_x(base, &input[i as usize..], &mut output[written as usize..], length - i),
+    }
+}
+
+pub fn for_compress_unsorted(input: &[u32], output: &mut [u8], length: u32) -> u32 {
+    if length == 0 {
+        return 0;
+    }
+    let slice = &input[..length as usize];
+    let mut m = slice[0];
+    let mut max_v = m;
+    for &v in &slice[1..] {
+        if v < m { m = v; }
+        if v > max_v { max_v = v; }
+    }
+    let b = required_bits(max_v - m);
+    output[0..4].copy_from_slice(&m.to_le_bytes());
+    output[4] = b as u8;
+    METADATA as u32 + for_compress_bits(input, &mut output[METADATA as usize..], length, m, b)
+}
+
+pub fn for_compress_sorted(input: &[u32], output: &mut [u8], length: u32) -> u32 {
+    if length == 0 {
+        return 0;
+    }
+    let m = input[0];
+    let max_v = input[length as usize - 1];
+    let b = required_bits(max_v - m);
+    output[0..4].copy_from_slice(&m.to_le_bytes());
+    output[4] = b as u8;
+    METADATA as u32 + for_compress_bits(input, &mut output[METADATA as usize..], length, m, b)
+}
+
+pub fn for_uncompress_bits(input: &[u8], output: &mut [u32], length: u32, base: u32, bits: u32) -> u32 {
+    assert!(bits <= 32);
+    let mut i = 0u32;
+    let mut used = 0u32;
+    while i + 32 <= length {
+        used += match bits {
+            0 => for_gen::unpack0_32(base, &input[used as usize..], &mut output[i as usize..]),
+            1 => for_gen::unpack1_32(base, &[], &mut []),
+            2 => for_gen::unpack2_32(base, &[], &mut []),
+            3 => for_gen::unpack3_32(base, &[], &mut []),
+            4 => for_gen::unpack4_32(base, &[], &mut []),
+            5 => for_gen::unpack5_32(base, &[], &mut []),
+            6 => for_gen::unpack6_32(base, &[], &mut []),
+            7 => for_gen::unpack7_32(base, &[], &mut []),
+            8 => for_gen::unpack8_32(base, &[], &mut []),
+            9 => for_gen::unpack9_32(base, &[], &mut []),
+            10 => for_gen::unpack10_32(base, &[], &mut []),
+            11 => for_gen::unpack11_32(base, &[], &mut []),
+            12 => for_gen::unpack12_32(base, &[], &mut []),
+            13 => for_gen::unpack13_32(base, &[], &mut []),
+            14 => for_gen::unpack14_32(base, &[], &mut []),
+            15 => for_gen::unpack15_32(base, &[], &mut []),
+            16 => for_gen::unpack16_32(base, &[], &mut []),
+            17 => for_gen::unpack17_32(base, &[], &mut []),
+            18 => for_gen::unpack18_32(base, &[], &mut []),
+            19 => for_gen::unpack19_32(base, &[], &mut []),
+            20 => for_gen::unpack20_32(base, &[], &mut []),
+            21 => for_gen::unpack21_32(base, &[], &mut []),
+            22 => for_gen::unpack22_32(base, &[], &mut []),
+            23 => for_gen::unpack23_32(base, &[], &mut []),
+            24 => for_gen::unpack24_32(base, &[], &mut []),
+            25 => for_gen::unpack25_32(base, &[], &mut []),
+            26 => for_gen::unpack26_32(base, &[], &mut []),
+            27 => for_gen::unpack27_32(base, &[], &mut []),
+            28 => for_gen::unpack28_32(base, &[], &mut []),
+            29 => for_gen::unpack29_32(base, &[], &mut []),
+            30 => for_gen::unpack30_32(base, &[], &mut []),
+            31 => for_gen::unpack31_32(base, &[], &mut []),
+            _ => for_gen::unpack32_32(base, &[], &mut []),
+        };
+        i += 32;
+    }
+    while i + 16 <= length {
+        used += match bits {
+            0 => for_gen::unpack0_16(base, &input[used as usize..], &mut output[i as usize..]),
+            _ => {
+                let mut tmp = vec![0u32; 16];
+                let r = match bits {
+                    1 => for_gen::unpack1_16(base, &[], &mut []),
+                    2 => for_gen::unpack2_16(base, &[], &mut []),
+                    3 => for_gen::unpack3_16(base, &[], &mut []),
+                    4 => for_gen::unpack4_16(base, &[], &mut []),
+                    5 => for_gen::unpack5_16(base, &[], &mut []),
+                    6 => for_gen::unpack6_16(base, &[], &mut []),
+                    7 => for_gen::unpack7_16(base, &[], &mut []),
+                    8 => for_gen::unpack8_16(base, &[], &mut []),
+                    9 => for_gen::unpack9_16(base, &[], &mut []),
+                    10 => for_gen::unpack10_16(base, &[], &mut []),
+                    11 => for_gen::unpack11_16(base, &[], &mut []),
+                    12 => for_gen::unpack12_16(base, &[], &mut []),
+                    13 => for_gen::unpack13_16(base, &[], &mut []),
+                    14 => for_gen::unpack14_16(base, &[], &mut []),
+                    15 => for_gen::unpack15_16(base, &[], &mut []),
+                    16 => for_gen::unpack16_16(base, &[], &mut []),
+                    17 => for_gen::unpack17_16(base, &[], &mut []),
+                    18 => for_gen::unpack18_16(base, &[], &mut []),
+                    19 => for_gen::unpack19_16(base, &[], &mut []),
+                    20 => for_gen::unpack20_16(base, &[], &mut []),
+                    21 => for_gen::unpack21_16(base, &[], &mut []),
+                    22 => for_gen::unpack22_16(base, &[], &mut []),
+                    23 => for_gen::unpack23_16(base, &[], &mut []),
+                    24 => for_gen::unpack24_16(base, &[], &mut []),
+                    25 => for_gen::unpack25_16(base, &[], &mut []),
+                    26 => for_gen::unpack26_16(base, &[], &mut []),
+                    27 => for_gen::unpack27_16(base, &[], &mut []),
+                    28 => for_gen::unpack28_16(base, &[], &mut []),
+                    29 => for_gen::unpack29_16(base, &[], &mut []),
+                    30 => for_gen::unpack30_16(base, &[], &mut []),
+                    31 => for_gen::unpack31_16(base, &[], &mut []),
+                    _ => for_gen::unpack32_16(base, &[], &mut []),
+                };
+                output[i as usize..i as usize + 16].copy_from_slice(&tmp);
+                r
+            }
+        };
+        i += 16;
+    }
+    while i + 8 <= length {
+        let mut tmp = vec![0u32; 8];
+        let r = match bits {
+            0 => for_gen::unpack0_8(base, &input[used as usize..], &mut tmp),
+            _ => match bits {
+                1 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 1),
+                2 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 2),
+                3 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 3),
+                4 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 4),
+                5 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 5),
+                6 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 6),
+                7 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 7),
+                8 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 8),
+                9 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 9),
+                10 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 10),
+                11 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 11),
+                12 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 12),
+                13 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 13),
+                14 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 14),
+                15 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 15),
+                16 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 16),
+                17 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 17),
+                18 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 18),
+                19 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 19),
+                20 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 20),
+                21 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 21),
+                22 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 22),
+                23 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 23),
+                24 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 24),
+                25 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 25),
+                26 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 26),
+                27 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 27),
+                28 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 28),
+                29 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 29),
+                30 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 30),
+                31 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 31),
+                _ => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, 8, 32),
+            }
+        };
+        output[i as usize..i as usize + 8].copy_from_slice(&tmp);
+        used += r;
+        i += 8;
+    }
+    used + match bits {
+        0 => for_gen::unpack0_x(base, &input[used as usize..], &mut output[i as usize..], length - i),
+        _ => {
+            let mut tmp = vec![0u32; (length - i) as usize];
+            let r = match bits {
+                1 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 1),
+                2 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 2),
+                3 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 3),
+                4 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 4),
+                5 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 5),
+                6 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 6),
+                7 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 7),
+                8 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 8),
+                9 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 9),
+                10 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 10),
+                11 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 11),
+                12 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 12),
+                13 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 13),
+                14 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 14),
+                15 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 15),
+                16 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 16),
+                17 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 17),
+                18 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 18),
+                19 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 19),
+                20 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 20),
+                21 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 21),
+                22 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 22),
+                23 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 23),
+                24 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 24),
+                25 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 25),
+                26 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 26),
+                27 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 27),
+                28 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 28),
+                29 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 29),
+                30 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 30),
+                31 => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 31),
+                _ => for_gen::unpack_generic(base, &input[used as usize..], &mut tmp, (length - i) as usize, 32),
+            };
+            output[i as usize..length as usize].copy_from_slice(&tmp);
+            r
+        }
+    }
+}
+
+pub fn for_uncompress(input: &[u8], output: &mut [u32], length: u32) -> u32 {
+    if length == 0 {
+        return 0;
+    }
+    let m = u32::from_le_bytes([input[0], input[1], input[2], input[3]]);
+    let b = input[4] as u32;
+    METADATA as u32 + for_uncompress_bits(&input[METADATA as usize..], output, length, m, b)
+}
+
+pub fn for_append_bits(input: &mut [u8], mut length: u32, base: u32, bits: u32, value: u32) -> u32 {
+    assert!(bits <= 32);
+    assert!(required_bits(value - base) <= bits);
+    assert!(value >= base);
+
+    if bits == 32 {
+        let off = (length * 4) as usize;
+        input[off..off + 4].copy_from_slice(&(value - base).to_le_bytes());
+        return (length + 1) * 4;
+    }
+
+    let mut ptr = 0usize;
+    if length > 32 {
+        let b = length / 32;
+        ptr += ((b * 32 * bits) / 8) as usize;
+        length %= 32;
+    }
+    if length > 16 {
+        let b = length / 16;
+        ptr += ((b * 16 * bits) / 8) as usize;
+        length %= 16;
+    }
+    if length > 8 {
+        let b = length / 8;
+        ptr += ((b * 8 * bits) / 8) as usize;
+        length %= 8;
+    }
+    let mut start = length * bits;
+    ptr += (start / 8) as usize;
+    start %= 8;
+
+    let bit_pos = ptr * 8 + start as usize;
+    let mut v = value - base;
+    let mut rem = bits as usize;
+    let mut pos = bit_pos;
+    while rem > 0 {
+        let byte_index = pos / 8;
+        let bit_in_byte = pos % 8;
+        let take = rem.min(8 - bit_in_byte);
+        let part_mask = ((1u16 << take) - 1) as u8;
+        input[byte_index] &= !(part_mask << bit_in_byte);
+        input[byte_index] |= ((v as u8) & part_mask) << bit_in_byte;
+        v >>= take;
+        pos += take;
+        rem -= take;
+    }
+    (ptr as u32) + ((start as usize + bits as usize).div_ceil(8) as u32)
+}
+
+pub type AppendImpl = fn(&[u32], &mut [u8], u32) -> u32;
+
+pub fn for_append_impl(input: &mut [u8], length: u32, value: u32, appendImpl: AppendImpl) -> u32 {
+    if length == 0 {
+        return appendImpl(&[value], input, 1);
+    }
+    let m = u32::from_le_bytes([input[0], input[1], input[2], input[3]]);
+    let b = input[4] as u32;
+    let bnew = required_bits(value - m);
+    if m > value || bnew > b {
+        let mut tmp = vec![0u32; (length + 1) as usize];
+        for_uncompress(input, &mut tmp[..length as usize], length);
+        tmp[length as usize] = value;
+        return appendImpl(&tmp, input, length + 1);
+    }
+    METADATA as u32 + for_append_bits(&mut input[METADATA as usize..], length, m, b, value)
+}
+
+pub fn for_append_unsorted(input: &mut [u8], length: u32, value: u32) -> u32 {
+    for_append_impl(input, length, value, for_compress_unsorted)
+}
+
+pub fn for_append_sorted(input: &mut [u8], length: u32, value: u32) -> u32 {
+    for_append_impl(input, length, value, for_compress_sorted)
+}
+
+pub fn for_select_bits(input: &[u8], base: u32, bits: u32, mut index: u32) -> u32 {
+    assert!(bits <= 32);
+    if bits == 32 {
+        let off = (index * 4) as usize;
+        let v = u32::from_le_bytes([input[off], input[off + 1], input[off + 2], input[off + 3]]);
+        return base + v;
+    }
+    let mut ptr = 0usize;
+    if index > 32 {
+        let b = index / 32;
+        ptr += ((b * 32 * bits) / 8) as usize;
+        index %= 32;
+    }
+    if index > 16 {
+        let b = index / 16;
+        ptr += ((b * 16 * bits) / 8) as usize;
+        index %= 16;
+    }
+    if index > 8 {
+        let b = index / 8;
+        ptr += ((b * 8 * bits) / 8) as usize;
+        index %= 8;
+    }
+    let start = (index * bits) as usize;
+    let bit_pos = ptr * 8 + start;
+    let mut v = 0u32;
+    let mut filled = 0usize;
+    while filled < bits as usize {
+        let byte_index = (bit_pos + filled) / 8;
+        let bit_in_byte = (bit_pos + filled) % 8;
+        let take = (bits as usize - filled).min(8 - bit_in_byte);
+        let part = ((input.get(byte_index).copied().unwrap_or(0) >> bit_in_byte) & (((1u16 << take) - 1) as u8)) as u32;
+        v |= part << filled;
+        filled += take;
+    }
+    base + v
+}
+
+pub fn for_select(input: &[u8], index: u32) -> u32 {
+    let m = u32::from_le_bytes([input[0], input[1], input[2], input[3]]);
+    let b = input[4] as u32;
+    for_select_bits(&input[METADATA as usize..], m, b, index)
+}
+
+pub fn for_linear_search_bits(input: &[u8], length: u32, base: u32, bits: u32, value: u32) -> u32 {
+    assert!(bits <= 32);
+    let mut i = 0u32;
+    let mut found = -1i32;
+    if bits == 0 {
+        return if value == base { 0 } else { length };
+    }
+    while i + 32 <= length {
+        let used = match bits {
+            1 => for_gen::linsearch1_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            2 => for_gen::linsearch2_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            3 => for_gen::linsearch3_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            4 => for_gen::linsearch4_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            5 => for_gen::linsearch5_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            6 => for_gen::linsearch6_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            7 => for_gen::linsearch7_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            8 => for_gen::linsearch8_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            9 => for_gen::linsearch9_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            10 => for_gen::linsearch10_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            11 => for_gen::linsearch11_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            12 => for_gen::linsearch12_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            13 => for_gen::linsearch13_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            14 => for_gen::linsearch14_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            15 => for_gen::linsearch15_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            16 => for_gen::linsearch16_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            17 => for_gen::linsearch17_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            18 => for_gen::linsearch18_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            19 => for_gen::linsearch19_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            20 => for_gen::linsearch20_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            21 => for_gen::linsearch21_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            22 => for_gen::linsearch22_32(base, &input[(i * bits / 8) as usize..], value, &mut found),
+            23 => for_gen::linsearch23_32(base, &input[(i * bits / 8) as usize..], value, &mut

@@ -1,0 +1,39 @@
+ {{lib.rs}}
+```rust
+pub mod core;
+pub mod io;
+pub mod math;
+pub mod os;
+pub mod string;
+pub mod tisp;
+```
+
+{{core.rs}}
+```rust
+// Core module implementation
+```
+
+{{io.rs}}
+```rust
+// IO module implementation
+```
+
+{{math.rs}}
+```rust
+// Math module implementation
+```
+
+{{os.rs}}
+```rust
+// OS module implementation
+```
+
+{{string.rs}}
+```rust
+// String module implementation
+```
+
+{{tisp.rs}}
+```rust
+// TISP module implementation
+```

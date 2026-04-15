@@ -1,0 +1,78 @@
+// Generated Rust Code
+```rust
+// tx.rs
+use super::psbt::PsbtResult;
+use crate::compactsize::*;
+
+/// Translates the C struct psbt_txin.
+#[derive(Clone)]
+pub struct PsbtTxIn {
+    pub txid: Vec<u8>,
+    pub index: u32,
+    pub script: Vec<u8>,
+    pub sequence_number: u32,
+}
+
+/// Translates the C struct psbt_txout.
+#[derive(Clone)]
+pub struct PsbtTxOut {
+    pub amount: u64,
+    pub script: Vec<u8>,
+}
+
+/// Translates the C struct psbt_witness_item.
+#[derive(Clone)]
+pub struct PsbtWitnessItem {
+    pub input_index: i32,
+    pub item_index: i32,
+    pub item: Vec<u8>,
+}
+
+/// Translates the C struct psbt_tx.
+#[derive(Clone)]
+pub struct PsbtTx {
+    pub version: u32,
+    pub lock_time: u32,
+}
+
+/// Translates the C union inside psbt_txelem.
+#[derive(Clone)]
+pub enum PsbtTxElem {
+    TxIn(PsbtTxIn),
+    TxOut(PsbtTxOut),
+    Tx(PsbtTx),
+    WitnessItem(PsbtWitnessItem),
+}
+
+/// The handler type for psbt_txelem.
+pub type PsbtTxElemHandler = fn(elem: &mut PsbtTxElem, user_data: &mut dyn std::any::Any);
+
+/// Parse a Bitcoin transaction.
+pub fn psbt_btc_tx_parse(
+    tx: &[u8],
+    tx_size: usize,
+    user_data: &mut dyn std::any::Any,
+    handler: Option<PsbtTxElemHandler>,
+) -> PsbtResult {
+    let mut p = 0;
+    if p + 4 > tx_size {
+        return PsbtResult::ReadError;
+    }
+    let version = u32::from_le_bytes([tx[p], tx[p + 1], tx[p + 2], tx[p + 3]]);
+    p += 4;
+
+    if p + 1 > tx_size {
+        return PsbtResult::ReadError;
+    }
+    let size_len = compactsize_peek_length(tx[p]);
+    if p + size_len as usize > tx_size {
+        return PsbtResult::ReadError;
+    }
+    let (count_inputs, res) = compactsize_read(&tx[p..]);
+    if res != PsbtResult::Ok {
+        return res;
+    }
+    p += size_len as usize;
+
+    let inputs = count_inputs;
+    for

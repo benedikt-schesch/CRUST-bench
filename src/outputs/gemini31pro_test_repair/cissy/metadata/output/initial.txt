@@ -1,0 +1,86 @@
+// Generated Rust Code
+```rust
+// csvfield.rs
+use std::fs::File;
+use std::io::Write;
+
+#[derive(Debug, Clone)]
+pub struct CsvField {
+    pub data: String,
+    pub len: usize,
+}
+
+impl CsvField {
+    pub fn new() -> Self {
+        Self {
+            data: String::new(),
+            len: 0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.data.clear();
+        self.len = 0;
+    }
+
+    pub fn set(&mut self, buf: &str, buf_start_idx: usize, len: usize) {
+        let end_idx = buf_start_idx + len;
+        let bytes = buf.as_bytes();
+        if end_idx <= bytes.len() {
+            self.data = String::from_utf8_lossy(&bytes[buf_start_idx..end_idx]).to_string();
+            self.len = self.data.len();
+        }
+    }
+
+    pub fn append(&mut self, buf: &str, buf_start_idx: usize, buflen: usize) {
+        let end_idx = buf_start_idx + buflen;
+        let bytes = buf.as_bytes();
+        if end_idx <= bytes.len() {
+            self.data.push_str(&String::from_utf8_lossy(&bytes[buf_start_idx..end_idx]));
+            self.len = self.data.len();
+        }
+    }
+
+    pub fn print_to_file(&self, fp: &mut File) {
+        let _ = writeln!(fp, "[{}:{}]", self.data, self.len);
+    }
+}
+```
+
+```rust
+// csvline.rs
+use crate::csvfield::CsvField;
+use std::fs::File;
+use std::io::Write;
+
+#[derive(Debug, Clone)]
+pub struct CsvLine {
+    pub field: Vec<CsvField>,
+    pub fieldsize: usize,
+    pub current_idx: usize,
+    pub eol_str: String,
+}
+
+impl CsvLine {
+    pub fn new() -> Self {
+        Self {
+            field: Vec::new(),
+            fieldsize: 0,
+            current_idx: 0,
+            eol_str: "\n".to_string(),
+        }
+    }
+
+    pub fn get_field_count(&self) -> usize {
+        self.current_idx
+    }
+
+    pub fn get_field(&self, idx: usize) -> Option<&str> {
+        if idx >= self.current_idx {
+            Some("")
+        } else {
+            Some(&self.field[idx].data)
+        }
+    }
+
+    pub fn reset(&mut

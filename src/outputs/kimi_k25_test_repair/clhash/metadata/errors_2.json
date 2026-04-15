@@ -1,0 +1,1 @@
+[{"error_code": null, "error_message": "expected one of `;` or `{`, found `/`", "file_path": "clhash/src/lib.rs", "row": "2", "col": "12", "error_snippet": "|\n2 | pub mod bin/example;\n  |            ^ expected one of `;` or `{`"}]

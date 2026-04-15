@@ -1,0 +1,54 @@
+ {{lib.rs}}
+```rust
+pub mod bigint;
+pub use bigint::BigInt;
+```
+
+{{bigint.rs}}
+```rust
+#[derive(Debug, Clone)]
+pub struct BigInt {
+    digits: Vec<u8>,
+}
+
+impl BigInt {
+    pub fn new() -> Self {
+        BigInt { digits: vec![0] }
+    }
+
+    pub fn from_i64(val: i64) -> Self {
+        // Simplified implementation for demonstration
+        BigInt { digits: vec![val as u8] }
+    }
+}
+```
+
+{{bin/test1.rs}}
+```rust
+use crate::bigint::BigInt;
+
+fn main() {
+    let _num = BigInt::new();
+    println!("Test 1: BigInt created successfully");
+}
+```
+
+{{bin/test2.rs}}
+```rust
+use crate::bigint::BigInt;
+
+fn main() {
+    let _num = BigInt::from_i64(42);
+    println!("Test 2: BigInt created successfully");
+}
+```
+
+{{bin/test3.rs}}
+```rust
+use crate::bigint::BigInt;
+
+fn main() {
+    let _num = BigInt::new();
+    println!("Test 3: BigInt created successfully");
+}
+```

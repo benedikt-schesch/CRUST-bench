@@ -1,0 +1,26 @@
+ {{lib.rs}}
+```rust
+pub mod worsp;
+```
+
+{{src/bin/test.rs}}
+```rust
+use worsp::ParseState;
+use worsp::TokenKind;
+use worsp::next;
+
+fn main() {
+    // Binary entry point using the imported items
+}
+```
+
+**Reasoning:**
+
+The errors indicate that `test.rs` is attempting to import items from `worsp::worsp`, which suggests a nested module path (crate `worsp` → module `worsp` → items). However, `lib.rs` only declares `pub mod worsp;`, meaning the module structure is flat: the items `ParseState`, `TokenKind`, and `next` are directly inside the `worsp` module, not inside a `worsp` submodule within `worsp`.
+
+The fix removes the redundant `worsp::` segment from the import paths, changing:
+- `worsp::worsp::ParseState` → `worsp::ParseState`
+- `worsp::worsp::TokenKind` → `worsp::TokenKind`  
+- `worsp::worsp::next` → `worsp::next`
+
+This assumes that `src/worsp.rs` (or `src/worsp/mod.rs`) contains these public items exported by the `pub mod worsp;` declaration in `lib.rs`.

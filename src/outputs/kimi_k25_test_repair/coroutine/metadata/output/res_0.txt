@@ -1,0 +1,219 @@
+ {{coroutine.rs}}
+```rust
+use std::any::Any;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread::{self, Thread, park};
+
+pub const COROUTINE_DEAD: i32 = 0;
+pub const COROUTINE_READY: i32 = 1;
+pub const COROUTINE_RUNNING: i32 = 2;
+pub const COROUTINE_SUSPEND: i32 = 3;
+
+pub const STACK_SIZE: usize = 1024 * 1024;
+pub const DEFAULT_COROUTINE: usize = 16;
+
+pub type CoroutineFunc = fn(schedule: &mut Schedule, data: &mut dyn Any);
+
+pub struct Coroutine {
+    pub func: CoroutineFunc,
+    pub data: Option<Box<dyn Any + Send>>,
+    pub cap: isize,
+    pub size: isize,
+    pub status: i32,
+    pub stack: Option<Box<[u8]>>,
+}
+
+pub struct Schedule {
+    pub stack: Box<[u8]>,
+    pub nco: usize,
+    pub cap: usize,
+    pub running: i32,
+    pub co: Vec<Option<Box<Coroutine>>>,
+    pub id: usize,
+}
+
+lazy_static::lazy_static! {
+    static ref COROUTINE_THREADS: Mutex<HashMap<usize, Thread>> = Mutex::new(HashMap::new());
+    static ref MAIN_THREAD: Mutex<Option<Thread>> = Mutex::new(None);
+    static ref SCHEDULE_REGISTRY: Mutex<HashMap<usize, Arc<Mutex<Schedule>>>> = Mutex::new(HashMap::new());
+    static ref NEXT_SCHEDULE_ID: AtomicUsize = AtomicUsize::new(0);
+}
+
+pub fn coroutine_open() -> Box<Schedule> {
+    *MAIN_THREAD.lock().unwrap() = Some(thread::current());
+    let id = NEXT_SCHEDULE_ID.fetch_add(1, Ordering::SeqCst);
+    let schedule = Schedule {
+        stack: vec![0u8; STACK_SIZE].into_boxed_slice(),
+        nco: 0,
+        cap: DEFAULT_COROUTINE,
+        running: -1,
+        co: (0..DEFAULT_COROUTINE).map(|_| None).collect(),
+        id,
+    };
+    let arc_schedule = Arc::new(Mutex::new(schedule));
+    SCHEDULE_REGISTRY.lock().unwrap().insert(id, arc_schedule);
+    Box::new(Schedule {
+        stack: vec![0u8; 0].into_boxed_slice(), 
+        nco: 0,
+        cap: 0,
+        running: -1,
+        co: Vec::new(),
+        id,
+    })
+}
+
+pub fn coroutine_close(schedule: Box<Schedule>) {
+    let id = schedule.id;
+    let mut threads = COROUTINE_THREADS.lock().unwrap();
+    for (_id, thread) in threads.drain() {
+        let _ = thread;
+    }
+    drop(threads);
+    SCHEDULE_REGISTRY.lock().unwrap().remove(&id);
+    drop(schedule);
+    *MAIN_THREAD.lock().unwrap() = None;
+}
+
+pub fn coroutine_new(schedule: &mut Schedule, func: CoroutineFunc, data: Box<dyn Any + Send>) -> i32 {
+    let id = schedule.id;
+    let arc = SCHEDULE_REGISTRY.lock().unwrap().get(&id).unwrap().clone();
+    let co = Box::new(Coroutine {
+        func,
+        data: Some(data),
+        cap: 0,
+        size: 0,
+        status: COROUTINE_READY,
+        stack: None,
+    });
+    let mut s = arc.lock().unwrap();
+    let coroutine_id: i32 = if s.nco >= s.cap {
+        let new_id = s.cap as i32;
+        let new_cap = s.cap * 2;
+        let current_len = s.co.len();
+        s.co.extend((0..(new_cap - current_len)).map(|_| None));
+        s.co[new_id as usize] = Some(co);
+        s.cap = new_cap;
+        new_id
+    } else {
+        let mut found_id: Option<i32> = None;
+        for i in 0..s.cap {
+            let idx = (i + s.nco) % s.cap;
+            if s.co[idx].is_none() {
+                found_id = Some(idx as i32);
+                s.co[idx] = Some(co);
+                break;
+            }
+        }
+        match found_id {
+            Some(id) => id,
+            None => panic!("Failed to find empty slot for coroutine"),
+        }
+    };
+    s.nco += 1;
+    let id_usize = coroutine_id as usize;
+    let arc_clone = Arc::clone(&arc);
+    drop(s); 
+    
+    let handle = thread::spawn(move || {
+        park();
+        let (func, mut data, sched_id) = {
+            let mut s = arc_clone.lock().unwrap();
+            let co = s.co[id_usize].as_mut().unwrap();
+            let func = co.func;
+            let data = co.data.take().expect("Coroutine data should be present");
+            co.status = COROUTINE_RUNNING;
+            (func, data, s.id)
+        };
+        
+        let mut dummy_schedule = Schedule {
+            stack: vec![0u8; 0].into_boxed_slice(),
+            nco: 0,
+            cap: 0,
+            running: id_usize as i32,
+            co: Vec::new(),
+            id: sched_id,
+        };
+        
+        func(&mut dummy_schedule, &mut *data);
+        
+        let mut s = arc_clone.lock().unwrap();
+        if let Some(ref mut co) = s.co[id_usize] {
+            co.data = Some(data);
+            co.status = COROUTINE_DEAD;
+        }
+        s.nco -= 1;
+        s.running = -1;
+        if let Some(ref main) = *MAIN_THREAD.lock().unwrap() {
+            main.unpark();
+        }
+    });
+    
+    COROUTINE_THREADS.lock().unwrap().insert(id_usize, handle.thread().clone());
+    coroutine_id
+}
+
+pub fn coroutine_resume(schedule: &mut Schedule, id: i32) {
+    let sched_id = schedule.id;
+    let arc = SCHEDULE_REGISTRY.lock().unwrap().get(&sched_id).unwrap().clone();
+    let mut s = arc.lock().unwrap();
+    assert!(s.running == -1);
+    assert!(id >= 0 && id < s.cap as i32);
+    let id_usize = id as usize;
+    if s.co[id_usize].is_none() {
+        return;
+    }
+    let status = s.co[id_usize].as_ref().unwrap().status;
+    match status {
+        COROUTINE_READY | COROUTINE_SUSPEND => {
+            s.running = id;
+            s.co[id_usize].as_mut().unwrap().status = COROUTINE_RUNNING;
+            drop(s); 
+            if let Some(thread) = COROUTINE_THREADS.lock().unwrap().get(&id_usize) {
+                thread.unpark();
+            }
+            park();
+        }
+        _ => {
+            panic!("Invalid coroutine status");
+        }
+    }
+}
+
+pub fn coroutine_yield(schedule: &mut Schedule) {
+    let sched_id = schedule.id;
+    let arc = SCHEDULE_REGISTRY.lock().unwrap().get(&sched_id).unwrap().clone();
+    let mut s = arc.lock().unwrap();
+    let id = s.running;
+    assert!(id >= 0);
+    let id_usize = id as usize;
+    if let Some(ref mut co) = s.co[id_usize] {
+        co.status = COROUTINE_SUSPEND;
+    }
+    s.running = -1;
+    drop(s); 
+    if let Some(ref main) = *MAIN_THREAD.lock().unwrap() {
+        main.unpark();
+    }
+    park();
+}
+
+pub fn coroutine_status(schedule: &Schedule, id: i32) -> i32 {
+    let sched_id = schedule.id;
+    let arc = SCHEDULE_REGISTRY.lock().unwrap().get(&sched_id).unwrap().clone();
+    let s = arc.lock().unwrap();
+    assert!(id >= 0 && id < s.cap as i32);
+    if s.co[id as usize].is_none() {
+        return COROUTINE_DEAD;
+    }
+    s.co[id as usize].as_ref().unwrap().status
+}
+
+pub fn coroutine_running(schedule: &Schedule) -> i32 {
+    let sched_id = schedule.id;
+    let arc = SCHEDULE_REGISTRY.lock().unwrap().get(&sched_id).unwrap().clone();
+    let s = arc.lock().unwrap();
+    s.running
+}
+```

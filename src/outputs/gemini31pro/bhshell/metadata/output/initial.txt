@@ -1,0 +1,77 @@
+{{bhshell.rs}}
+```rust
+use crate::input::Command;
+use crate::input::bhshell_read_line;
+use crate::input::bhshell_parse;
+use crate::input::destroy_command;
+use std::env;
+use std::io::{self, Write};
+use std::process::{Command as ProcessCommand, Stdio};
+use std::fs::File;
+
+pub const BUF_SIZE: usize = 64;
+
+/// Runs the main bhshell loop.
+pub fn bhshell_loop() {
+    let mut status = 1;
+    while status != 0 {
+        let dir = match env::current_dir() {
+            Ok(d) => d,
+            Err(_) => std::process::exit(1),
+        };
+        print!("[{}] $ ", dir.display());
+        let _ = io::stdout().flush();
+
+        let line = bhshell_read_line();
+        let mut cmd = bhshell_parse(&line);
+
+        if cmd.args.is_empty() {
+            println!("Invalid Command");
+            continue;
+        }
+
+        status = bhshell_execute(&mut cmd);
+        destroy_command(cmd);
+    }
+}
+
+/// Executes the given command.
+/// Returns an integer status code (C equivalent of int).
+pub fn bhshell_execute(cmd: &mut Command) -> i32 {
+    if cmd.args.is_empty() {
+        return 1;
+    }
+
+    let builtin_str = ["cd", "help", "exit"];
+    if cmd.args[0] == builtin_str[0] {
+        return bhshell_cd(&cmd.args);
+    } else if cmd.args[0] == builtin_str[1] {
+        return bhshell_help(&cmd.args);
+    } else if cmd.args[0] == builtin_str[2] {
+        return bhshell_exit(&cmd.args);
+    }
+
+    bhshell_launch(cmd)
+}
+
+/// Launches the given command.
+/// Returns an integer status code (C equivalent of int).
+pub fn bhshell_launch(cmd: &mut Command) -> i32 {
+    if cmd.args.is_empty() {
+        return 1;
+    }
+
+    let mut child1_cmd = ProcessCommand::new(&cmd.args[0]);
+    if cmd.args.len() > 1 {
+        child1_cmd.args(&cmd.args[1..]);
+    }
+
+    if !cmd.pipe_args.is_empty() {
+        child1_cmd.stdout(Stdio::piped());
+        
+        let mut child1 = match child1_cmd.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("bhshell: {}", e);
+                return 1;
+            }

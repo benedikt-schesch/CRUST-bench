@@ -1,0 +1,63 @@
+```rust
+use std::any::Any;
+use std::io::Write;
+
+// Constants
+pub const HEXALOW: &str = "0123456789abcdef";
+pub const DECIMAL: &str = "0123456789";
+pub const HEXAUP: &str = "0123456789ABCDEF";
+pub const LOCATION: i32 = 2;
+
+// Function Declarations
+pub fn writeuint(mut n: u64, len: &mut i32) -> i32 {
+    let mut arr = [0u8; 16];
+    let mut i = 0;
+    if n == 0 {
+        return writechar('0', len);
+    }
+    let decimal = DECIMAL.as_bytes();
+    while n > 0 {
+        arr[i] = decimal[(n % 10) as usize];
+        n /= 10;
+        i += 1;
+    }
+    while i > 0 {
+        i -= 1;
+        if writechar(arr[i] as char, len) == -1 {
+            return -1;
+        }
+    }
+    1
+}
+
+pub fn format(args: &[Box<dyn Any>], c: char, len: &mut i32) -> i32 {
+    if c == '%' {
+        return writechar('%', len);
+    }
+    if args.is_empty() {
+        return -1;
+    }
+    let arg = &args[0];
+    if c == 'c' {
+        if let Some(&val) = arg.downcast_ref::<i32>() {
+            return writechar(val as u8 as char, len);
+        } else if let Some(&val) = arg.downcast_ref::<char>() {
+            return writechar(val, len);
+        }
+    } else if c == 's' {
+        if let Some(val) = arg.downcast_ref::<&str>() {
+            return writestring(val, len);
+        } else if let Some(val) = arg.downcast_ref::<String>() {
+            return writestring(val, len);
+        }
+    } else if c == 'd' || c == 'i' {
+        if let Some(&val) = arg.downcast_ref::<i32>() {
+            return writeint(val, len);
+        }
+    } else if c == 'u' {
+        if let Some(&val) = arg.downcast_ref::<u32>() {
+            return writeuint(val as u64, len);
+        } else if let Some(&val) = arg.downcast_ref::<u64>() {
+            return writeuint(val, len);
+        }
+    } else if c ==

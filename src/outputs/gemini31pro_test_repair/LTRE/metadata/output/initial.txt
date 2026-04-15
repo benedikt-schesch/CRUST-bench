@@ -1,0 +1,78 @@
+```rust
+// Generated Rust Code
+use std::fmt;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SymSet {
+    bits: [u8; 256 / 8],
+}
+
+impl SymSet {
+    pub fn empty() -> Self {
+        Self { bits: [0; 32] }
+    }
+
+    pub fn full() -> Self {
+        Self { bits: [0xff; 32] }
+    }
+
+    pub fn contains(&self, c: u8) -> bool {
+        (self.bits[(c / 8) as usize] & (1 << (c % 8))) != 0
+    }
+
+    pub fn insert(&mut self, c: u8) {
+        self.bits[(c / 8) as usize] |= 1 << (c % 8);
+    }
+
+    pub fn invert(&mut self) {
+        for b in &mut self.bits {
+            *b = !*b;
+        }
+    }
+
+    pub fn union_with(&mut self, other: &SymSet) {
+        for (a, b) in self.bits.iter_mut().zip(other.bits.iter()) {
+            *a |= *b;
+        }
+    }
+
+    pub fn intersect_with(&mut self, other: &SymSet) {
+        for (a, b) in self.bits.iter_mut().zip(other.bits.iter()) {
+            *a &= *b;
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.bits.iter().all(|&b| b == 0)
+    }
+}
+
+pub fn symset_fmt(set: &SymSet) -> String {
+    let mut buf = String::new();
+    let mut nbuf = String::new();
+
+    let mut nsym = 0;
+    let mut nnsym = 0;
+
+    nbuf.push('^');
+    buf.push('[');
+    nbuf.push('[');
+
+    let metachars = b"\\.-^$*+?{}[]<>()|&~";
+
+    let mut chr = 0;
+    while chr < 256 {
+        let contains = set.contains(chr as u8);
+        if contains {
+            nsym += 1;
+        } else {
+            nnsym += 1;
+        }
+
+        let is_metachar = chr != 0 && metachars.contains(&(chr as u8));
+        let is_print = (chr as u8).is_ascii_graphic() || chr == b' ';
+
+        let append_to = if contains { &mut buf } else { &mut nbuf };
+
+        if !is_print && !is_metachar {
+            append_to.push_str(&format!("\\x{:

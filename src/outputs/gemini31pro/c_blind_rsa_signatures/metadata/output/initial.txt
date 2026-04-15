@@ -1,0 +1,73 @@
+// Generated Rust Code
+```rust
+use openssl_sys::*;
+use std::ptr;
+use std::cmp::Ordering;
+use std::ffi::c_int;
+
+pub const BRSA_DEFAULT_SALT_LENGTH: usize = usize::MAX;
+
+#[derive(Debug, Clone, Copy)]
+pub enum BRSAHashFunction {
+    BRSA_SHA256,
+    BRSA_SHA384,
+    BRSA_SHA512,
+}
+
+pub struct BRSAContext {
+    pub evp_md: *const EVP_MD,
+    pub salt_len: usize,
+}
+
+impl BRSAContext {
+    pub fn new() -> Self {
+        Self {
+            evp_md: ptr::null(),
+            salt_len: 0,
+        }
+    }
+
+    pub fn brsa_context_init_default(&mut self) {
+        self.brsa_context_init_custom(BRSAHashFunction::BRSA_SHA384, BRSA_DEFAULT_SALT_LENGTH);
+    }
+
+    pub fn brsa_context_init_deterministic(&mut self) {
+        self.brsa_context_init_custom(BRSAHashFunction::BRSA_SHA384, 0);
+    }
+
+    pub fn brsa_context_init_custom(
+        &mut self,
+        hash_function: BRSAHashFunction,
+        salt_len: usize,
+    ) -> i32 {
+        unsafe {
+            let evp_md = match hash_function {
+                BRSAHashFunction::BRSA_SHA256 => EVP_sha256(),
+                BRSAHashFunction::BRSA_SHA384 => EVP_sha384(),
+                BRSAHashFunction::BRSA_SHA512 => EVP_sha512(),
+            };
+            self.evp_md = evp_md;
+            if salt_len == BRSA_DEFAULT_SALT_LENGTH {
+                self.salt_len = EVP_MD_size(evp_md) as usize;
+            } else {
+                self.salt_len = salt_len;
+            }
+            0
+        }
+    }
+
+    pub fn brsa_blind_message_generate(
+        &self,
+        blind_message: &mut BRSABlindMessage,
+        msg: &mut [u8],
+        msg_len: usize,
+        secret: &mut BRSABlindingSecret,
+        pk: &mut BRSAPublicKey,
+    ) -> i32 {
+        unsafe {
+            if RAND_bytes(msg.as_mut_ptr(), msg_len as c_int) != 1 {
+                return -1;
+            }
+            self.brsa_blind(blind_message, secret, &mut None, pk, msg, msg_len)
+        }
+    

@@ -1,0 +1,340 @@
+use crate::fnv::fnv1;
+use std::fmt;
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom, Write};
+
+const M: u64 = 18446744073709551557;
+const G: u64 = 18446744073709550147;
+const FNV_PRIME: u64 = 1099511628211;
+const FNV_OFFSET_BASIS: u64 = 14695981039346656037;
+
+#[derive(Debug, Clone)]
+pub struct Header {
+pub version: u64,
+pub n: u64,
+pub p: f64,
+pub k: u64,
+pub m: u64,
+pub n_value: u64,
+}
+
+impl fmt::Display for Header {
+fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+write!(
+f,
+"Header details:\n version: {}\n n: {} \n p: {}\n k: {} \n m: {} \n N: {} \n",
+self.version, self.n, self.p, self.k, self.m, self.n_value
+)
+}
+}
+
+#[derive(Debug, Clone)]
+pub struct BloomFilter {
+pub version: u64,
+pub datasize: u64,
+pub h: Header,
+pub m: u64,
+pub v: Vec<u64>,
+pub data: Vec<u8>,
+pub modified: i32,
+pub error: i32,
+}
+
+impl fmt::Display for BloomFilter {
+fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+let data_str = String::from_utf8_lossy(&self.data);
+write!(
+f,
+"Filter details:\n n: {} \n p: {}\n k: {} \n m: {} \n N: {} \n M: {}\n Data: {}.\n",
+self.h.n, self.h.p, self.h.k, self.h.m, self.h.n_value, self.m, data_str
+)
+}
+}
+
+impl BloomFilter {
+pub fn fingerprint(&self, buf: &[u8]) -> Vec<u64> {
+let mut tmp = vec![0u64; self.h.k as usize];
+let h = fnv1(buf);
+let mut hn = h % M;
+for i in 0..self.h.k as usize {
+hn = hn.wrapping_mul(G) % M;
+tmp[i] = hn % self.h.m;
+}
+tmp
+}
+
+pub fn add(&mut self, buf: &[u8]) -> i32 {
+if (self.h.n_value + 1) <= self.h.n {
+let fp = self.fingerprint(buf);
+let mut new_value = 0;
+for &idx in &fp {
+let k = (idx / 64) as usize;
+let l = idx % 64;
+let v = 1u64 << l;
+if (self.v[k] & v) == 0 {
+new_value = 1;
+}
+self.v[k] |= v;
+}
+if new_value == 1 {
+self.h.n_value += 1;
+self.modified = 1;
+1
+} else {
+0
+}
+} else {
+-1
+}
+}
+
+pub fn join(&mut self, bf: &BloomFilter) -> i32 {
+if self.h.n != bf.h.n
+|| self.h.p != bf.h.p
+|| self.h.k != bf.h.k
+|| self.h.m != bf.h.m
+|| self.m != bf.m
+{
+return 0;
+}
+if (self.h.n_value + bf.h.n_value) > self.h.n {
+return -1;
+}
+for i in 0..self.m as usize {
+self.v[i] |= bf.v[i];
+}
+self.h.n_value += bf.h.n_value;
+1
+}
+
+pub fn check(&self, buf: &[u8]) -> i32 {
+let fp = self.fingerprint(buf);
+for &idx in &fp {
+let k = (idx / 64) as usize;
+let l = idx % 64;
+let v = 1u64 << l;
+if (self.v[k] & v) == 0 {
+return 0;
+}
+}
+1
+}
+
+pub fn set_data(&mut self, buf: &[u8]) {
+self.data = buf.to_vec();
+self.datasize = buf.len() as u64;
+}
+
+pub fn to_file(&self, mut file: File) -> i32 {
+let version = 1u64;
+
+let mut ret_ok = true;
+ret_ok &= file.write_all(&version.to_le_bytes()).is_ok();
+ret_ok &= file.write_all(&self.h.n.to_le_bytes()).is_ok();
+ret_ok &= file.write_all(&self.h.p.to_le_bytes()).is_ok();
+ret_ok &= file.write_all(&self.h.k.to_le_bytes()).is_ok();
+ret_ok &= file.write_all(&self.h.m.to_le_bytes()).is_ok();
+ret_ok &= file.write_all(&self.h.n_value.to_le_bytes()).is_ok();
+
+let mut bit_bytes = Vec::with_capacity(self.v.len() * 8);
+for &x in &self.v {
+bit_bytes.extend_from_slice(&x.to_le_bytes());
+}
+ret_ok &= file.write_all(&bit_bytes).is_ok();
+ret_ok &= file.write_all(&self.data).is_ok();
+
+if ret_ok { 1 } else { 0 }
+}
+
+pub fn initialize(n: u64, p: f64, buf: &[u8]) -> BloomFilter {
+let bits = ((n as f64 * p.ln()) / (2.0f64.ln().powi(2))).ceil().abs() as u64;
+let k = ((2.0f64.ln() * bits as f64) / n as f64).ceil() as u64;
+let m_words = (bits as f64 / 64.0).ceil() as u64;
+
+BloomFilter {
+version: 0,
+datasize: buf.len() as u64,
+h: Header {
+version: 1,
+n,
+p,
+k,
+m: bits,
+n_value: 0,
+},
+m: m_words,
+v: vec![0u64; m_words as usize],
+data: buf.to_vec(),
+modified: 0,
+error: 0,
+}
+}
+
+pub fn from_file(mut file: File) -> BloomFilter {
+fn read_u64(file: &mut File) -> Option<u64> {
+let mut buf = [0u8; 8];
+file.read_exact(&mut buf).ok()?;
+Some(u64::from_le_bytes(buf))
+}
+fn read_f64(file: &mut File) -> Option<f64> {
+let mut buf = [0u8; 8];
+file.read_exact(&mut buf).ok()?;
+Some(f64::from_le_bytes(buf))
+}
+
+let empty = || BloomFilter {
+version: 0,
+datasize: 0,
+h: Header {
+version: 0,
+n: 0,
+p: 0.0,
+k: 0,
+m: 0,
+n_value: 0,
+},
+m: 0,
+v: Vec::new(),
+data: Vec::new(),
+modified: 0,
+error: 1,
+};
+
+let version = match read_u64(&mut file) {
+Some(v) => v,
+None => return empty(),
+};
+let n = match read_u64(&mut file) {
+Some(v) => v,
+None => return empty(),
+};
+let p = match read_f64(&mut file) {
+Some(v) => v,
+None => return empty(),
+};
+let k = match read_u64(&mut file) {
+Some(v) => v,
+None => return empty(),
+};
+let m_bits = match read_u64(&mut file) {
+Some(v) => v,
+None => return empty(),
+};
+let n_value = match read_u64(&mut file) {
+Some(v) => v,
+None => return empty(),
+};
+
+let h = Header {
+version,
+n,
+p,
+k,
+m: m_bits,
+n_value,
+};
+
+if !h.check() {
+let mut bf = empty();
+bf.h = h;
+return bf;
+}
+
+let m_words = (m_bits as f64 / 64.0).ceil() as u64;
+
+let size = match file.seek(SeekFrom::End(0)) {
+Ok(s) => s,
+Err(_) => return empty(),
+};
+
+if file.seek(SeekFrom::Start(48)).is_err() {
+return empty();
+}
+
+let bitarray_bytes = m_words.saturating_mul(8);
+let datasize = if size >= 48 + bitarray_bytes {
+size - 48 - bitarray_bytes
+} else {
+0
+};
+
+let mut v = vec![0u64; m_words as usize];
+for i in 0..m_words as usize {
+v[i] = match read_u64(&mut file) {
+Some(val) => val,
+None => {
+return BloomFilter {
+version,
+datasize: 0,
+h,
+m: m_words,
+v: Vec::new(),
+data: Vec::new(),
+modified: 0,
+error: 1,
+}
+}
+};
+}
+
+let mut data = vec![0u8; datasize as usize];
+if datasize > 0 && file.read_exact(&mut data).is_err() {
+return BloomFilter {
+version,
+datasize: 0,
+h,
+m: m_words,
+v: Vec::new(),
+data: Vec::new(),
+modified: 0,
+error: 1,
+};
+}
+
+BloomFilter {
+version,
+datasize,
+h,
+m: m_words,
+v,
+data,
+modified: 0,
+error: 0,
+}
+}
+}
+
+impl Header {
+pub fn check(&self) -> bool {
+if self.version != 1 {
+return false;
+}
+
+let maxint: u64 = 9223372036854775807;
+if self.k >= maxint {
+return false;
+}
+if self.p <= f64::EPSILON {
+return false;
+}
+if self.p > 1.0 {
+return false;
+}
+if self.n_value > self.n {
+return false;
+}
+
+let tmp_m =
+((self.n as f64 * self.p.ln()) / (2.0f64.ln().powi(2))).ceil().abs() as u64;
+if tmp_m != self.m {
+return false;
+}
+
+let tmp_k = ((2.0f64.ln() * self.m as f64) / self.n as f64).ceil() as u64;
+if tmp_k != self.k {
+return false;
+}
+
+true
+}
+}

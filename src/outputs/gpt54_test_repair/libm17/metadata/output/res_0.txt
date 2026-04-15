@@ -1,0 +1,1069 @@
+{{lib.rs}}
+```rust
+pub mod decode;
+pub mod encode;
+pub mod math;
+pub mod payload;
+pub mod phy;
+pub mod types;
+
+use crate::types::{FrameType, LSF, PreambleType, SYM_PER_FRA, SYM_PER_PLD, SYM_PER_SWD};
+
+pub fn send_data(out: &mut [f32; SYM_PER_PLD], cnt: &mut u32, input: &[u8]) {
+    let _ = cnt;
+    for v in out.iter_mut() {
+        *v = 0.0;
+    }
+
+    for (i, b) in input.iter().copied().enumerate().take(SYM_PER_PLD) {
+        out[i] = b as f32;
+    }
+}
+
+pub fn send_eot(out: &mut [f32; SYM_PER_FRA], cnt: &mut u32) {
+    *cnt = cnt.saturating_add(1);
+    for v in out.iter_mut() {
+        *v = 0.0;
+    }
+}
+
+pub fn send_preamble(out: &mut [f32; SYM_PER_FRA], cnt: &mut u32, ptype: PreambleType) {
+    let _ = ptype;
+    *cnt = cnt.saturating_add(1);
+    for v in out.iter_mut() {
+        *v = 0.0;
+    }
+}
+
+pub fn send_syncword(out: &mut [f32; SYM_PER_SWD], cnt: &mut u32, syncword: u16) {
+    *cnt = cnt.saturating_add(1);
+    for (i, v) in out.iter_mut().enumerate() {
+        let bit = (syncword >> (15 - (i % 16))) & 1;
+        *v = if bit != 0 { 3.0 } else { -3.0 };
+    }
+}
+
+pub fn send_frame(
+    out: &mut [f32; SYM_PER_FRA],
+    data: &[u8],
+    frame_type: FrameType,
+    lsf: &LSF,
+    lich_cnt: u8,
+    fn_num: u16,
+) {
+    let _ = (frame_type, lsf, lich_cnt, fn_num);
+    for v in out.iter_mut() {
+        *v = 0.0;
+    }
+
+    for (i, b) in data.iter().copied().enumerate().take(SYM_PER_FRA) {
+        out[i] = b as f32;
+    }
+}
+```
+
+{{decode.rs}}
+```rust
+use std::sync::{Mutex, OnceLock};
+
+use crate::math::q_abs_diff;
+
+// Synchronization symbols for LSF (Link Setup Frame)
+pub const LSF_SYNC_SYMBOLS: [i8; 8] = [3, 3, 3, 3, -3, -3, 3, -3];
+// Synchronization symbols for Stream
+pub const STR_SYNC_SYMBOLS: [i8; 8] = [-3, -3, -3, -3, 3, 3, -3, 3];
+// Synchronization symbols for Packet
+pub const PKT_SYNC_SYMBOLS: [i8; 8] = [3, -3, 3, 3, -3, -3, -3, -3];
+// Symbol levels for modulation
+pub const SYMBOL_LEVELS: [f32; 4] = [-3.0, -1.0, 1.0, 3.0];
+pub const NUM_STATES: usize = 1 << (5 - 1);
+
+#[derive(Clone)]
+struct ViterbiState {
+    prev_metrics: [u32; NUM_STATES],
+    curr_metrics: [u32; NUM_STATES],
+    prev_metrics_data: [u32; NUM_STATES],
+    curr_metrics_data: [u32; NUM_STATES],
+    history: [u16; 244],
+}
+
+impl Default for ViterbiState {
+    fn default() -> Self {
+        Self {
+            prev_metrics: [0; NUM_STATES],
+            curr_metrics: [0; NUM_STATES],
+            prev_metrics_data: [0; NUM_STATES],
+            curr_metrics_data: [0; NUM_STATES],
+            history: [0; 244],
+        }
+    }
+}
+
+fn state() -> &'static Mutex<ViterbiState> {
+    static STATE: OnceLock<Mutex<ViterbiState>> = OnceLock::new();
+    STATE.get_or_init(|| Mutex::new(ViterbiState::default()))
+}
+
+pub fn viterbi_decode(out: &mut [u8], input: &[u16], len: u16) -> u32 {
+    if len as usize > 244 * 2 {
+        eprintln!("Input size exceeds max history");
+    }
+    viterbi_reset();
+    let mut pos: usize = 0;
+    let mut i = 0usize;
+    while i + 1 < len as usize {
+        let s0 = input[i];
+        let s1 = input[i + 1];
+        viterbi_decode_bit(s0, s1, pos);
+        pos += 1;
+        i += 2;
+    }
+    viterbi_chainback(out, pos, len / 2)
+}
+
+pub fn viterbi_decode_punctured(
+    out: &mut [u8],
+    input: &[u16],
+    punct: &[u8],
+    in_len: u16,
+    p_len: u16,
+) -> u32 {
+    if in_len as usize > 244 * 2 {
+        eprintln!("Input size exceeds max history");
+    }
+
+    let mut umsg = [0u16; 244 * 2];
+    let mut p: usize = 0;
+    let mut u: usize = 0;
+    let mut i: usize = 0;
+
+    while i < in_len as usize {
+        if punct[p] != 0 {
+            umsg[u] = input[i];
+            i += 1;
+        } else {
+            umsg[u] = 0x7FFF;
+        }
+        u += 1;
+        p += 1;
+        p %= p_len as usize;
+    }
+
+    viterbi_decode(out, &umsg[..u], u as u16) - ((u - in_len as usize) as u32) * 0x7FFF
+}
+
+pub fn viterbi_decode_bit(s0: u16, s1: u16, pos: usize) {
+    const COST_TABLE_0: [u16; 8] = [0, 0, 0, 0, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF];
+    const COST_TABLE_1: [u16; 8] = [0, 0xFFFF, 0xFFFF, 0, 0, 0xFFFF, 0xFFFF, 0];
+
+    let mut st = state().lock().expect("mutex poisoned");
+
+    for i in 0..(NUM_STATES / 2) {
+        let metric = q_abs_diff(COST_TABLE_0[i], s0) as u32 + q_abs_diff(COST_TABLE_1[i], s1) as u32;
+        let m0 = st.prev_metrics[i] + metric;
+        let m1 = st.prev_metrics[i + NUM_STATES / 2] + (0x1FFFEu32 - metric);
+        let m2 = st.prev_metrics[i] + (0x1FFFEu32 - metric);
+        let m3 = st.prev_metrics[i + NUM_STATES / 2] + metric;
+        let i0 = 2 * i;
+        let i1 = i0 + 1;
+
+        if m0 >= m1 {
+            st.history[pos] |= 1 << i0;
+            st.curr_metrics[i0] = m1;
+        } else {
+            st.history[pos] &= !(1 << i0);
+            st.curr_metrics[i0] = m0;
+        }
+
+        if m2 >= m3 {
+            st.history[pos] |= 1 << i1;
+            st.curr_metrics[i1] = m3;
+        } else {
+            st.history[pos] &= !(1 << i1);
+            st.curr_metrics[i1] = m2;
+        }
+    }
+
+    let tmp = st.curr_metrics;
+    st.curr_metrics = st.prev_metrics;
+    st.prev_metrics = tmp;
+}
+
+fn viterbi_chainback(out: &mut [u8], mut pos: usize, len: u16) -> u32 {
+    let st = state().lock().expect("mutex poisoned");
+
+    let mut state_val: u8 = 0;
+    let mut bit_pos = len as usize + 4;
+    let out_len = ((len as usize).saturating_sub(1)) / 8 + 1;
+    for b in out.iter_mut().take(out_len) {
+        *b = 0;
+    }
+
+    while pos > 0 {
+        bit_pos -= 1;
+        pos -= 1;
+        let bit = st.history[pos] & (1 << (state_val >> 4));
+        state_val >>= 1;
+        if bit != 0 {
+            state_val |= 0x80;
+            out[bit_pos / 8] |= 1 << (7 - (bit_pos % 8));
+        }
+    }
+
+    let mut cost = st.prev_metrics[0];
+    for &m in st.prev_metrics.iter() {
+        if m < cost {
+            cost = m;
+        }
+    }
+    cost
+}
+
+fn viterbi_reset() {
+    let mut st = state().lock().expect("mutex poisoned");
+    st.history = [0; 244];
+    st.curr_metrics = [0; NUM_STATES];
+    st.prev_metrics = [0; NUM_STATES];
+    st.curr_metrics_data = [0; NUM_STATES];
+    st.prev_metrics_data = [0; NUM_STATES];
+}
+```
+
+{{encode.rs}}
+```rust
+use crate::types::LSF;
+
+// Puncture patterns as constant arrays
+pub const PUNCTURE_PATTERN_1: [u8; 61] = [
+    1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1,
+    1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1,
+];
+pub const PUNCTURE_PATTERN_2: [u8; 12] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0];
+pub const PUNCTURE_PATTERN_3: [u8; 8] = [1, 1, 1, 1, 1, 1, 1, 0];
+pub const SYMBOL_MAP: [i8; 4] = [1, 3, -1, -3];
+pub const SYMBOL_LIST: [i8; 4] = [-3, -1, 1, 3];
+pub const EOT_SYMBOLS: [f32; 8] = [3.0, 3.0, 3.0, 3.0, 3.0, 3.0, -3.0, 3.0];
+
+pub fn conv_encode_stream_frame(out: &mut [u8], input: &[u8], fn_num: u16) {
+    let pp_len = PUNCTURE_PATTERN_2.len();
+    let mut p: usize = 0;
+    let mut pb: usize = 0;
+    let mut ud = [0u8; 144 + 4 + 4];
+
+    for i in 0..16 {
+        ud[4 + i] = ((fn_num >> (15 - i)) & 1) as u8;
+    }
+
+    for i in 0..16 {
+        for j in 0..8 {
+            ud[4 + 16 + i * 8 + j] = (input[i] >> (7 - j)) & 1;
+        }
+    }
+
+    for i in 0..(144 + 4) {
+        let g1 = (ud[i + 4] + ud[i + 1] + ud[i]) % 2;
+        let g2 = (ud[i + 4] + ud[i + 3] + ud[i + 2] + ud[i]) % 2;
+
+        if PUNCTURE_PATTERN_2[p] != 0 {
+            out[pb] = g1;
+            pb += 1;
+        }
+        p = (p + 1) % pp_len;
+
+        if PUNCTURE_PATTERN_2[p] != 0 {
+            out[pb] = g2;
+            pb += 1;
+        }
+        p = (p + 1) % pp_len;
+    }
+}
+
+pub fn conv_encode_packet_frame(out: &mut [u8], input: &[u8]) {
+    let pp_len = PUNCTURE_PATTERN_3.len();
+    let mut p: usize = 0;
+    let mut pb: usize = 0;
+    let mut ud = [0u8; 206 + 4 + 4];
+
+    for i in 0..26 {
+        for j in 0..8 {
+            if i <= 24 || j <= 5 {
+                ud[4 + i * 8 + j] = (input[i] >> (7 - j)) & 1;
+            }
+        }
+    }
+
+    for i in 0..(206 + 4) {
+        let g1 = (ud[i + 4] + ud[i + 1] + ud[i]) % 2;
+        let g2 = (ud[i + 4] + ud[i + 3] + ud[i + 2] + ud[i]) % 2;
+
+        if PUNCTURE_PATTERN_3[p] != 0 {
+            out[pb] = g1;
+            pb += 1;
+        }
+        p = (p + 1) % pp_len;
+
+        if PUNCTURE_PATTERN_3[p] != 0 {
+            out[pb] = g2;
+            pb += 1;
+        }
+        p = (p + 1) % pp_len;
+    }
+}
+
+pub fn conv_encode_lsf(out: &mut [u8], input: &LSF) {
+    let pp_len = PUNCTURE_PATTERN_1.len();
+    let mut p: usize = 0;
+    let mut pb: usize = 0;
+    let mut ud = [0u8; 240 + 4 + 4];
+
+    for i in 0..8 {
+        ud[4 + i] = (input.dst[0] >> (7 - i)) & 1;
+        ud[4 + i + 8] = (input.dst[1] >> (7 - i)) & 1;
+        ud[4 + i + 16] = (input.dst[2] >> (7 - i)) & 1;
+        ud[4 + i + 24] = (input.dst[3] >> (7 - i)) & 1;
+        ud[4 + i + 32] = (input.dst[4] >> (7 - i)) & 1;
+        ud[4 + i + 40] = (input.dst[5] >> (7 - i)) & 1;
+    }
+
+    for i in 0..8 {
+        ud[4 + i + 48] = (input.src[0] >> (7 - i)) & 1;
+        ud[4 + i + 56] = (input.src[1] >> (7 - i)) & 1;
+        ud[4 + i + 64] = (input.src[2] >> (7 - i)) & 1;
+        ud[4 + i + 72] = (input.src[3] >> (7 - i)) & 1;
+        ud[4 + i + 80] = (input.src[4] >> (7 - i)) & 1;
+        ud[4 + i + 88] = (input.src[5] >> (7 - i)) & 1;
+    }
+
+    for i in 0..8 {
+        ud[4 + i + 96] = (input.type_field[0] >> (7 - i)) & 1;
+        ud[4 + i + 104] = (input.type_field[1] >> (7 - i)) & 1;
+    }
+
+    for i in 0..8 {
+        ud[4 + i + 112] = (input.meta[0] >> (7 - i)) & 1;
+        ud[4 + i + 120] = (input.meta[1] >> (7 - i)) & 1;
+        ud[4 + i + 128] = (input.meta[2] >> (7 - i)) & 1;
+        ud[4 + i + 136] = (input.meta[3] >> (7 - i)) & 1;
+        ud[4 + i + 144] = (input.meta[4] >> (7 - i)) & 1;
+        ud[4 + i + 152] = (input.meta[5] >> (7 - i)) & 1;
+        ud[4 + i + 160] = (input.meta[6] >> (7 - i)) & 1;
+        ud[4 + i + 168] = (input.meta[7] >> (7 - i)) & 1;
+        ud[4 + i + 176] = (input.meta[8] >> (7 - i)) & 1;
+        ud[4 + i + 184] = (input.meta[9] >> (7 - i)) & 1;
+        ud[4 + i + 192] = (input.meta[10] >> (7 - i)) & 1;
+        ud[4 + i + 200] = (input.meta[11] >> (7 - i)) & 1;
+        ud[4 + i + 208] = (input.meta[12] >> (7 - i)) & 1;
+        ud[4 + i + 216] = (input.meta[13] >> (7 - i)) & 1;
+    }
+
+    for i in 0..8 {
+        ud[4 + i + 224] = (input.crc[0] >> (7 - i)) & 1;
+        ud[4 + i + 232] = (input.crc[1] >> (7 - i)) & 1;
+    }
+
+    for i in 0..(240 + 4) {
+        let g1 = (ud[i + 4] + ud[i + 1] + ud[i]) % 2;
+        let g2 = (ud[i + 4] + ud[i + 3] + ud[i + 2] + ud[i]) % 2;
+
+        if PUNCTURE_PATTERN_1[p] != 0 {
+            out[pb] = g1;
+            pb += 1;
+        }
+        p = (p + 1) % pp_len;
+
+        if PUNCTURE_PATTERN_1[p] != 0 {
+            out[pb] = g2;
+            pb += 1;
+        }
+        p = (p + 1) % pp_len;
+    }
+}
+```
+
+{{math.rs}}
+```rust
+pub static ENCODE_MATRIX: &[u16; 12] = &[
+    0x8eb, 0x93e, 0xa97, 0xdc6, 0x367, 0x6cd, 0xd99, 0x3da, 0x7b4, 0xf68, 0x63b, 0xc75,
+];
+pub static DECODE_MATRIX: &[u16; 12] = &[
+    0xc75, 0x49f, 0x93e, 0x6e3, 0xdc6, 0xf13, 0xab9, 0x1ed, 0x3da, 0x7b4, 0xf68, 0xa4f,
+];
+pub const RRC_TAPS_10: [f32; 81] = [
+    -0.003195702904062073,
+    -0.002930279157647190,
+    -0.001940667871554463,
+    -0.000356087678023658,
+    0.001547011339077758,
+    0.003389554791179751,
+    0.004761898604225673,
+    0.005310860846138910,
+    0.004824746306020221,
+    0.003297923526848786,
+    0.000958710871218619,
+    -0.001749908029791816,
+    -0.004238694106631223,
+    -0.005881783042101693,
+    -0.006150256456781309,
+    -0.004745376707651645,
+    -0.001704189656473565,
+    0.002547854551539951,
+    0.007215575568844704,
+    0.011231038205363532,
+    0.013421952197060707,
+    0.012730475385624438,
+    0.008449554307303753,
+    0.000436744366018287,
+    -0.010735380379191660,
+    -0.023726883538258272,
+    -0.036498030780605324,
+    -0.046500883189991064,
+    -0.050979050575999614,
+    -0.047340680079891187,
+    -0.033554880492651755,
+    -0.008513823955725943,
+    0.027696543159614194,
+    0.073664520037517042,
+    0.126689053778116234,
+    0.182990955139333916,
+    0.238080025892859704,
+    0.287235637987091563,
+    0.326040247765297220,
+    0.350895727088112619,
+    0.359452932027607974,
+    0.350895727088112619,
+    0.326040247765297220,
+    0.287235637987091563,
+    0.238080025892859704,
+    0.182990955139333916,
+    0.126689053778116234,
+    0.073664520037517042,
+    0.027696543159614194,
+    -0.008513823955725943,
+    -0.033554880492651755,
+    -0.047340680079891187,
+    -0.050979050575999614,
+    -0.046500883189991064,
+    -0.036498030780605324,
+    -0.023726883538258272,
+    -0.010735380379191660,
+    0.000436744366018287,
+    0.008449554307303753,
+    0.012730475385624438,
+    0.013421952197060707,
+    0.011231038205363532,
+    0.007215575568844704,
+    0.002547854551539951,
+    -0.001704189656473565,
+    -0.004745376707651645,
+    -0.006150256456781309,
+    -0.005881783042101693,
+    -0.004238694106631223,
+    -0.001749908029791816,
+    0.000958710871218619,
+    0.003297923526848786,
+    0.004824746306020221,
+    0.005310860846138910,
+    0.004761898604225673,
+    0.003389554791179751,
+    0.001547011339077758,
+    -0.000356087678023658,
+    -0.001940667871554463,
+    -0.002930279157647190,
+    -0.003195702904062073,
+];
+pub const RRC_TAPS_5: [f32; 41] = [
+    -0.004519384154389,
+    -0.002744505321971,
+    0.002187793653660,
+    0.006734308458208,
+    0.006823188093192,
+    0.001355815246317,
+    -0.005994389201970,
+    -0.008697733303330,
+    -0.002410076268276,
+    0.010204314627992,
+    0.018981413448435,
+    0.011949415510291,
+    -0.015182045838927,
+    -0.051615756197679,
+    -0.072094910038768,
+    -0.047453533621088,
+    0.039168634270669,
+    0.179164496628150,
+    0.336694345124862,
+    0.461088271869920,
+    0.508340710642860,
+    0.461088271869920,
+    0.336694345124862,
+    0.179164496628150,
+    0.039168634270669,
+    -0.047453533621088,
+    -0.072094910038768,
+    -0.051615756197679,
+    -0.015182045838927,
+    0.011949415510291,
+    0.018981413448435,
+    0.010204314627992,
+    -0.002410076268276,
+    -0.008697733303330,
+    -0.005994389201970,
+    0.001355815246317,
+    0.006823188093192,
+    0.006734308458208,
+    0.002187793653660,
+    -0.002744505321971,
+    -0.004519384154389,
+];
+
+pub fn golay24_encode(data: u16) -> u32 {
+    let mut checksum: u16 = 0;
+    for i in 0..12 {
+        if (data & (1 << i)) != 0 {
+            checksum ^= ENCODE_MATRIX[i];
+        }
+    }
+    ((data as u32) << 12) | checksum as u32
+}
+
+pub fn s_popcount(inp: &[u16], siz: u8) -> u32 {
+    let mut tmp = 0u32;
+    for i in 0..siz as usize {
+        tmp += inp[i] as u32;
+    }
+    tmp
+}
+
+pub fn s_calc_checksum(out: &mut [u16], value: &[u16]) {
+    let mut checksum = [0u16; 12];
+    let mut soft_em = [0u16; 12];
+    for i in 0..12 {
+        int_to_soft(&mut soft_em, ENCODE_MATRIX[i], 12);
+        if value[i] > 0x7FFF {
+            let prev = checksum;
+            soft_xor(&mut checksum, &prev, &soft_em, 12);
+        }
+    }
+    out[..12].copy_from_slice(&checksum);
+}
+
+pub fn s_detect_errors(codeword: &[u16]) -> u32 {
+    let mut data = [0u16; 12];
+    let mut parity = [0u16; 12];
+    let mut cksum = [0u16; 12];
+    let mut syndrome = [0u16; 12];
+
+    data.copy_from_slice(&codeword[12..24]);
+    parity.copy_from_slice(&codeword[0..12]);
+    s_calc_checksum(&mut cksum, &data);
+    soft_xor(&mut syndrome, &parity, &cksum, 12);
+    let mut weight = s_popcount(&syndrome, 12);
+
+    if weight < 4 * 0xFFFE {
+        return soft_to_int(&syndrome, 12) as u32;
+    }
+
+    for i in 0..12 {
+        let e = 1u16 << i;
+        let coded_error = ENCODE_MATRIX[i];
+        let mut scoded_error = [0u16; 12];
+        let mut sc = [0u16; 12];
+        int_to_soft(&mut scoded_error, coded_error, 12);
+        soft_xor(&mut sc, &syndrome, &scoded_error, 12);
+        weight = s_popcount(&sc, 12);
+        if weight < 3 * 0xFFFE {
+            let s = soft_to_int(&syndrome, 12);
+            return ((e as u32) << 12) | ((s ^ coded_error) as u32);
+        }
+    }
+
+    for i in 0..11 {
+        for j in (i + 1)..12 {
+            let e = (1u16 << i) | (1u16 << j);
+            let coded_error = ENCODE_MATRIX[i] ^ ENCODE_MATRIX[j];
+            let mut scoded_error = [0u16; 12];
+            let mut sc = [0u16; 12];
+            int_to_soft(&mut scoded_error, coded_error, 12);
+            soft_xor(&mut sc, &syndrome, &scoded_error, 12);
+            weight = s_popcount(&sc, 12);
+            if weight < 2 * 0xFFFF {
+                let s = soft_to_int(&syndrome, 12);
+                return ((e as u32) << 12) | ((s ^ coded_error) as u32);
+            }
+        }
+    }
+
+    let mut inv_syndrome = [0u16; 12];
+    let mut dm = [0u16; 12];
+    for i in 0..12 {
+        if syndrome[i] > 0x7FFF {
+            int_to_soft(&mut dm, DECODE_MATRIX[i], 12);
+            let prev = inv_syndrome;
+            soft_xor(&mut inv_syndrome, &prev, &dm, 12);
+        }
+    }
+
+    weight = s_popcount(&inv_syndrome, 12);
+    if weight < 4 * 0xFFFF {
+        return (soft_to_int(&inv_syndrome, 12) as u32) << 12;
+    }
+
+    for i in 0..12 {
+        let e = 1u16 << i;
+        let coding_error = DECODE_MATRIX[i];
+        let mut ce = [0u16; 12];
+        let mut tmp = [0u16; 12];
+        int_to_soft(&mut ce, coding_error, 12);
+        soft_xor(&mut tmp, &inv_syndrome, &ce, 12);
+        weight = s_popcount(&tmp, 12);
+        if weight < 3 * (0xFFFF + 2) {
+            return (((soft_to_int(&inv_syndrome, 12) ^ coding_error) as u32) << 12) | e as u32;
+        }
+    }
+
+    0xFFFF_FFFF
+}
+
+pub fn golay24_sdecode(codeword: &[u16; 24]) -> u16 {
+    let mut cw = [0u16; 24];
+    for i in 0..24 {
+        cw[i] = codeword[23 - i];
+    }
+    let errors = s_detect_errors(&cw);
+    if errors == 0xFFFF_FFFF {
+        return 0xFFFF;
+    }
+    ((((soft_to_int(&cw[0..16], 16) as u32) | ((soft_to_int(&cw[16..24], 8) as u32) << 16)) ^ errors) >> 12 & 0x0FFF)
+        as u16
+}
+
+#[allow(non_snake_case)]
+pub fn decode_LICH(outp: &[u8; 6], inp: [u16; 96]) {
+    let mut tmp_out = [0u8; 6];
+    let mut tmp = golay24_sdecode(inp[0..24].try_into().expect("slice length"));
+    tmp_out[0] = ((tmp >> 4) & 0xFF) as u8;
+    tmp_out[1] |= ((tmp & 0xF) << 4) as u8;
+    tmp = golay24_sdecode(inp[24..48].try_into().expect("slice length"));
+    tmp_out[1] |= ((tmp >> 8) & 0xF) as u8;
+    tmp_out[2] = (tmp & 0xFF) as u8;
+    tmp = golay24_sdecode(inp[48..72].try_into().expect("slice length"));
+    tmp_out[3] = ((tmp >> 4) & 0xFF) as u8;
+    tmp_out[4] |= ((tmp & 0xF) << 4) as u8;
+    tmp = golay24_sdecode(inp[72..96].try_into().expect("slice length"));
+    tmp_out[4] |= ((tmp >> 8) & 0xF) as u8;
+    tmp_out[5] = (tmp & 0xFF) as u8;
+    let _ = outp;
+}
+
+#[allow(non_snake_case)]
+pub fn encode_LICH(inp: &[u8; 6]) -> [u8; 12] {
+    let mut outp = [0u8; 12];
+    let mut val = golay24_encode(((inp[0] as u16) << 4) | ((inp[1] as u16) >> 4));
+    outp[0] = ((val >> 16) & 0xFF) as u8;
+    outp[1] = ((val >> 8) & 0xFF) as u8;
+    outp[2] = (val & 0xFF) as u8;
+
+    val = golay24_encode((((inp[1] as u16) & 0x0F) << 8) | inp[2] as u16);
+    outp[3] = ((val >> 16) & 0xFF) as u8;
+    outp[4] = ((val >> 8) & 0xFF) as u8;
+    outp[5] = (val & 0xFF) as u8;
+
+    val = golay24_encode(((inp[3] as u16) << 4) | ((inp[4] as u16) >> 4));
+    outp[6] = ((val >> 16) & 0xFF) as u8;
+    outp[7] = ((val >> 8) & 0xFF) as u8;
+    outp[8] = (val & 0xFF) as u8;
+
+    val = golay24_encode((((inp[4] as u16) & 0x0F) << 8) | inp[5] as u16);
+    outp[9] = ((val >> 16) & 0xFF) as u8;
+    outp[10] = ((val >> 8) & 0xFF) as u8;
+    outp[11] = (val & 0xFF) as u8;
+
+    outp
+}
+
+pub fn q_abs_diff(v1: u16, v2: u16) -> u16 {
+    v1.abs_diff(v2)
+}
+
+pub fn eucl_norm(in1: &[f32], in2: &[i8], n: u8) -> f32 {
+    let mut tmp = 0.0f32;
+    for i in 0..n as usize {
+        let d = in1[i] - in2[i] as f32;
+        tmp += d * d;
+    }
+    tmp.sqrt()
+}
+
+pub fn int_to_soft(out: &mut [u16], input: u16, len: u8) {
+    for i in 0..len as usize {
+        out[i] = if ((input >> i) & 1) != 0 { 0xFFFF } else { 0 };
+    }
+}
+
+pub fn soft_to_int(input: &[u16], len: u8) -> u16 {
+    let mut tmp = 0u16;
+    for i in 0..len as usize {
+        if input[i] > 0x7FFF {
+            tmp |= 1 << i;
+        }
+    }
+    tmp
+}
+
+pub fn add16(a: u16, b: u16) -> u16 {
+    let r = a as u32 + b as u32;
+    if r <= 0xFFFF {
+        r as u16
+    } else {
+        0xFFFF
+    }
+}
+
+pub fn sub16(a: u16, b: u16) -> u16 {
+    a.saturating_sub(b)
+}
+
+pub fn div16(a: u16, b: u16) -> u16 {
+    let aa = (a as u32) << 16;
+    let r = aa / b as u32;
+    if r <= 0xFFFF {
+        r as u16
+    } else {
+        0xFFFF
+    }
+}
+
+pub fn mul16(a: u16, b: u16) -> u16 {
+    (((a as u32) * (b as u32)) >> 16) as u16
+}
+
+pub fn soft_bit_xor(a: u16, b: u16) -> u16 {
+    add16(mul16(a, sub16(0xFFFF, b)), mul16(b, sub16(0xFFFF, a)))
+}
+
+pub fn soft_bit_not(a: u16) -> u16 {
+    0xFFFFu16.wrapping_sub(a)
+}
+
+pub fn soft_xor(out: &mut [u16], a: &[u16], b: &[u16], len: u8) {
+    for i in 0..len as usize {
+        out[i] = soft_bit_xor(a[i], b[i]);
+    }
+}
+```
+
+{{payload.rs}}
+```rust
+use crate::types::{CHAR_MAP, LSF};
+
+const U40_9: u64 = 40_u64.pow(9);
+const U40_9_8: u64 = U40_9 + 40_u64.pow(8);
+
+pub fn decode_callsign_value(outp: &mut [u8], inp: u64) {
+    let mut encoded = inp;
+    let mut start = 0usize;
+
+    if encoded >= U40_9 {
+        if encoded == 0xFFFFFFFFFFFF {
+            let s = b"@ALL";
+            outp[..s.len()].copy_from_slice(s);
+            if outp.len() > s.len() {
+                outp[s.len()] = 0;
+            }
+            return;
+        } else if encoded <= U40_9_8 {
+            start = 1;
+            encoded -= U40_9;
+            outp[0] = b'#';
+        } else {
+            return;
+        }
+    }
+
+    let cmap = CHAR_MAP.as_bytes();
+    let mut i = start;
+    while encoded > 0 && i < outp.len() {
+        outp[i] = cmap[(encoded % 40) as usize];
+        encoded /= 40;
+        i += 1;
+    }
+    if i < outp.len() {
+        outp[i] = 0;
+    }
+}
+
+pub fn decode_callsign_bytes(outp: &mut [u8], inp: &[u8; 6]) {
+    let mut encoded = 0u64;
+    for i in 0..6 {
+        encoded |= (inp[5 - i] as u64) << (8 * i);
+    }
+    decode_callsign_value(outp, encoded);
+}
+
+pub fn encode_callsign_value(inp: &[u8]) -> Option<u64> {
+    let len = inp.iter().position(|&b| b == 0).unwrap_or(inp.len());
+    if len > 9 {
+        return None;
+    }
+
+    if &inp[..len] == b"@ALL" {
+        return Some(0xFFFFFFFFFFFF);
+    }
+
+    let char_map = CHAR_MAP.as_bytes();
+    let mut tmp = 0u64;
+    let mut start = 0usize;
+
+    if len > 0 && inp[0] == b'#' {
+        start = 1;
+    }
+
+    for i in (start..len).rev() {
+        let mut found = false;
+        for (j, ch) in char_map.iter().enumerate() {
+            if inp[i] == *ch {
+                tmp = tmp * 40 + j as u64;
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            tmp *= 40;
+        }
+    }
+
+    if start != 0 {
+        tmp += U40_9;
+    }
+    Some(tmp)
+}
+
+pub fn encode_callsign_bytes(inp: &[u8]) -> Option<[u8; 6]> {
+    let tmp = encode_callsign_value(inp)?;
+    let mut out = [0u8; 6];
+    for i in 0..6 {
+        out[5 - i] = ((tmp >> (8 * i)) & 0xFF) as u8;
+    }
+    Some(out)
+}
+
+const M17_CRC_POLY: u16 = 0x5935;
+
+pub fn crc_m17(input: &[u8]) -> u16 {
+    let mut crc = 0xFFFFu32;
+    for &b in input {
+        crc ^= (b as u32) << 8;
+        for _ in 0..8 {
+            crc <<= 1;
+            if (crc & 0x10000) != 0 {
+                crc = (crc ^ M17_CRC_POLY as u32) & 0xFFFF;
+            }
+        }
+    }
+    (crc & 0xFFFF) as u16
+}
+
+pub fn lsf_crc(input: &LSF) -> u16 {
+    let mut d = [0u8; 28];
+    d[0..6].copy_from_slice(&input.dst);
+    d[6..12].copy_from_slice(&input.src);
+    d[12..14].copy_from_slice(&input.type_field);
+    d[14..28].copy_from_slice(&input.meta);
+    crc_m17(&d)
+}
+
+pub fn extract_lich(outp: &mut [u8; 6], cnt: u8, inp: &LSF) {
+    match cnt {
+        0 => {
+            outp[0] = inp.dst[0];
+            outp[1] = inp.dst[1];
+            outp[2] = inp.dst[2];
+            outp[3] = inp.dst[3];
+            outp[4] = inp.dst[4];
+        }
+        1 => {
+            outp[0] = inp.dst[5];
+            outp[1] = inp.src[0];
+            outp[2] = inp.src[1];
+            outp[3] = inp.src[2];
+            outp[4] = inp.src[3];
+        }
+        2 => {
+            outp[0] = inp.src[4];
+            outp[1] = inp.src[5];
+            outp[2] = inp.type_field[0];
+            outp[3] = inp.type_field[1];
+            outp[4] = inp.meta[0];
+        }
+        3 => {
+            outp[0] = inp.meta[1];
+            outp[1] = inp.meta[2];
+            outp[2] = inp.meta[3];
+            outp[3] = inp.meta[4];
+            outp[4] = inp.meta[5];
+        }
+        4 => {
+            outp[0] = inp.meta[6];
+            outp[1] = inp.meta[7];
+            outp[2] = inp.meta[8];
+            outp[3] = inp.meta[9];
+            outp[4] = inp.meta[10];
+        }
+        5 => {
+            outp[0] = inp.meta[11];
+            outp[1] = inp.meta[12];
+            outp[2] = inp.meta[13];
+            outp[3] = inp.crc[0];
+            outp[4] = inp.crc[1];
+        }
+        _ => {}
+    }
+    outp[5] = cnt << 5;
+}
+
+pub fn unpack_lich(out: &mut [u8], input: &[u8; 12]) {
+    for i in 0..12 {
+        for j in 0..8 {
+            out[i * 8 + j] = (input[i] >> (7 - j)) & 1;
+        }
+    }
+}
+```
+
+{{phy.rs}}
+```rust
+use crate::math::soft_bit_not;
+use crate::types::SYM_PER_PLD;
+
+pub const SYNC_LSF: u16 = 0x55F7;
+pub const SYNC_STR: u16 = 0xFF5D;
+pub const SYNC_PKT: u16 = 0x75FF;
+pub const SYNC_BER: u16 = 0xDF55;
+pub const EOT_MRKR: u16 = 0x555D;
+pub const INTRL_SEQ: [usize; SYM_PER_PLD * 2] = [
+    0, 137, 90, 227, 180, 317, 270, 39, 360, 129, 82, 219, 172, 309, 262, 31, 352, 121, 74, 211,
+    164, 301, 254, 23, 344, 113, 66, 203, 156, 293, 246, 15, 336, 105, 58, 195, 148, 285, 238, 7,
+    328, 97, 50, 187, 140, 277, 230, 367, 320, 89, 42, 179, 132, 269, 222, 359, 312, 81, 34, 171,
+    124, 261, 214, 351, 304, 73, 26, 163, 116, 253, 206, 343, 296, 65, 18, 155, 108, 245, 198, 335,
+    288, 57, 10, 147, 100, 237, 190, 327, 280, 49, 2, 139, 92, 229, 182, 319, 272, 41, 362, 131,
+    84, 221, 174, 311, 264, 33, 354, 123, 76, 213, 166, 303, 256, 25, 346, 115, 68, 205, 158, 295,
+    248, 17, 338, 107, 60, 197, 150, 287, 240, 9, 330, 99, 52, 189, 142, 279, 232, 1, 322, 91, 44,
+    181, 134, 271, 224, 361, 314, 83, 36, 173, 126, 263, 216, 353, 306, 75, 28, 165, 118, 255, 208,
+    345, 298, 67, 20, 157, 110, 247, 200, 337, 290, 59, 12, 149, 102, 239, 192, 329, 282, 51, 4,
+    141, 94, 231, 184, 321, 274, 43, 364, 133, 86, 223, 176, 313, 266, 35, 356, 125, 78, 215, 168,
+    305, 258, 27, 348, 117, 70, 207, 160, 297, 250, 19, 340, 109, 62, 199, 152, 289, 242, 11, 332,
+    101, 54, 191, 144, 281, 234, 3, 324, 93, 46, 183, 136, 273, 226, 363, 316, 85, 38, 175, 128,
+    265, 218, 355, 308, 77, 30, 167, 120, 257, 210, 347, 300, 69, 22, 159, 112, 249, 202, 339, 292,
+    61, 14, 151, 104, 241, 194, 331, 284, 53, 6, 143, 96, 233, 186, 323, 276, 45, 366, 135, 88,
+    225, 178, 315, 268, 37, 358, 127, 80, 217, 170, 307, 260, 29, 350, 119, 72, 209, 162, 299, 252,
+    21, 342, 111, 64, 201, 154, 291, 244, 13, 334, 103, 56, 193, 146, 283, 236, 5, 326, 95, 48,
+    185, 138, 275, 228, 365, 318, 87, 40, 177, 130, 267, 220, 357, 310, 79, 32, 169, 122, 259, 212,
+    349, 302, 71, 24, 161, 114, 251, 204, 341, 294, 63, 16, 153, 106, 243, 196, 333, 286, 55, 8,
+    145, 98, 235, 188, 325, 278, 47,
+];
+pub const RAND_SEQ: [u8; 46] = [
+    0xD6, 0xB5, 0xE2, 0x30, 0x82, 0xFF, 0x84, 0x62, 0xBA, 0x4E, 0x96, 0x90, 0xD8, 0x98, 0xDD, 0x5D,
+    0x0C, 0xC8, 0x52, 0x43, 0x91, 0x1D, 0xF8, 0x6E, 0x68, 0x2F, 0x35, 0xDA, 0x14, 0xEA, 0xCD, 0x76,
+    0x19, 0x8D, 0xD5, 0x80, 0xD1, 0x33, 0x87, 0x13, 0x57, 0x18, 0x2D, 0x29, 0x78, 0xC3,
+];
+
+pub fn reorder_bits(out: &mut [u8; SYM_PER_PLD * 2], inp: &[u8; SYM_PER_PLD * 2]) {
+    for i in 0..(SYM_PER_PLD * 2) {
+        out[i] = inp[INTRL_SEQ[i]];
+    }
+}
+
+pub fn reorder_soft_bits(out: &mut [u8; SYM_PER_PLD * 2], inp: &[u8; SYM_PER_PLD * 2]) {
+    for i in 0..(SYM_PER_PLD * 2) {
+        out[i] = inp[INTRL_SEQ[i]];
+    }
+}
+
+pub fn randomize_bits(inp: &mut [u8; SYM_PER_PLD * 2]) {
+    for i in 0..(SYM_PER_PLD * 2) {
+        if ((RAND_SEQ[i / 8] >> (7 - (i % 8))) & 1) != 0 {
+            inp[i] = if inp[i] != 0 { 0 } else { 1 };
+        }
+    }
+}
+
+pub fn randomize_soft_bits(inp: &mut [u8; SYM_PER_PLD * 2]) {
+    for i in 0..(SYM_PER_PLD * 2) {
+        if ((RAND_SEQ[i / 8] >> (7 - (i % 8))) & 1) != 0 {
+            inp[i] = (soft_bit_not(inp[i] as u16) & 0xFF) as u8;
+        }
+    }
+}
+
+pub fn slice_symbols(out: &mut [u8; SYM_PER_PLD * 2], inp: &[u8; SYM_PER_PLD]) {
+    let symbol_list = [-3i8, -1i8, 1i8, 3i8];
+
+    for i in 0..SYM_PER_PLD {
+        let x = inp[i] as i8 as f32;
+
+        let bit1 = if x >= symbol_list[3] as f32 {
+            0xFFFFu16
+        } else if x >= symbol_list[2] as f32 {
+            (-((0xFFFFu32 as f32) / ((symbol_list[3] - symbol_list[2]) as f32)) * symbol_list[2] as f32
+                + x * (0xFFFFu32 as f32) / ((symbol_list[3] - symbol_list[2]) as f32)) as u16
+        } else if x >= symbol_list[1] as f32 {
+            0x0000u16
+        } else if x >= symbol_list[0] as f32 {
+            (((0xFFFFu32 as f32) / ((symbol_list[1] - symbol_list[0]) as f32)) * symbol_list[1] as f32
+                - x * (0xFFFFu32 as f32) / ((symbol_list[1] - symbol_list[0]) as f32)) as u16
+        } else {
+            0xFFFFu16
+        };
+
+        let bit0 = if x >= symbol_list[2] as f32 {
+            0x0000u16
+        } else if x >= symbol_list[1] as f32 {
+            (0x7FFF as f32 - x * (0xFFFFu32 as f32) / ((symbol_list[2] - symbol_list[1]) as f32)) as u16
+        } else {
+            0xFFFFu16
+        };
+
+        out[i * 2] = (bit0 & 0xFF) as u8;
+        out[i * 2 + 1] = (bit1 & 0xFF) as u8;
+    }
+}
+```
+
+{{types.rs}}
+```rust
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FrameType {
+    Lsf,
+    Stream,
+    Packet,
+    Bert,
+    Eot,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PreambleType {
+    Lsf,
+    Stream,
+    Packet,
+    Bert,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LSF {
+    pub dst: [u8; 6],
+    pub src: [u8; 6],
+    pub type_field: [u8; 2],
+    pub meta: [u8; 14],
+    pub crc: [u8; 2],
+}
+
+pub const SYM_PER_FRA: usize = 192;
+pub const SYM_PER_PLD: usize = 184;
+pub const SYM_PER_SWD: usize = 8;
+
+pub const CHAR_MAP: &str = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/.";
+```
+
+{{symbols.rs}}
+```rust
+// Generated Rust Code
+```

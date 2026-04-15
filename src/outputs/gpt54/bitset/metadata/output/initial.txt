@@ -1,0 +1,142 @@
+{{bitset.rs}}
+```rust
+use std::fs::File;
+use std::io::{self, Read, Write};
+use std::path::Path;
+
+#[derive(Debug)]
+pub struct Bitset {
+    pub flip: bool,
+    pub size: usize,
+    pub count: usize,
+    pub array: Vec<u8>,
+}
+
+impl Bitset {
+    fn bitset_size(nbits: usize) -> usize {
+        (nbits + 7) >> 3
+    }
+
+    fn bitset_byte(idx: usize) -> usize {
+        idx >> 3
+    }
+
+    fn bitset_bit_mask(idx: usize) -> u8 {
+        1u8 << (idx & 0x7)
+    }
+
+    pub fn new(nb_bits: usize) -> Self {
+        Self {
+            flip: false,
+            size: nb_bits,
+            count: 0,
+            array: vec![0u8; Self::bitset_size(nb_bits)],
+        }
+    }
+
+    pub fn delete(self) {}
+
+    pub fn count(&self) -> usize {
+        if self.flip {
+            self.size - self.count
+        } else {
+            self.count
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn test(&self, idx: usize) -> bool {
+        self.flip ^ ((self.array[Self::bitset_byte(idx)] & Self::bitset_bit_mask(idx)) != 0)
+    }
+
+    pub fn any(&self) -> bool {
+        if self.flip {
+            self.count != self.size
+        } else {
+            self.count != 0
+        }
+    }
+
+    pub fn none(&self) -> bool {
+        !self.any()
+    }
+
+    pub fn all(&self) -> bool {
+        if self.flip {
+            self.count == 0
+        } else {
+            self.count == self.size
+        }
+    }
+
+    pub fn set(&mut self, idx: usize, value: bool) {
+        let flip_value = if self.flip { !value } else { value };
+        let byte_idx = Self::bitset_byte(idx);
+        let mask = Self::bitset_bit_mask(idx);
+        let previous_count = self.array[byte_idx].count_ones() as isize;
+
+        if flip_value {
+            self.array[byte_idx] |= mask;
+        } else {
+            self.array[byte_idx] &= !mask;
+        }
+
+        let new_count = self.array[byte_idx].count_ones() as isize;
+        self.count = ((self.count as isize) + (new_count - previous_count)) as usize;
+    }
+
+    pub fn reset(&mut self) {
+        self.array.fill(0);
+        self.flip = false;
+        self.count = 0;
+    }
+
+    pub fn flip(&mut self) {
+        self.flip = !self.flip;
+    }
+
+    pub fn to_string(&self) -> String {
+        let mut res = String::with_capacity(self.size);
+        for i in 0..self.size {
+            res.push(if self.test(i) { '1' } else { '0' });
+        }
+        res
+    }
+
+    pub fn write(&self, path: &str) -> io::Result<()> {
+        let mut file = File::create(Path::new(path))?;
+        let bytes_to_write = Self::bitset_size(self.size);
+
+        file.write_all(&self.size.to_ne_bytes())?;
+        file.write_all(&self.count.to_ne_bytes())?;
+        file.write_all(&[if self.flip { 1 } else { 0 }])?;
+        file.write_all(&self.array[..bytes_to_write])?;
+        Ok(())
+    }
+
+    pub fn read(path: &str) -> io::Result<Self> {
+        let mut file = File::open(Path::new(path))?;
+
+        let mut usize_buf = [0u8; std::mem::size_of::<usize>()];
+        file.read_exact(&mut usize_buf)?;
+        let size = usize::from_ne_bytes(usize_buf);
+
+        let mut bs = Self::new(size);
+
+        file.read_exact(&mut usize_buf)?;
+        bs.count = usize::from_ne_bytes(usize_buf);
+
+        let mut bool_buf = [0u8; 1];
+        file.read_exact(&mut bool_buf)?;
+        bs.flip = bool_buf[0] != 0;
+
+        let bytes_to_read = Self::bitset_size(bs.size);
+        file.read_exact(&mut bs.array[..bytes_to_read])?;
+
+        Ok(bs)
+    }
+}
+```

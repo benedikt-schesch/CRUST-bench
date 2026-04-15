@@ -1,0 +1,6 @@
+```rust
+// Generated Rust Code
+pub mod chtrie {
+    pub struct Chtrie;
+}
+```

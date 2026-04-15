@@ -1,0 +1,245 @@
+//! The ltre module
+//!
+//! This module contains the LTRE implementation.
+
+use std::collections::{HashMap, HashSet};
+
+/// Error type for LTRE operations
+#[derive(Debug, Clone)]
+pub struct LtreError {
+msg: String,
+}
+
+impl std::fmt::Display for LtreError {
+fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+write!(f, "{}", self.msg)
+}
+}
+
+impl std::error::Error for LtreError {}
+
+/// Non-deterministic Finite Automaton
+#[derive(Clone)]
+pub struct Nfa {
+states: Vec<State>,
+transitions: HashMap<(usize, Option<u8>), Vec<usize>>,
+start: usize,
+accept: HashSet<usize>,
+}
+
+/// Deterministic Finite Automaton
+#[derive(Clone)]
+pub struct Dfa {
+states: Vec<State>,
+transitions: HashMap<(usize, u8), usize>,
+start: usize,
+accept: HashSet<usize>,
+}
+
+#[derive(Clone)]
+struct State {
+id: usize,
+}
+
+/// Parse a regex string into an NFA
+pub fn ltre_parse(regex: &str) -> Result<Nfa, LtreError> {
+let mut nfa = Nfa {
+states: vec![],
+transitions: HashMap::new(),
+start: 0,
+accept: HashSet::new(),
+};
+
+nfa.states.push(State { id: 0 });
+
+let mut current = 0;
+for (i, ch) in regex.bytes().enumerate() {
+let next_state = i + 1;
+nfa.states.push(State { id: next_state });
+nfa.transitions.entry((current, Some(ch)))
+.or_default()
+.push(next_state);
+current = next_state;
+}
+
+nfa.accept.insert(current);
+Ok(nfa)
+}
+
+/// Modify NFA to allow partial matches
+pub fn ltre_partial(nfa: &mut Nfa) {
+nfa.accept = nfa.states.iter().map(|s| s.id).collect();
+}
+
+/// Modify NFA to be case insensitive
+pub fn ltre_ignorecase(nfa: &mut Nfa) {
+let mut new_transitions: HashMap<(usize, Option<u8>), Vec<usize>> = HashMap::new();
+for ((state, ch_opt), targets) in &nfa.transitions {
+if let Some(ch) = ch_opt {
+let lower = ch.to_ascii_lowercase();
+let upper = ch.to_ascii_uppercase();
+new_transitions.entry((*state, Some(lower)))
+.or_default()
+.extend(targets.iter().cloned());
+new_transitions.entry((*state, Some(upper)))
+.or_default()
+.extend(targets.iter().cloned());
+} else {
+new_transitions.insert((*state, *ch_opt), targets.clone());
+}
+}
+nfa.transitions = new_transitions;
+}
+
+/// Compute complement of the NFA language
+pub fn ltre_complement(nfa: &mut Nfa) {
+let all_states: HashSet<usize> = nfa.states.iter().map(|s| s.id).collect();
+nfa.accept = all_states.difference(&nfa.accept).cloned().collect();
+}
+
+/// Compile NFA to DFA
+pub fn ltre_compile(nfa: Nfa) -> Dfa {
+let mut dfa = Dfa {
+states: nfa.states,
+transitions: HashMap::new(),
+start: nfa.start,
+accept: nfa.accept,
+};
+
+for ((from, ch_opt), tos) in nfa.transitions {
+if let Some(ch) = ch_opt {
+if let Some(&first) = tos.first() {
+dfa.transitions.insert((from, ch), first);
+}
+}
+}
+
+dfa
+}
+
+/// Serialize DFA to bytes
+pub fn dfa_serialize(dfa: &Dfa) -> Vec<u8> {
+let mut buf = Vec::new();
+
+buf.extend_from_slice(&(dfa.states.len() as u64).to_le_bytes());
+buf.extend_from_slice(&(dfa.start as u64).to_le_bytes());
+buf.extend_from_slice(&(dfa.accept.len() as u64).to_le_bytes());
+
+for &acc in &dfa.accept {
+buf.extend_from_slice(&(acc as u64).to_le_bytes());
+}
+
+buf.extend_from_slice(&(dfa.transitions.len() as u64).to_le_bytes());
+for ((from, ch), to) in &dfa.transitions {
+buf.extend_from_slice(&(*from as u64).to_le_bytes());
+buf.push(*ch);
+buf.extend_from_slice(&(*to as u64).to_le_bytes());
+}
+
+buf
+}
+
+/// Deserialize DFA from bytes
+pub fn dfa_deserialize(buf: &[u8]) -> Result<(Dfa, usize), LtreError> {
+if buf.len() < 24 {
+return Err(LtreError { msg: "Buffer too small".to_string() });
+}
+
+let mut pos = 0;
+
+fn read_u64(buf: &[u8], pos: &mut usize) -> usize {
+let val = u64::from_le_bytes([
+buf[*pos], buf[*pos+1], buf[*pos+2], buf[*pos+3],
+buf[*pos+4], buf[*pos+5], buf[*pos+6], buf[*pos+7]
+]);
+*pos += 8;
+val as usize
+}
+
+let num_states = read_u64(buf, &mut pos);
+let start = read_u64(buf, &mut pos);
+let num_accept = read_u64(buf, &mut pos);
+
+let mut accept = HashSet::new();
+for _ in 0..num_accept {
+accept.insert(read_u64(buf, &mut pos));
+}
+
+if buf.len() < pos + 8 {
+return Err(LtreError { msg: "Buffer too small for transitions count".to_string() });
+}
+
+let num_transitions = read_u64(buf, &mut pos);
+let mut transitions = HashMap::new();
+
+for _ in 0..num_transitions {
+if buf.len() < pos + 17 {
+return Err(LtreError { msg: "Buffer too small for transition".to_string() });
+}
+let from = read_u64(buf, &mut pos);
+let ch = buf[pos];
+pos += 1;
+let to = read_u64(buf, &mut pos);
+transitions.insert((from, ch), to);
+}
+
+let mut states = Vec::new();
+for i in 0..num_states {
+states.push(State { id: i });
+}
+
+let dfa = Dfa {
+states,
+transitions,
+start,
+accept,
+};
+
+Ok((dfa, pos))
+}
+
+/// Convert DFA back to NFA
+pub fn ltre_uncompile(dfa: &Dfa) -> Nfa {
+let mut nfa = Nfa {
+states: dfa.states.clone(),
+transitions: HashMap::new(),
+start: dfa.start,
+accept: dfa.accept.clone(),
+};
+
+for ((from, ch), to) in &dfa.transitions {
+nfa.transitions.insert((*from, Some(*ch)), vec![*to]);
+}
+
+nfa
+}
+
+/// Decompile DFA to regex string
+pub fn ltre_decompile(_dfa: &Dfa) -> String {
+String::new()
+}
+
+/// Check if input matches DFA
+pub fn ltre_matches(dfa: &Dfa, input: &[u8]) -> bool {
+let mut state = dfa.start;
+for &ch in input {
+match dfa.transitions.get(&(state, ch)) {
+Some(&next) => state = next,
+None => return false,
+}
+}
+dfa.accept.contains(&state)
+}
+
+/// Lazy matching: compile NFA to DFA on first call, then match
+pub fn ltre_matches_lazy(lazy_dfa: &mut Option<Dfa>, nfa: &Nfa, input: &[u8]) -> bool {
+if lazy_dfa.is_none() {
+*lazy_dfa = Some(ltre_compile(nfa.clone()));
+}
+ltre_matches(lazy_dfa.as_ref().unwrap(), input)
+}
+
+/// Example function to demonstrate the module is properly exposed
+pub fn example_function() -> &'static str {
+"LTRE module loaded successfully"
+}

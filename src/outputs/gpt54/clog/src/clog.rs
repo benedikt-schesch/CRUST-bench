@@ -1,0 +1,389 @@
+use std::fmt;
+use std::fs::{File, OpenOptions};
+use std::io::{self, Write};
+use std::sync::{Mutex, OnceLock};
+
+pub const CLOG_MAX_LOGGERS: usize = 16;
+pub const CLOG_FORMAT_LENGTH: usize = 256;
+pub const CLOG_DATETIME_LENGTH: usize = 256;
+pub const CLOG_DEFAULT_FORMAT: &str = "%d %t %f(%n): %l: %m\n";
+pub const CLOG_DEFAULT_DATE_FORMAT: &str = "%Y-%m-%d";
+pub const CLOG_DEFAULT_TIME_FORMAT: &str = "%H:%M:%S";
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ClogLevel {
+Debug,
+Info,
+Warn,
+Error,
+}
+
+pub struct Clog {
+level: ClogLevel,
+file: Option<File>,
+fmt: [char; CLOG_FORMAT_LENGTH],
+date_fmt: [char; CLOG_FORMAT_LENGTH],
+time_fmt: [char; CLOG_FORMAT_LENGTH],
+opened: bool,
+}
+
+fn logger_store() -> &'static Mutex<Vec<Option<Clog>>> {
+static LOGGERS: OnceLock<Mutex<Vec<Option<Clog>>>> = OnceLock::new();
+LOGGERS.get_or_init(|| {
+let mut v = Vec::with_capacity(CLOG_MAX_LOGGERS);
+for _ in 0..CLOG_MAX_LOGGERS {
+v.push(None);
+}
+Mutex::new(v)
+})
+}
+
+fn str_to_buf(s: &str) -> [char; CLOG_FORMAT_LENGTH] {
+let mut buf = ['\0'; CLOG_FORMAT_LENGTH];
+for (i, ch) in s.chars().take(CLOG_FORMAT_LENGTH - 1).enumerate() {
+buf[i] = ch;
+}
+buf
+}
+
+fn buf_to_string(buf: &[char; CLOG_FORMAT_LENGTH]) -> String {
+let mut s = String::new();
+for ch in buf.iter() {
+if *ch == '\0' {
+break;
+}
+s.push(*ch);
+}
+s
+}
+
+fn basename(path: &str) -> &str {
+path.rsplit(['/', '\\']).next().unwrap_or(path)
+}
+
+fn is_leap_year(year: i32) -> bool {
+(year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+fn current_date_time_parts() -> (i32, u32, u32, u32, u32, u32) {
+use std::time::{SystemTime, UNIX_EPOCH};
+
+let now = SystemTime::now();
+let duration = match now.duration_since(UNIX_EPOCH) {
+Ok(d) => d,
+Err(_) => return (1970, 1, 1, 0, 0, 0),
+};
+
+let total_secs = duration.as_secs();
+let secs_of_day = (total_secs % 86_400) as u32;
+let mut days = (total_secs / 86_400) as i64;
+
+let hour = secs_of_day / 3600;
+let minute = (secs_of_day % 3600) / 60;
+let second = secs_of_day % 60;
+
+let mut year = 1970i32;
+loop {
+let diy = if is_leap_year(year) { 366 } else { 365 };
+if days >= diy {
+days -= diy;
+year += 1;
+} else {
+break;
+}
+}
+
+let month_lengths = [
+31,
+if is_leap_year(year) { 29 } else { 28 },
+31,
+30,
+31,
+30,
+31,
+31,
+30,
+31,
+30,
+31,
+];
+
+let mut month = 1u32;
+for ml in month_lengths {
+if days >= ml {
+days -= ml;
+month += 1;
+} else {
+break;
+}
+}
+
+let day = (days + 1) as u32;
+(year, month, day, hour, minute, second)
+}
+
+fn format_time_like_c(fmt: &str) -> String {
+let (year, month, day, hour, minute, second) = current_date_time_parts();
+let mut out = String::new();
+let chars: Vec<char> = fmt.chars().collect();
+let mut i = 0usize;
+
+while i < chars.len() {
+if chars[i] == '%' && i + 1 < chars.len() {
+i += 1;
+match chars[i] {
+'Y' => out.push_str(&format!("{:04}", year)),
+'m' => out.push_str(&format!("{:02}", month)),
+'d' => out.push_str(&format!("{:02}", day)),
+'H' => out.push_str(&format!("{:02}", hour)),
+'M' => out.push_str(&format!("{:02}", minute)),
+'S' => out.push_str(&format!("{:02}", second)),
+'%' => out.push('%'),
+c => {
+out.push('%');
+out.push(c);
+}
+}
+} else {
+out.push(chars[i]);
+}
+i += 1;
+}
+
+out
+}
+
+fn format_log(logger: &Clog, sfile: &str, sline: i32, level: &str, message: &str) -> String {
+let fmt_str = buf_to_string(&logger.fmt);
+let date_fmt = buf_to_string(&logger.date_fmt);
+let time_fmt = buf_to_string(&logger.time_fmt);
+let file_name = basename(sfile);
+
+let mut result = String::new();
+let chars: Vec<char> = fmt_str.chars().collect();
+let mut i = 0usize;
+let mut subst = false;
+
+while i < chars.len() {
+let ch = chars[i];
+if !subst {
+if ch == '%' {
+subst = true;
+} else {
+result.push(ch);
+}
+} else {
+match ch {
+'%' => result.push('%'),
+'t' => result.push_str(&format_time_like_c(&time_fmt)),
+'d' => result.push_str(&format_time_like_c(&date_fmt)),
+'l' => result.push_str(level),
+'n' => result.push_str(&sline.to_string()),
+'f' => result.push_str(file_name),
+'m' => result.push_str(message),
+_ => {}
+}
+subst = false;
+}
+i += 1;
+}
+
+result
+}
+
+fn level_name(level: ClogLevel) -> &'static str {
+match level {
+ClogLevel::Debug => "DEBUG",
+ClogLevel::Info => "INFO",
+ClogLevel::Warn => "WARN",
+ClogLevel::Error => "ERROR",
+}
+}
+
+fn level_value(level: ClogLevel) -> u8 {
+match level {
+ClogLevel::Debug => 0,
+ClogLevel::Info => 1,
+ClogLevel::Warn => 2,
+ClogLevel::Error => 3,
+}
+}
+
+fn clog_log(sfile: &str, sline: i32, level: ClogLevel, id: usize, args: fmt::Arguments) {
+let mut guard = match logger_store().lock() {
+Ok(g) => g,
+Err(_) => return,
+};
+
+if id >= CLOG_MAX_LOGGERS {
+eprintln!("No such logger: {}", id);
+return;
+}
+
+let logger = match guard[id].as_mut() {
+Some(l) => l,
+None => {
+eprintln!("No such logger: {}", id);
+return;
+}
+};
+
+if level_value(level) < level_value(logger.level) {
+return;
+}
+
+let message = fmt::format(args);
+let rendered = format_log(logger, sfile, sline, level_name(level), &message);
+
+if let Some(file) = logger.file.as_mut() {
+if let Err(e) = file.write_all(rendered.as_bytes()) {
+eprintln!("Unable to write to log file: {}", e);
+}
+}
+}
+
+pub fn clog_init_path(id: usize, path: &str) -> io::Result<()> {
+if id >= CLOG_MAX_LOGGERS {
+return Err(io::Error::new(
+io::ErrorKind::InvalidInput,
+"logger id out of range",
+));
+}
+
+let file = match OpenOptions::new().create(true).append(true).write(true).open(path) {
+Ok(f) => f,
+Err(e) => {
+eprintln!("Unable to open {}: {}", path, e);
+return Err(e);
+}
+};
+
+if let Err(e) = clog_init_fd(id, file) {
+return Err(e);
+}
+
+let mut guard = logger_store()
+.lock()
+.map_err(|_| io::Error::new(io::ErrorKind::Other, "logger store poisoned"))?;
+if let Some(logger) = guard[id].as_mut() {
+logger.opened = true;
+}
+
+Ok(())
+}
+
+pub fn clog_init_fd(id: usize, file: File) -> io::Result<()> {
+if id >= CLOG_MAX_LOGGERS {
+return Err(io::Error::new(
+io::ErrorKind::InvalidInput,
+"logger id out of range",
+));
+}
+
+let mut guard = logger_store()
+.lock()
+.map_err(|_| io::Error::new(io::ErrorKind::Other, "logger store poisoned"))?;
+
+if guard[id].is_some() {
+eprintln!("Logger {} already initialized.", id);
+return Err(io::Error::new(
+io::ErrorKind::AlreadyExists,
+"logger already initialized",
+));
+}
+
+let logger = Clog {
+level: ClogLevel::Debug,
+file: Some(file),
+fmt: str_to_buf(CLOG_DEFAULT_FORMAT),
+date_fmt: str_to_buf(CLOG_DEFAULT_DATE_FORMAT),
+time_fmt: str_to_buf(CLOG_DEFAULT_TIME_FORMAT),
+opened: false,
+};
+
+guard[id] = Some(logger);
+Ok(())
+}
+
+pub fn clog_free(id: usize) {
+if id >= CLOG_MAX_LOGGERS {
+return;
+}
+
+if let Ok(mut guard) = logger_store().lock() {
+guard[id] = None;
+}
+}
+
+pub fn clog_set_level(id: usize, level: ClogLevel) -> Result<(), ()> {
+if id >= CLOG_MAX_LOGGERS {
+return Err(());
+}
+
+let mut guard = logger_store().lock().map_err(|_| ())?;
+let logger = guard[id].as_mut().ok_or(())?;
+logger.level = level;
+Ok(())
+}
+
+pub fn clog_set_date_fmt(id: usize, fmt: &str) -> Result<(), ()> {
+if id >= CLOG_MAX_LOGGERS {
+return Err(());
+}
+
+let mut guard = logger_store().lock().map_err(|_| ())?;
+let logger = match guard[id].as_mut() {
+Some(l) => l,
+None => {
+eprintln!("clog_set_date_fmt: No such logger: {}", id);
+return Err(());
+}
+};
+
+if fmt.chars().count() >= CLOG_FORMAT_LENGTH {
+eprintln!("clog_set_date_fmt: Format specifier too long.");
+return Err(());
+}
+
+logger.date_fmt = str_to_buf(fmt);
+Ok(())
+}
+
+pub fn clog_set_fmt(id: usize, fmt: &str) -> Result<(), ()> {
+if id >= CLOG_MAX_LOGGERS {
+return Err(());
+}
+
+let mut guard = logger_store().lock().map_err(|_| ())?;
+let logger = match guard[id].as_mut() {
+Some(l) => l,
+None => {
+eprintln!("clog_set_fmt: No such logger: {}", id);
+return Err(());
+}
+};
+
+if fmt.chars().count() >= CLOG_FORMAT_LENGTH {
+eprintln!("clog_set_fmt: Format specifier too long.");
+return Err(());
+}
+
+logger.fmt = str_to_buf(fmt);
+Ok(())
+}
+
+pub fn clog_debug(sfile: &str, sline: i32, id: usize, args: std::fmt::Arguments) {
+clog_log(sfile, sline, ClogLevel::Debug, id, args);
+}
+
+pub fn clog_info(sfile: &str, sline: i32, id: usize, args: std::fmt::Arguments) {
+clog_log(sfile, sline, ClogLevel::Info, id, args);
+}
+
+pub fn clog_warn(sfile: &str, sline: i32, id: usize, args: std::fmt::Arguments) {
+clog_log(sfile, sline, ClogLevel::Warn, id, args);
+}
+
+pub fn clog_error(sfile: &str, sline: i32, id: usize, args: std::fmt::Arguments) {
+clog_log(sfile, sline, ClogLevel::Error, id, args);
+}

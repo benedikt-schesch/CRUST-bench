@@ -1,0 +1,630 @@
+{{ast.rs}} 
+```rust
+// Generated Rust Code
+use crate::token;
+
+pub const SIMPLE_LANG_AST_H: bool = true;
+
+/// Safe, idiomatic representation of the ASTNode in Rust.
+/// In C:
+/// typedef struct ASTNode {
+///     TokenType type;
+///     struct ASTNode* left;
+///     struct ASTNode* right;
+///     char* value;
+/// } ASTNode;
+#[derive(Debug, Clone)]
+pub struct ASTNode {
+    pub type_: token::TokenType,
+    pub left: Option<Box<ASTNode>>,
+    pub right: Option<Box<ASTNode>>,
+    pub value: String,
+}
+
+/// Replicates the C signature:
+/// ASTNode* new_ast_node(TokenType type, const char* value);
+pub fn new_ast_node(type_: token::TokenType, value: &str) -> Box<ASTNode> {
+    Box::new(ASTNode {
+        type_,
+        left: None,
+        right: None,
+        value: value.to_string(),
+    })
+}
+
+/// Replicates the C signature:
+/// void free_ast_node(ASTNode* node);
+pub fn free_ast_node(_node: Box<ASTNode>) {
+    // In Rust, memory is automatically freed when the Box goes out of scope.
+}
+```
+
+{{compiler.rs}} 
+```rust
+// Generated Rust Code
+use crate::{vm, lexer, parser, ast};
+
+pub const SIMPLE_LANG_COMPILER_H: bool = true;
+
+/// Replicates: Instruction* compile_asts(ASTNode** asts, int* instr_count);
+/// In Rust: returns a vector of Instructions, updates an integer by reference.
+pub fn compile_asts(asts: &[Box<ast::ASTNode>], instr_count: &mut i32) -> Vec<vm::Instruction> {
+    *instr_count = 0;
+    let mut all_instr = Vec::new();
+    for ast in asts {
+        let mut count = 0;
+        let mut instrs = compile_statement(ast, &mut count);
+        all_instr.append(&mut instrs);
+        *instr_count += count;
+    }
+    all_instr
+}
+
+/// Replicates: Instruction* compile(const char* source, int* instr_count);
+pub fn compile(source: &str, instr_count: &mut i32) -> Vec<vm::Instruction> {
+    let tokens = lexer::tokenize(source);
+    let ast_nodes = parser::parse(&tokens);
+    compile_asts(&ast_nodes, instr_count)
+}
+
+/// Replicates: void compile_expression(ASTNode* node, Instruction* instructions, int* count);
+/// In Rust: modifies a mutable vector of Instructions and a count reference.
+pub fn compile_expression(
+    node: &ast::ASTNode,
+    instructions: &mut Vec<vm::Instruction>,
+    count: &mut i32,
+) {
+    use crate::token::TokenType;
+    if node.type_ == TokenType::TOKEN_INT {
+        emit(instructions, count, vm::OpCode::LOAD_CONST, &node.value);
+    } else if node.type_ == TokenType::TOKEN_IDENTIFIER {
+        emit(instructions, count, vm::OpCode::LOAD_NAME, &node.value);
+    } else if node.type_ == TokenType::TOKEN_PLUS {
+        if let Some(ref left) = node.left {
+            compile_expression(left, instructions, count);
+        }
+        if let Some(ref right) = node.right {
+            compile_expression(right, instructions, count);
+        }
+        emit(instructions, count, vm::OpCode::BINARY_ADD, "");
+    } else if node.type_ == TokenType::TOKEN_MINUS {
+        if let Some(ref left) = node.left {
+            compile_expression(left, instructions, count);
+        }
+        if let Some(ref right) = node.right {
+            compile_expression(right, instructions, count);
+        }
+        emit(instructions, count, vm::OpCode::BINARY_SUB, "");
+    }
+}
+
+/// Replicates: Instruction* compile_statement(ASTNode* ast, int* instr_count);
+pub fn compile_statement(ast: &ast::ASTNode, instr_count: &mut i32) -> Vec<vm::Instruction> {
+    use crate::token::TokenType;
+    let mut instructions = Vec::new();
+    *instr_count = 0;
+    if ast.type_ == TokenType::TOKEN_LET || ast.type_ == TokenType::TOKEN_ASSIGN {
+        if let Some(ref left) = ast.left {
+            compile_expression(left, &mut instructions, instr_count);
+        }
+        emit(&mut instructions, instr_count, vm::OpCode::STORE_NAME, &ast.value);
+    } else if ast.type_ == TokenType::TOKEN_DIS {
+        if let Some(ref left) = ast.left {
+            compile_expression(left, &mut instructions, instr_count);
+        }
+        emit(&mut instructions, instr_count, vm::OpCode::STK_DIS, &ast.value);
+    }
+    instructions
+}
+
+/// Replicates: void emit(Instruction* instructions, int* count, OpCode opcode, const char* operand);
+pub fn emit(
+    instructions: &mut Vec<vm::Instruction>,
+    count: &mut i32,
+    opcode: vm::OpCode,
+    operand: &str,
+) {
+    instructions.push(vm::new_instruction(opcode, operand));
+    *count += 1;
+}
+```
+
+{{lexer.rs}} 
+```rust
+// Generated Rust Code
+use crate::token;
+
+pub const SIMPLE_LANG_LEXER_H: bool = true;
+
+/// Replicates: Token* tokenize(const char* source);
+/// In Rust: returns a vector of Tokens.
+pub fn tokenize(source: &str) -> Vec<token::Token> {
+    let mut tokens = Vec::new();
+    let chars: Vec<char> = source.chars().collect();
+    let len = chars.len();
+    let mut pos = 0;
+
+    while pos < len {
+        if chars[pos].is_whitespace() {
+            pos += 1;
+        } else if chars[pos].is_ascii_digit() {
+            let start = pos;
+            while pos < len && chars[pos].is_ascii_digit() {
+                pos += 1;
+            }
+            let num: String = chars[start..pos].iter().collect();
+            tokens.push(new_token(token::TokenType::TOKEN_INT, &num));
+        } else if chars[pos].is_ascii_alphabetic() {
+            let start = pos;
+            while pos < len && chars[pos].is_ascii_alphabetic() {
+                pos += 1;
+            }
+            let indent: String = chars[start..pos].iter().collect();
+            if indent == "let" {
+                tokens.push(new_token(token::TokenType::TOKEN_LET, &indent));
+            } else if indent == "dis" {
+                tokens.push(new_token(token::TokenType::TOKEN_DIS, &indent));
+            } else {
+                tokens.push(new_token(token::TokenType::TOKEN_IDENTIFIER, &indent));
+            }
+        } else {
+            match chars[pos] {
+                '+' => tokens.push(new_token(token::TokenType::TOKEN_PLUS, "+")),
+                '-' => tokens.push(new_token(token::TokenType::TOKEN_MINUS, "-")),
+                ';' => tokens.push(new_token(token::TokenType::TOKEN_SEMICOLON, ";")),
+                '=' => tokens.push(new_token(token::TokenType::TOKEN_ASSIGN, "=")),
+                _ => {
+                    eprintln!("SyntaxError: unexpected character {}", chars[pos]);
+                    std::process::exit(1);
+                }
+            }
+            pos += 1;
+        }
+    }
+    tokens.push(new_token(token::TokenType::TOKEN_EOF, ""));
+    tokens
+}
+
+/// Replicates: void free_token(Token* token);
+pub fn free_token(_token: token::Token) {
+    // Automatically freed in Rust
+}
+
+/// Replicates: Token* new_token(TokenType type, const char* value);
+/// In Rust: returns a new Token struct.
+pub fn new_token(type_: token::TokenType, value: &str) -> token::Token {
+    token::Token {
+        token_type: type_,
+        value: value.to_string(),
+    }
+}
+```
+
+{{misc.rs}} 
+```rust
+// Generated Rust Code
+use crate::{vm, ast, token, settings};
+
+pub const SIMPLE_LANG_MISC_H: bool = true;
+
+fn get_token_type_name(token_type: &token::TokenType) -> String {
+    match token_type {
+        token::TokenType::TOKEN_INT => "TOKEN_INT".to_string(),
+        token::TokenType::TOKEN_IDENTIFIER => "TOKEN_IDENTIFIER".to_string(),
+        token::TokenType::TOKEN_ASSIGN => "TOKEN_ASSIGN".to_string(),
+        token::TokenType::TOKEN_PLUS => "TOKEN_PLUS".to_string(),
+        token::TokenType::TOKEN_MINUS => "TOKEN_MINUS".to_string(),
+        token::TokenType::TOKEN_SEMICOLON => "TOKEN_SEMICOLON".to_string(),
+        token::TokenType::TOKEN_LET => "TOKEN_LET".to_string(),
+        token::TokenType::TOKEN_EOF => "TOKEN_EOF".to_string(),
+        token::TokenType::TOKEN_DIS => "TOKEN_DIS".to_string(),
+    }
+}
+
+/// Replicates: void show_opcode(Instruction* instruction, int instr_count);
+pub fn show_opcode(instruction: &vm::Instruction, instr_count: i32) {
+    println!("bytecode:");
+    // Due to the strict signature requiring a reference to a single instruction,
+    // we can only print this single instruction.
+    for _ in 0..instr_count {
+        if !instruction.operand.is_empty() {
+            println!("{:-15} \t ({})", get_opcode_name(instruction.opcode), instruction.operand);
+        } else {
+            println!("{:-15} \t *", get_opcode_name(instruction.opcode));
+        }
+    }
+    println!();
+}
+
+/// Replicates: void show_tokens(Token* tokens);
+/// Interpreted as working with a slice of tokens in Rust.
+pub fn show_tokens(tokens: &[token::Token]) {
+    println!("tokens:");
+    for token in tokens {
+        if token.token_type == token::TokenType::TOKEN_EOF {
+            break;
+        }
+        println!("{:-15} \t ({})", get_token_type_name(&token.token_type), token.value);
+    }
+    println!();
+}
+
+/// Replicates: void print_asts(ASTNode** asts);
+/// Interpreted as working with a slice of ASTNode pointers in Rust.
+pub fn print_asts(asts: &[Box<ast::ASTNode>]) {
+    println!("AST:");
+    for ast in asts {
+        print_ast(ast, 0);
+        println!();
+    }
+    println!();
+}
+
+/// Replicates: char* read_file(const char* source_path);
+pub fn read_file(source_path: &str) -> String {
+    std::fs::read_to_string(source_path).unwrap_or_else(|_| {
+        eprintln!("Could not open file");
+        std::process::exit(-1);
+    })
+}
+
+/// Replicates: void print_ast(ASTNode* node, int level);
+pub fn print_ast(node: &ast::ASTNode, level: i32) {
+    for _ in 0..level {
+        print!("  ");
+    }
+    match node.type_ {
+        token::TokenType::TOKEN_INT => println!("INT: {}", node.value),
+        token::TokenType::TOKEN_IDENTIFIER => println!("IDENTIFIER: {}", node.value),
+        token::TokenType::TOKEN_ASSIGN => println!("ASSIGN: {}", node.value),
+        token::TokenType::TOKEN_LET => println!("LET: {}", node.value),
+        token::TokenType::TOKEN_PLUS => println!("PLUS"),
+        token::TokenType::TOKEN_MINUS => println!("MINUS"),
+        token::TokenType::TOKEN_DIS => println!("DISPLAY"),
+        _ => println!("UNKNOWN"),
+    }
+    if let Some(ref left) = node.left {
+        print_ast(left, level + 1);
+    }
+    if let Some(ref right) = node.right {
+        print_ast(right, level + 1);
+    }
+}
+
+/// Replicates: char* get_opcode_name(OpCode opcode);
+pub fn get_opcode_name(opcode: vm::OpCode) -> String {
+    match opcode {
+        vm::OpCode::LOAD_CONST => "LOAD_CONST".to_string(),
+        vm::OpCode::LOAD_NAME => "LOAD_NAME".to_string(),
+        vm::OpCode::STORE_NAME => "STORE_NAME".to_string(),
+        vm::OpCode::BINARY_SUB => "BINARY_SUB".to_string(),
+        vm::OpCode::BINARY_ADD => "BINARY_ADD".to_string(),
+        vm::OpCode::STK_DIS => "STK_DIS".to_string(),
+    }
+}
+```
+
+{{parser.rs}} 
+```rust
+// Generated Rust Code
+use crate::{token, ast};
+use std::cell::RefCell;
+
+pub const SIMPLE_LANG_PARSER_H: bool = true;
+
+thread_local! {
+    static TOKENS: RefCell<Vec<token::Token>> = RefCell::new(Vec::new());
+    static POS: RefCell<usize> = RefCell::new(0);
+}
+
+/// This would represent a global tokens pointer in C:
+/// Token* tokens;
+/// Rust does not use global mutable state in the same way, so it is omitted.
+/// Replicates: Token* consume();
+pub fn consume() -> token::Token {
+    TOKENS.with(|tokens| {
+        POS.with(|pos| {
+            let mut p = pos.borrow_mut();
+            let t = tokens.borrow()[*p].clone();
+            *p += 1;
+            t
+        })
+    })
+}
+
+/// Replicates: ASTNode* parse_statement();
+pub fn parse_statement() -> Box<ast::ASTNode> {
+    let token = consume();
+    if token.token_type == token::TokenType::TOKEN_LET {
+        let identifier = consume();
+        if identifier.token_type != token::TokenType::TOKEN_IDENTIFIER {
+            eprintln!("Expected identifier after 'let'");
+            std::process::exit(1);
+        }
+        if consume().token_type != token::TokenType::TOKEN_ASSIGN {
+            eprintln!("Expected '=' after identifier");
+            std::process::exit(1);
+        }
+        let expr = parse_expression();
+        if consume().token_type != token::TokenType::TOKEN_SEMICOLON {
+            eprintln!("Expected ';' at end of statement");
+            std::process::exit(1);
+        }
+        let mut node = ast::new_ast_node(token::TokenType::TOKEN_LET, &identifier.value);
+        node.left = Some(expr);
+        node
+    } else if token.token_type == token::TokenType::TOKEN_IDENTIFIER {
+        let identifier = token;
+        if consume().token_type != token::TokenType::TOKEN_ASSIGN {
+            eprintln!("Expected '=' after identifier");
+            std::process::exit(1);
+        }
+        let expr = parse_expression();
+        if consume().token_type != token::TokenType::TOKEN_SEMICOLON {
+            eprintln!("Expected ';' at end of statement");
+            std::process::exit(1);
+        }
+        let mut node = ast::new_ast_node(token::TokenType::TOKEN_ASSIGN, &identifier.value);
+        node.left = Some(expr);
+        node
+    } else if token.token_type == token::TokenType::TOKEN_DIS {
+        let expr = parse_expression();
+        let mut node = ast::new_ast_node(token::TokenType::TOKEN_DIS, "");
+        if consume().token_type != token::TokenType::TOKEN_SEMICOLON {
+            eprintln!("Expected ';' at end of statement");
+            std::process::exit(1);
+        }
+        node.left = Some(expr);
+        node
+    } else {
+        eprintln!("Unexpected token: {}", token.value);
+        std::process::exit(1);
+    }
+}
+
+/// Replicates: ASTNode* parse_primary();
+pub fn parse_primary() -> Box<ast::ASTNode> {
+    let token = consume();
+    if token.token_type == token::TokenType::TOKEN_INT {
+        ast::new_ast_node(token::TokenType::TOKEN_INT, &token.value)
+    } else if token.token_type == token::TokenType::TOKEN_IDENTIFIER {
+        ast::new_ast_node(token::TokenType::TOKEN_IDENTIFIER, &token.value)
+    } else {
+        eprintln!("Unexpected token in primary expression: {}", token.value);
+        std::process::exit(1);
+    }
+}
+
+/// Replicates: ASTNode* parse_expression();
+pub fn parse_expression() -> Box<ast::ASTNode> {
+    let mut left = parse_primary();
+    let mut token = lookahead();
+    while token.token_type == token::TokenType::TOKEN_PLUS || token.token_type == token::TokenType::TOKEN_MINUS {
+        token = consume();
+        let right = parse_primary();
+        let mut node = ast::new_ast_node(token.token_type.clone(), &token.value);
+        node.left = Some(left);
+        node.right = Some(right);
+        left = node;
+        token = lookahead();
+    }
+    left
+}
+
+/// Replicates: ASTNode** parse(Token* tokens);
+/// In Rust: returns a vector of Box<ASTNode>.
+pub fn parse(tokens_array: &[token::Token]) -> Vec<Box<ast::ASTNode>> {
+    TOKENS.with(|tokens| {
+        *tokens.borrow_mut() = tokens_array.to_vec();
+    });
+    POS.with(|pos| {
+        *pos.borrow_mut() = 0;
+    });
+
+    let mut ast_nodes = Vec::new();
+    loop {
+        let t = lookahead();
+        if t.token_type == token::TokenType::TOKEN_EOF {
+            break;
+        }
+        ast_nodes.push(parse_statement());
+    }
+    ast_nodes
+}
+
+/// Replicates: Token* lookahead();
+pub fn lookahead() -> token::Token {
+    TOKENS.with(|tokens| {
+        POS.with(|pos| {
+            tokens.borrow()[*pos.borrow()].clone()
+        })
+    })
+}
+```
+
+{{settings.rs}} 
+```rust
+// Generated Rust Code
+pub const SIMPLE_LANG_SETTINGS_H: bool = true;
+
+/// Replicates the defines in settings.h as Rust constants.
+pub const MAX_TOKEN: i32 = 200;
+pub const MAX_STATEMENT: i32 = 100;
+pub const MAX_INSTR_IN_STATEMENT: i32 = 100;
+pub const STAKE_LENGTH: i32 = 200;
+pub const MAX_SOURCE_LENGTH: i32 = 2000;
+pub const DEBUG: i32 = 0;
+```
+
+{{token.rs}} 
+```rust
+// Generated Rust Code
+pub const SIMPLE_LANG_TOKEN_H: bool = true;
+
+/// Replicates the C enum:
+/// typedef enum {
+///     TOKEN_INT,
+///     TOKEN_IDENTIFIER,
+///     TOKEN_ASSIGN,
+///     TOKEN_PLUS,
+///     TOKEN_MINUS,
+///     TOKEN_SEMICOLON,
+///     TOKEN_LET,
+///     TOKEN_EOF,
+///     TOKEN_DIS
+/// } TokenType;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TokenType {
+    TOKEN_INT,
+    TOKEN_IDENTIFIER,
+    TOKEN_ASSIGN,
+    TOKEN_PLUS,
+    TOKEN_MINUS,
+    TOKEN_SEMICOLON,
+    TOKEN_LET,
+    TOKEN_EOF,
+    TOKEN_DIS,
+}
+
+/// Replicates the C struct:
+/// typedef struct {
+///     TokenType type;
+///     char* value;
+/// } Token;
+#[derive(Debug, Clone)]
+pub struct Token {
+    pub token_type: TokenType,
+    pub value: String,
+}
+
+/// Replicates: Token* new_token(TokenType type, const char* value);
+pub fn new_token(type_: TokenType, value: &str) -> Token {
+    Token {
+        token_type: type_,
+        value: value.to_string(),
+    }
+}
+
+/// Replicates: void free_token(Token* token);
+pub fn free_token(_token: Token) {
+    // Automatically freed in Rust
+}
+```
+
+{{utils.rs}} 
+```rust
+// Generated Rust Code
+pub const SIMPLE_LANG_UTILS_H: bool = true;
+
+// No external crate references needed
+/// Replicates the C signature: char* strndup(const char* s, size_t n);
+/// Returns a newly allocated substring of length n from s in a safe, idiomatic way.
+pub fn strndup(s: &str, n: usize) -> String {
+    s.chars().take(n).collect()
+}
+```
+
+{{vm.rs}} 
+```rust
+// Generated Rust Code
+use crate::{ast, settings};
+
+pub const SIMPLE_LANG_VM_H: bool = true;
+
+/// Replicates the C enum:
+/// typedef enum { LOAD_CONST, LOAD_NAME, STORE_NAME, BINARY_ADD, BINARY_SUB, STK_DIS } OpCode;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpCode {
+    LOAD_CONST,
+    LOAD_NAME,
+    STORE_NAME,
+    BINARY_ADD,
+    BINARY_SUB,
+    STK_DIS,
+}
+
+/// Replicates the C struct:
+/// typedef struct {
+///     OpCode opcode;
+///     char* operand;
+/// } Instruction;
+#[derive(Debug, Clone)]
+pub struct Instruction {
+    pub opcode: OpCode,
+    pub operand: String,
+}
+
+/// Replicates the C struct Frame, referencing STAKE_LENGTH from settings.
+#[derive(Debug, Clone)]
+pub struct Frame {
+    pub stack: [i32; settings::STAKE_LENGTH as usize],
+    pub sp: i32,
+    pub variables: [i32; 100],
+    pub var_names: [String; 100],
+    pub var_count: i32,
+}
+
+/// Replicates: Instruction* new_instruction(OpCode opcode, const char* operand);
+pub fn new_instruction(opcode: OpCode, operand: &str) -> Instruction {
+    Instruction {
+        opcode,
+        operand: operand.to_string(),
+    }
+}
+
+/// Replicates: void free_instruction(Instruction* instruction);
+pub fn free_instruction(_instruction: &mut Instruction) {
+    // Automatically freed in Rust
+}
+
+/// Replicates: void eval(Frame* frame, Instruction* instructions, int instr_count);
+/// In Rust: instructions is a slice of Instruction, instr_count is the length, or a separate i32.
+pub fn eval(frame: &mut Frame, instructions: &[Instruction]) {
+    for instr in instructions {
+        match instr.opcode {
+            OpCode::LOAD_CONST => {
+                frame.sp += 1;
+                frame.stack[frame.sp as usize] = instr.operand.parse::<i32>().unwrap_or(0);
+            }
+            OpCode::LOAD_NAME => {
+                for i in 0..frame.var_count as usize {
+                    if frame.var_names[i] == instr.operand {
+                        frame.sp += 1;
+                        frame.stack[frame.sp as usize] = frame.variables[i];
+                        break;
+                    }
+                }
+            }
+            OpCode::STORE_NAME => {
+                for i in 0..frame.var_count as usize {
+                    if frame.var_names[i] == instr.operand {
+                        frame.variables[i] = frame.stack[frame.sp as usize];
+                        frame.sp -= 1;
+                        break;
+                    }
+                }
+                let mut should_add = false;
+                if frame.var_count == 0 {
+                    should_add = true;
+                } else if frame.var_names[(frame.var_count - 1) as usize] != instr.operand {
+                    should_add = true;
+                }
+                
+                if should_add {
+                    let idx = frame.var_count as usize;
+                    frame.var_names[idx] = instr.operand.clone();
+                    frame.variables[idx] = frame.stack[frame.sp as usize];
+                    frame.sp -= 1;
+                    frame.var_count += 1;
+                }
+            }
+            OpCode::BINARY_ADD => {
+                frame.stack[(frame.sp - 1) as usize] = frame.stack[(frame.sp - 1) as usize] + frame.stack[frame.sp as usize];
+                frame.sp -= 1;
+            }
+            OpCode::BINARY_SUB => {
+                frame.stack[(frame.sp - 1) as usize] = frame.stack[(frame.sp - 1) as usize] - frame.stack[frame.sp as usize];
+                frame.sp -= 1;
+            }
+            OpCode::STK_DIS => {
+                println!("{}", frame.stack[frame.sp as

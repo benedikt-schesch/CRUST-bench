@@ -1,0 +1,115 @@
+// Simple sparse hash module
+// This module provides a basic sparse hash implementation
+
+use std::collections::HashMap;
+
+/// Group size constant used for sparse array indexing
+pub const GROUP_SIZE: usize = 64;
+
+/// SparseArray represents a sparse array where elements are stored only at set indices
+pub struct SparseArray {
+item_size: usize,
+data: HashMap<u32, Vec<u8>>,
+}
+
+/// SparseDict represents a sparse dictionary (hash map) with byte slice keys and values
+pub struct SparseDict {
+data: HashMap<Vec<u8>, Vec<u8>>,
+pub bucket_count: usize,
+}
+
+/// Initialize a new sparse array with the given item size and capacity hint
+pub fn sparse_array_init(item_size: usize, _capacity: u32) -> Option<SparseArray> {
+Some(SparseArray {
+item_size,
+data: HashMap::new(),
+})
+}
+
+/// Get a value from the sparse array at the given index
+/// Returns a reference to the data and optionally writes the size to size_out
+pub fn sparse_array_get<'a>(arr: &'a SparseArray, index: u32, size_out: Option<&mut usize>) -> Option<&'a [u8]> {
+arr.data.get(&index).map(|v| {
+if let Some(s) = size_out {
+*s = v.len();
+}
+v.as_slice()
+})
+}
+
+/// Set a value in the sparse array at the given index
+/// Returns 1 on success, 0 on failure
+pub fn sparse_array_set(arr: &mut SparseArray, index: u32, data: &[u8], size: usize) -> i32 {
+if data.len() < size {
+return 0;
+}
+let mut vec = Vec::with_capacity(size);
+vec.extend_from_slice(&data[..size]);
+arr.data.insert(index, vec);
+1
+}
+
+/// Free the sparse array
+/// Returns 1 on success
+pub fn sparse_array_free(_arr: SparseArray) -> i32 {
+// Ownership is taken and the array is dropped when the function returns
+1
+}
+
+/// Initialize a new sparse dictionary
+pub fn sparse_dict_init() -> Option<SparseDict> {
+Some(SparseDict {
+data: HashMap::new(),
+bucket_count: 0,
+})
+}
+
+/// Set a key-value pair in the sparse dictionary
+/// Returns 1 on success, 0 on failure
+pub fn sparse_dict_set(dict: &mut SparseDict, key: &str, key_len: usize, value: &[u8], value_len: usize) -> i32 {
+if key.len() < key_len || value.len() < value_len {
+return 0;
+}
+let k = key.as_bytes()[..key_len].to_vec();
+let v = value[..value_len].to_vec();
+dict.data.insert(k, v);
+dict.bucket_count = dict.data.len();
+1
+}
+
+/// Get a value from the sparse dictionary by key
+/// Returns a reference to the value data and optionally writes the size to size_out
+pub fn sparse_dict_get<'a>(dict: &'a SparseDict, key: &str, key_len: usize, size_out: Option<&mut usize>) -> Option<&'a [u8]> {
+if key.len() < key_len {
+return None;
+}
+let k = &key.as_bytes()[..key_len];
+dict.data.get(k).map(|v| {
+if let Some(s) = size_out {
+*s = v.len();
+}
+v.as_slice()
+})
+}
+
+/// Free the sparse dictionary
+/// Returns 1 on success
+pub fn sparse_dict_free(_dict: SparseDict) -> i32 {
+// Ownership is taken and the dictionary is dropped when the function returns
+1
+}
+
+/// SimpleSparseHash struct for basic hash functionality
+pub struct SimpleSparseHash;
+
+impl SimpleSparseHash {
+/// Create a new SimpleSparseHash instance
+pub fn new() -> Self {
+SimpleSparseHash
+}
+}
+
+/// Create a new SimpleSparseHash instance
+pub fn create_hash() -> SimpleSparseHash {
+SimpleSparseHash::new()
+}

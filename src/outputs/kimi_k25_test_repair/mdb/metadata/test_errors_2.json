@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `mdb::mdb`", "file_path": "mdb/src/bin/tests.rs", "row": "4", "col": "10", "error_snippet": "|\n4 | use mdb::mdb::{Mdb, MdbOptions, MdbError, MdbStatusCode};\n  |          ^^^ could not find `mdb` in `mdb`"}]

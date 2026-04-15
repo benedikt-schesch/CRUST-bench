@@ -1,0 +1,194 @@
+use crate::bucket;
+use crate::cards::card_compare;
+use crate::cards::Card;
+use crate::cards::Rank;
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
+pub enum HandType {
+InvalidHand,
+HighCard,
+Pair,
+TwoPair,
+ThreeOfAKind,
+Straight,
+Wheel,
+Flush,
+FullHouse,
+FourOfAKind,
+StraightFlush,
+WheelFlush,
+}
+
+pub fn hand_compare(hand1: &[Card; 5], hand2: &[Card; 5]) -> i32 {
+let hand1_type = hand_classify(hand1);
+let hand2_type = hand_classify(hand2);
+let diff = (hand1_type as i32) - (hand2_type as i32);
+if diff != 0 {
+return diff;
+}
+
+for i in 0..5 {
+let cmp = card_compare(&hand1[i], &hand2[i]);
+if cmp != 0 {
+return cmp;
+}
+}
+
+0
+}
+
+pub fn hand_sort(hand: &mut [Card; 5]) {
+let mut buckets = [
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+bucket::Bucket::new(),
+];
+
+for card in hand.iter() {
+if card.rank >= Rank::Deuce && card.rank <= Rank::Ace {
+let bucket_index = (card.rank as usize) - 1;
+buckets[bucket_index].add(*card);
+}
+}
+
+let mut index = 0usize;
+for count in (1..=4).rev() {
+for j in (0..13).rev() {
+if buckets[j].count == count {
+for k in 0..count {
+if let Some(card) = buckets[j].cards[k] {
+hand[index] = card;
+index += 1;
+}
+}
+}
+}
+}
+}
+
+pub fn hand_classify(cards: &[Card; 5]) -> HandType {
+if !hand_is_valid(cards) {
+return HandType::InvalidHand;
+}
+
+if hand_is_straight_flush(cards) {
+return HandType::StraightFlush;
+}
+if hand_is_wheel_flush(cards) {
+return HandType::WheelFlush;
+}
+if hand_is_four_of_a_kind(cards) {
+return HandType::FourOfAKind;
+}
+if hand_is_full_house(cards) {
+return HandType::FullHouse;
+}
+if hand_is_flush(cards) {
+return HandType::Flush;
+}
+if hand_is_straight(cards) {
+return HandType::Straight;
+}
+if hand_is_wheel(cards) {
+return HandType::Wheel;
+}
+if hand_is_three_of_a_kind(cards) {
+return HandType::ThreeOfAKind;
+}
+if hand_is_two_pair(cards) {
+return HandType::TwoPair;
+}
+if hand_is_pair(cards) {
+return HandType::Pair;
+}
+
+HandType::HighCard
+}
+
+pub fn hand_is_valid(cards: &[Card; 5]) -> bool {
+for card in cards.iter() {
+if !card.is_valid() {
+return false;
+}
+}
+true
+}
+
+fn hand_is_straight_flush(cards: &[Card; 5]) -> bool {
+hand_is_straight(cards) && hand_is_flush(cards)
+}
+
+fn hand_is_wheel_flush(cards: &[Card; 5]) -> bool {
+hand_is_wheel(cards) && hand_is_flush(cards)
+}
+
+fn hand_is_four_of_a_kind(cards: &[Card; 5]) -> bool {
+(cards[0].rank == cards[3].rank && cards[3].rank != cards[4].rank)
+|| (cards[1].rank == cards[4].rank && cards[0].rank != cards[1].rank)
+}
+
+fn hand_is_full_house(cards: &[Card; 5]) -> bool {
+cards[0].rank == cards[2].rank
+&& cards[3].rank == cards[4].rank
+&& cards[2].rank != cards[3].rank
+}
+
+fn hand_is_flush(cards: &[Card; 5]) -> bool {
+for i in 1..5 {
+if cards[i].suit != cards[0].suit {
+return false;
+}
+}
+true
+}
+
+fn hand_is_straight(cards: &[Card; 5]) -> bool {
+for i in 0..4 {
+if (cards[i].rank as i32) != (cards[i + 1].rank as i32) + 1 {
+return false;
+}
+}
+true
+}
+
+fn hand_is_wheel(cards: &[Card; 5]) -> bool {
+cards[0].rank == Rank::Ace
+&& cards[1].rank == Rank::Five
+&& cards[2].rank == Rank::Four
+&& cards[3].rank == Rank::Trey
+&& cards[4].rank == Rank::Deuce
+}
+
+fn hand_is_three_of_a_kind(cards: &[Card; 5]) -> bool {
+cards[0].rank == cards[2].rank
+&& cards[2].rank != cards[3].rank
+&& cards[3].rank != cards[4].rank
+}
+
+fn hand_is_two_pair(cards: &[Card; 5]) -> bool {
+cards[0].rank == cards[1].rank
+&& cards[2].rank == cards[3].rank
+&& cards[1].rank != cards[2].rank
+&& cards[3].rank != cards[4].rank
+}
+
+fn hand_is_pair(cards: &[Card; 5]) -> bool {
+cards[0].rank == cards[1].rank
+&& cards[1].rank != cards[2].rank
+&& cards[2].rank != cards[3].rank
+&& cards[3].rank != cards[4].rank
+}
+
+fn hand_is_high_card(_cards: &[Card; 5]) -> bool {
+true
+}

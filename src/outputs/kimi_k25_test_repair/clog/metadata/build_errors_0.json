@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `clog::clog`", "file_path": "clog/src/bin/test.rs", "row": "1", "col": "5", "error_snippet": "|\n1 | use clog::clog;\n  |     ^^^^^^^^^^ no `clog` in the root"}]

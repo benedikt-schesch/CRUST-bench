@@ -1,0 +1,8 @@
+```rust
+// Generated Rust Code
+```
+
+{{lib.rs}}
+```rust
+pub mod vcd;
+```

@@ -1,0 +1,102 @@
+```rust
+{{bucket.rs}}
+```rust
+use crate::cards::Card;
+
+pub struct Bucket {
+    pub cards: [Option<Card>; 4],
+    pub count: usize,
+}
+
+impl Bucket {
+    pub fn new() -> Self {
+        Bucket {
+            cards: [None, None, None, None],
+            count: 0,
+        }
+    }
+
+    pub fn add(&mut self, card: Card) {
+        if self.count < 4 {
+            self.cards[self.count] = Some(card);
+            self.count += 1;
+        }
+    }
+}
+```
+
+{{cards.rs}}
+```rust
+pub const RANKS_PER_DECK: usize = 13;
+pub const SUITS_PER_DECK: usize = 4;
+pub const RANK_CHARS: &str = "23456789TJQKA";
+pub const SUIT_CHARS: &str = "cdhs";
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum Suit {
+    InvalidSuit,
+    Club,
+    Diamond,
+    Heart,
+    Spade,
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
+pub enum Rank {
+    InvalidRank,
+    Deuce,
+    Trey,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
+    Ten,
+    Jack,
+    Queen,
+    King,
+    Ace,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Card {
+    pub rank: Rank,
+    pub suit: Suit,
+}
+
+impl Card {
+    pub fn new(rank: Rank, suit: Suit) -> Self {
+        let card = Card { rank, suit };
+        if card.is_valid() {
+            card
+        } else {
+            Card {
+                rank: Rank::InvalidRank,
+                suit: Suit::InvalidSuit,
+            }
+        }
+    }
+
+    pub fn from_string(s: &str) -> Card {
+        if s.len() != 2 {
+            Card {
+                rank: Rank::InvalidRank,
+                suit: Suit::InvalidSuit,
+            }
+        } else {
+            let mut chars = s.chars();
+            let r = chars.next().unwrap();
+            let s = chars.next().unwrap();
+            Card::from_chars(r, s)
+        }
+    }
+
+    pub fn from_chars(rank: char, suit: char) -> Card {
+        let r = char_to_rank(rank);
+        let s = char_to_suit(suit);
+        Card::new(r, s)
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.

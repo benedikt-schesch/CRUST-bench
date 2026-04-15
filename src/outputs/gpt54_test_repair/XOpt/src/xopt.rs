@@ -1,0 +1,621 @@
+use crate::snprintf;
+
+pub const XOPT_TYPE_STRING: i64 = 0x1;
+pub const XOPT_TYPE_INT: i64 = 0x2;
+pub const XOPT_TYPE_LONG: i64 = 0x4;
+pub const XOPT_TYPE_FLOAT: i64 = 0x8;
+pub const XOPT_TYPE_DOUBLE: i64 = 0x10;
+pub const XOPT_TYPE_BOOL: i64 = 0x20;
+pub const XOPT_OPTIONAL: i64 = 0x40;
+
+pub const XOPT_CTX_KEEPFIRST: i64 = 0x1;
+pub const XOPT_CTX_POSIXMEHARDER: i64 = 0x2;
+pub const XOPT_CTX_NOCONDENSE: i64 = 0x4;
+pub const XOPT_CTX_SLOPPYSHORTS: i64 = 0x8 | XOPT_CTX_NOCONDENSE;
+pub const XOPT_CTX_STRICT: i64 = 0x10;
+
+pub type XoptCallback = fn(
+value: Option<&str>,
+data: *mut u8,
+option: &XoptOption,
+long_arg: bool,
+err: &mut Option<String>,
+);
+
+#[derive(Debug, Clone)]
+pub struct XoptOption {
+pub long_arg: Option<String>,
+pub short_arg: char,
+pub offset: usize,
+pub callback: Option<XoptCallback>,
+pub options: i64,
+pub arg_descrip: Option<String>,
+pub descrip: Option<String>,
+}
+
+pub const fn XOPT_NULLOPTION() -> XoptOption {
+XoptOption {
+long_arg: None,
+short_arg: '\0',
+offset: 0,
+callback: None,
+options: 0,
+arg_descrip: None,
+descrip: None,
+}
+}
+
+#[derive(Debug)]
+pub struct XoptContext {
+pub options: Vec<XoptOption>,
+pub flags: i64,
+pub name: Option<String>,
+pub doubledash: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct XoptAutohelpOptions {
+pub usage: Option<String>,
+pub prefix: Option<String>,
+pub suffix: Option<String>,
+pub spacer: usize,
+}
+
+const EXTRAS_INIT: usize = 10;
+
+fn _xopt_set_err(err: &mut Option<String>, msg: String) {
+let mut tmp = String::new();
+let _ = snprintf::rpl_vsnprintf(&mut tmp, usize::MAX, "%s", &[&msg]);
+*err = Some(tmp);
+}
+
+fn _xopt_get_size(arg: &str) -> i32 {
+let b = arg.as_bytes();
+let mut size = 0;
+while size < 2 && size < b.len() && b[size] == b'-' {
+size += 1;
+}
+size as i32
+}
+
+fn _xopt_get_arg<'a>(
+arg: &str,
+len: usize,
+options: &'a [XoptOption],
+size: i32,
+) -> (i32, Option<&'a XoptOption>) {
+let mut found: Option<&XoptOption> = None;
+for opt in options {
+if opt.long_arg.is_none() && opt.short_arg == '\0' {
+break;
+}
+if size == 1 && opt.short_arg != '\0' && arg.chars().next().unwrap_or('\0') == opt.short_arg
+{
+found = Some(opt);
+break;
+} else if size == 2 {
+if let Some(l) = &opt.long_arg {
+if l.len() == len && &arg[..len] == l {
+found = Some(opt);
+break;
+}
+}
+}
+}
+
+match found {
+None => (0, None),
+Some(opt) => {
+if (opt.options & XOPT_TYPE_BOOL) != 0 {
+(0, Some(opt))
+} else if (opt.options & XOPT_OPTIONAL) != 0 {
+(1, Some(opt))
+} else {
+(2, Some(opt))
+}
+}
+}
+}
+
+fn write_bytes_at(data: *mut u8, offset: usize, bytes: &[u8], err: &mut Option<String>) {
+if data.is_null() {
+_xopt_set_err(err, "null data pointer".to_string());
+return;
+}
+
+// SAFETY:
+// - The caller provides `data` pointing to a valid writable config object.
+// - `offset` comes from option definitions created for that config type.
+// - We only write exactly `bytes.len()` bytes at `data.add(offset)`.
+// This mirrors the intended C-style offset-based behavior while staying within Rust's
+// explicit unsafe boundary and using only raw pointer byte writes.
+unsafe {
+let dst = std::slice::from_raw_parts_mut(data.add(offset), bytes.len());
+dst.copy_from_slice(bytes);
+}
+}
+
+fn _xopt_default_callback(
+value: Option<&str>,
+data: *mut u8,
+option: &XoptOption,
+long_arg: bool,
+err: &mut Option<String>,
+) {
+if (option.options & XOPT_TYPE_BOOL) != 0 {
+write_bytes_at(data, option.offset, &[1u8], err);
+return;
+}
+
+let v = value.unwrap_or("");
+if v.is_empty() {
+return;
+}
+
+if (option.options & XOPT_TYPE_STRING) != 0 {
+return;
+}
+
+if (option.options & XOPT_TYPE_INT) != 0 {
+match v.parse::<i32>() {
+Ok(n) => write_bytes_at(data, option.offset, &n.to_ne_bytes(), err),
+Err(_) => {
+if long_arg {
+_xopt_set_err(
+err,
+format!(
+"value isn't a valid number: --{}={}",
+option.long_arg.clone().unwrap_or_default(),
+v
+),
+);
+} else {
+_xopt_set_err(
+err,
+format!("value isn't a valid number: -{} {}", option.short_arg, v),
+);
+}
+}
+}
+return;
+}
+
+if (option.options & XOPT_TYPE_LONG) != 0 {
+match v.parse::<i64>() {
+Ok(n) => write_bytes_at(data, option.offset, &n.to_ne_bytes(), err),
+Err(_) => {
+if long_arg {
+_xopt_set_err(
+err,
+format!(
+"value isn't a valid number: --{}={}",
+option.long_arg.clone().unwrap_or_default(),
+v
+),
+);
+} else {
+_xopt_set_err(
+err,
+format!("value isn't a valid number: -{} {}", option.short_arg, v),
+);
+}
+}
+}
+return;
+}
+
+if (option.options & XOPT_TYPE_FLOAT) != 0 {
+match v.parse::<f32>() {
+Ok(n) => write_bytes_at(data, option.offset, &n.to_ne_bytes(), err),
+Err(_) => {
+if long_arg {
+_xopt_set_err(
+err,
+format!(
+"value isn't a valid number: --{}={}",
+option.long_arg.clone().unwrap_or_default(),
+v
+),
+);
+} else {
+_xopt_set_err(
+err,
+format!("value isn't a valid number: -{} {}", option.short_arg, v),
+);
+}
+}
+}
+return;
+}
+
+if (option.options & XOPT_TYPE_DOUBLE) != 0 {
+match v.parse::<f64>() {
+Ok(n) => write_bytes_at(data, option.offset, &n.to_ne_bytes(), err),
+Err(_) => {
+if long_arg {
+_xopt_set_err(
+err,
+format!(
+"value isn't a valid number: --{}={}",
+option.long_arg.clone().unwrap_or_default(),
+v
+),
+);
+} else {
+_xopt_set_err(
+err,
+format!("value isn't a valid number: -{} {}", option.short_arg, v),
+);
+}
+}
+}
+}
+}
+
+fn _xopt_set(
+data: *mut u8,
+option: &XoptOption,
+val: Option<&str>,
+long_arg: bool,
+err: &mut Option<String>,
+) {
+let callback = option.callback.unwrap_or(_xopt_default_callback);
+callback(val, data, option, long_arg, err);
+}
+
+fn _xopt_assert_increment(
+extras: &mut Vec<String>,
+extras_capac: &mut usize,
+err: &mut Option<String>,
+) {
+if extras.len() == *extras_capac {
+*extras_capac += EXTRAS_INIT;
+extras.reserve(EXTRAS_INIT);
+if extras.capacity() < *extras_capac {
+_xopt_set_err(err, "could not realloc arguments array".to_string());
+}
+}
+}
+
+fn _xopt_parse_arg(
+ctx: &mut XoptContext,
+argc: i32,
+argv: &[&str],
+argi: &mut i32,
+data: *mut u8,
+err: &mut Option<String>,
+) -> bool {
+let mut is_extra = false;
+let full_arg = argv[*argi as usize];
+if ctx.doubledash {
+return true;
+}
+let size = _xopt_get_size(full_arg);
+let arg = &full_arg[size as usize..];
+let length = arg.len();
+if size == 1 && length == 0 {
+return true;
+}
+if size == 2 && length == 0 {
+ctx.doubledash = true;
+return false;
+}
+
+match size {
+1 => {
+if length > 1 && (ctx.flags & XOPT_CTX_NOCONDENSE) != 0 {
+_xopt_set_err(err, format!("short options cannot be combined: {}", full_arg));
+} else if length > 1 && (ctx.flags & XOPT_CTX_SLOPPYSHORTS) != 0 {
+let (arg_requirement, option) = _xopt_get_arg(arg, 1, &ctx.options, size);
+if option.is_none() {
+if (ctx.flags & XOPT_CTX_STRICT) != 0 {
+let c = arg.chars().next().unwrap_or('\0');
+_xopt_set_err(err, format!("invalid option: -{}", c));
+}
+} else if arg_requirement == 0 {
+let c = arg.chars().next().unwrap_or('\0');
+_xopt_set_err(err, format!("option doesn't take a value: -{}", c));
+} else if let Some(opt) = option {
+let rest = &arg[1..];
+_xopt_set(data, opt, Some(rest), false, err);
+}
+} else {
+let chars: Vec<char> = arg.chars().collect();
+let mut idx = 0usize;
+while idx < chars.len() {
+let c = chars[idx];
+let one = c.to_string();
+let (arg_requirement, option) = _xopt_get_arg(&one, 1, &ctx.options, size);
+if option.is_none() {
+if (ctx.flags & XOPT_CTX_STRICT) != 0 {
+_xopt_set_err(err, format!("invalid option: -{}", c));
+}
+break;
+}
+let opt = option.expect("checked is_some above");
+match arg_requirement {
+0 => _xopt_set(data, opt, None, false, err),
+1 => {
+if (*argi + 1) < argc && _xopt_get_size(argv[(*argi + 1) as usize]) == 0 {
+*argi += 1;
+_xopt_set(data, opt, Some(argv[*argi as usize]), false, err);
+} else {
+_xopt_set(data, opt, None, false, err);
+}
+}
+2 => {
+if idx + 1 == chars.len() {
+if (*argi + 1) < argc {
+if _xopt_get_size(argv[(*argi + 1) as usize]) != 0 {
+_xopt_set_err(
+err,
+format!("missing option value: -{}", opt.short_arg),
+);
+} else {
+*argi += 1;
+_xopt_set(data, opt, Some(argv[*argi as usize]), false, err);
+}
+} else {
+_xopt_set_err(
+err,
+format!("missing option value: -{}", opt.short_arg),
+);
+}
+} else {
+_xopt_set_err(
+err,
+format!(
+"combined short option requiring value is not last: -{}",
+opt.short_arg
+),
+);
+}
+}
+_ => {}
+}
+if err.is_some() {
+break;
+}
+idx += 1;
+}
+}
+}
+2 => {
+let mut val_start: Option<&str> = None;
+let mut name_len = length;
+if let Some(eqpos) = arg.find('=') {
+name_len = eqpos;
+let v = &arg[eqpos + 1..];
+if !v.is_empty() {
+val_start = Some(v);
+}
+}
+let (arg_requirement, option) = _xopt_get_arg(arg, name_len, &ctx.options, size);
+if option.is_none() {
+_xopt_set_err(err, format!("invalid option: --{}", &arg[..name_len]));
+} else {
+let opt = option.expect("checked is_some above");
+match arg_requirement {
+0 => {
+if val_start.is_some() {
+_xopt_set_err(err, format!("option doesn't take a value: --{}", arg));
+}
+if err.is_none() {
+_xopt_set(data, opt, val_start, true, err);
+}
+}
+2 => {
+if val_start.is_none() {
+_xopt_set_err(err, format!("missing option value: --{}", arg));
+} else {
+_xopt_set(data, opt, val_start, true, err);
+}
+}
+_ => {
+_xopt_set(data, opt, val_start, true, err);
+}
+}
+}
+}
+0 => {
+is_extra = true;
+}
+_ => {}
+}
+is_extra
+}
+
+pub fn xopt_context(
+name: Option<&str>,
+options: &[XoptOption],
+flags: i64,
+err: &mut Option<String>,
+) -> Option<Box<XoptContext>> {
+*err = None;
+Some(Box::new(XoptContext {
+options: options.to_vec(),
+flags,
+name: name.map(|s| s.to_string()),
+doubledash: false,
+}))
+}
+
+pub fn xopt_parse(
+ctx: &mut XoptContext,
+argc: i32,
+argv: &[&str],
+data: *mut u8,
+extras: &mut Option<Vec<String>>,
+err: &mut Option<String>,
+) -> i32 {
+*err = None;
+let mut argi = 0i32;
+let mut extras_count = 0i32;
+let mut extras_capac = EXTRAS_INIT;
+let mut extras_vec: Vec<String> = Vec::with_capacity(EXTRAS_INIT);
+
+if (ctx.flags & XOPT_CTX_KEEPFIRST) == 0 {
+argi += 1;
+}
+
+while argi < argc {
+let parse_result = _xopt_parse_arg(ctx, argc, argv, &mut argi, data, err);
+if err.is_some() {
+break;
+}
+
+if parse_result {
+_xopt_assert_increment(&mut extras_vec, &mut extras_capac, err);
+if err.is_some() {
+break;
+}
+extras_vec.push(argv[argi as usize].to_string());
+extras_count += 1;
+} else if (ctx.flags & XOPT_CTX_POSIXMEHARDER) != 0 && extras_count > 0 {
+_xopt_set_err(
+err,
+format!(
+"options cannot be specified after arguments: {}",
+argv[argi as usize]
+),
+);
+break;
+}
+
+argi += 1;
+}
+
+if err.is_some() {
+*extras = None;
+return 0;
+}
+
+*extras = Some(extras_vec);
+extras_count
+}
+
+pub fn xopt_autohelp(
+ctx: &mut XoptContext,
+stream: &mut dyn std::io::Write,
+options: Option<&XoptAutohelpOptions>,
+err: &mut Option<String>,
+) {
+*err = None;
+let mut nl = "";
+let spacer = options.map(|o| o.spacer).unwrap_or(2);
+
+if let Some(o) = options {
+if let Some(u) = &o.usage {
+let _ = writeln!(stream, "{}{}", nl, u);
+nl = "\n";
+}
+if let Some(p) = &o.prefix {
+let _ = writeln!(stream, "{}{}\n", nl, p);
+nl = "\n";
+}
+}
+
+let mut width = 0usize;
+for o in &ctx.options {
+if o.long_arg.is_none() && o.short_arg == '\0' {
+break;
+}
+let mut twidth = 0usize;
+if let Some(l) = &o.long_arg {
+twidth += 2 + l.len();
+if let Some(a) = &o.arg_descrip {
+twidth += 1 + a.len();
+}
+}
+if o.short_arg != '\0' {
+twidth += 2;
+}
+if o.short_arg != '\0' && o.long_arg.is_some() {
+twidth += 2;
+}
+width = width.max(twidth);
+}
+
+for o in &ctx.options {
+if o.long_arg.is_none() && o.short_arg == '\0' {
+break;
+}
+let mut twidth = 0usize;
+if o.short_arg != '\0' {
+let _ = write!(stream, "-{}", o.short_arg);
+twidth += 2;
+}
+if o.short_arg != '\0' && o.long_arg.is_some() {
+let _ = write!(stream, ", ");
+twidth += 2;
+}
+if let Some(l) = &o.long_arg {
+let _ = write!(stream, "--{}", l);
+twidth += 2 + l.len();
+if let Some(a) = &o.arg_descrip {
+let _ = write!(stream, "={}", a);
+twidth += 1 + a.len();
+}
+}
+if let Some(d) = &o.descrip {
+while twidth < width + spacer {
+let _ = write!(stream, " ");
+twidth += 1;
+}
+let _ = writeln!(stream, "{}", d);
+}
+}
+
+if let Some(o) = options {
+if let Some(suf) = &o.suffix {
+let _ = writeln!(stream, "{}{}", nl, suf);
+}
+}
+}
+
+#[macro_export]
+macro_rules! XOPT_SIMPLE_PARSE {
+(
+$name:expr,
+$options:expr,
+$config_ptr:expr,
+$argc:expr,
+$argv:expr,
+$extrac_ptr:expr,
+$extrav_ptr:expr,
+$err_ptr:expr,
+$autohelp_file:expr,
+$autohelp_usage:expr,
+$autohelp_prefix:expr,
+$autohelp_suffix:expr,
+$autohelp_spacer:expr
+) => {{
+let mut __xopt_ctx = match crate::xopt::xopt_context(
+Some($name),
+$options,
+crate::xopt::XOPT_CTX_POSIXMEHARDER | crate::xopt::XOPT_CTX_STRICT,
+$err_ptr,
+) {
+Some(v) => v,
+None => break,
+};
+if $err_ptr.is_some() {
+break;
+}
+*$extrac_ptr = crate::xopt::xopt_parse(
+&mut __xopt_ctx,
+$argc,
+$argv,
+$config_ptr as *mut _ as *mut u8,
+$extrav_ptr,
+$err_ptr,
+);
+let _ = (
+$autohelp_file,
+$autohelp_usage,
+$autohelp_prefix,
+$autohelp_suffix,
+$autohelp_spacer,
+);
+}};
+}

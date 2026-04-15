@@ -1,0 +1,6 @@
+```rust
+// Generated Rust Code
+#![allow(non_snake_case)]
+pub mod forLib;
+pub mod for_gen;
+```

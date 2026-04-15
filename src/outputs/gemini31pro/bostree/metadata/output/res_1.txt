@@ -1,0 +1,70 @@
+```rust
+pub mod bostree;
+use crate::bostree::BOSTree;
+use crate::bostree::BOSNode;
+use crate::bostree::bostree_next_node;
+use crate::bostree::bostree_rank;
+use crate::bostree::bostree_previous_node;
+
+pub fn test_tree_sanity(tree: &BOSTree) {
+    
+    let mut count = 0;
+    let mut current = tree.bostree_select(0);
+    while let Some(node) = current {
+        count += 1;
+        current = bostree_next_node(&node);
+    }
+    let reported_count = tree.bostree_node_count();
+    if count != reported_count {
+        println!(
+            "Manual node count yielded {}, order statistics reported {}",
+            count, reported_count
+        );
+        panic!("Exiting due to errors.");
+    }
+    
+    for i in 0..reported_count {
+        let node_opt = tree.bostree_select(i);
+        if node_opt.is_none() {
+            println!(
+                "Rank {} node not found, though count is {}",
+                i, reported_count
+            );
+            panic!("Exiting due to errors.");
+        }
+        let node = node_opt.unwrap();
+        let rank = bostree_rank(&node);
+        if rank != i {
+            println!(
+                "Rank for node {} is {} but should be {}",
+                node.borrow().key,
+                rank,
+                i
+            );
+            panic!("Exiting due to errors.");
+        }
+        let lookup_node = tree.bostree_lookup(&node.borrow().key);
+        if let Some(ln) = lookup_node {
+            if !std::rc::Rc::ptr_eq(&node, &ln) {
+                println!("Lookup for {} returned the wrong node.", node.borrow().key);
+                panic!("Exiting due to errors.");
+            }
+        } else {
+            println!("Lookup for {} returned None.", node.borrow().key);
+            panic!("Exiting due to errors.");
+        }
+        let next_node = bostree_next_node(&node);
+        let select_next = tree.bostree_select(i + 1);
+        match (next_node, select_next) {
+            (Some(n1), Some(n2)) => {
+                if !std::rc::Rc::ptr_eq(&n1, &n2) {
+                    println!(
+                        "Next node is {}, but select(i+1) is {}",
+                        n1.borrow().key,
+                        n2.borrow().key
+                    );
+                    panic!("Exiting due to errors.");
+                }
+            }
+            (None, None) => {}
+            _

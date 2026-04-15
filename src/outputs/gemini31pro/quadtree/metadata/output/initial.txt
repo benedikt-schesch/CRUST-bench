@@ -1,0 +1,62 @@
+```rust
+pub mod quadtree {
+    #[derive(Default, Clone)]
+    pub struct QuadtreePoint {
+        pub x: f64,
+        pub y: f64,
+    }
+    impl QuadtreePoint {
+        pub fn quadtree_point_new(x: f64, y: f64) -> QuadtreePoint {
+            QuadtreePoint { x, y }
+        }
+        pub fn quadtree_point_free(&self) {
+            // Memory is automatically freed in Rust
+        } 
+    }
+
+    #[derive(Default, Clone)]
+    pub struct QuadtreeBounds {
+        pub nw: Option<Box<QuadtreePoint>>,
+        pub se: Option<Box<QuadtreePoint>>,
+        pub width: f64,
+        pub height: f64,
+    }
+    impl QuadtreeBounds {
+        pub fn quadtree_bounds_new() -> QuadtreeBounds {
+            QuadtreeBounds {
+                nw: Some(Box::new(QuadtreePoint::quadtree_point_new(f64::INFINITY, f64::NEG_INFINITY))),
+                se: Some(Box::new(QuadtreePoint::quadtree_point_new(f64::NEG_INFINITY, f64::INFINITY))),
+                width: 0.0,
+                height: 0.0,
+            }
+        }
+        pub fn quadtree_bounds_extend(&mut self, x: f64, y: f64) {
+            if let Some(ref mut nw) = self.nw {
+                nw.x = nw.x.min(x);
+                nw.y = nw.y.max(y);
+            }
+            if let Some(ref mut se) = self.se {
+                se.x = se.x.max(x);
+                se.y = se.y.min(y);
+            }
+            if let (Some(ref nw), Some(ref se)) = (&self.nw, &self.se) {
+                self.width = (nw.x - se.x).abs();
+                self.height = (nw.y - se.y).abs();
+            }
+        }
+        pub fn quadtree_bounds_free(&self) {
+            // Memory is automatically freed in Rust
+        }
+    }
+
+    #[derive(Default, Clone)]
+    pub struct QuadtreeNode<T> {
+        pub ne: Option<Box<QuadtreeNode<T>>>,
+        pub nw: Option<Box<QuadtreeNode<T>>>,
+        pub se: Option<Box<QuadtreeNode<T>>>,
+        pub sw: Option<Box<QuadtreeNode<T>>>,
+        pub bounds: Option<Box<QuadtreeBounds>>,
+        pub point: Option<Box<QuadtreePoint>>,
+        pub key: Option<T>,
+    }
+    impl <T: Clone

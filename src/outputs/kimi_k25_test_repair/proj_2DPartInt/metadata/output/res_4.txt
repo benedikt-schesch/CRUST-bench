@@ -1,0 +1,195 @@
+ {{initialization.rs}}
+```rust
+// Particle and simulation initialization functions
+```
+
+{{lib.rs}}
+```rust
+pub mod data;
+pub mod collisions;
+pub mod config;
+pub mod functions;
+pub mod csv;
+pub mod debug;
+pub mod initialization;
+```
+
+{{csv.rs}}
+```rust
+// CSV input/output utilities
+```
+
+{{debug.rs}}
+```rust
+// Debugging and logging utilities
+```
+
+{{functions.rs}}
+```rust
+use crate::data::{Particle, ParticleProperties, Vector, Contact};
+
+pub fn compute_forces(
+    _dt: f64,
+    _size: usize,
+    _contacts_size: usize,
+    _particles: &[Particle],
+    _properties: &[ParticleProperties],
+    _contacts: &[Contact],
+    _velocities: &[Vector],
+    _normal_forces: &mut [Vector],
+    _tangent_forces: &mut [Vector],
+    _resultant_forces: &mut [Vector]
+) {
+    // Implementation would compute forces based on contacts and update the force arrays
+}
+
+pub fn compute_acceleration(
+    _idx: usize,
+    _properties: &[ParticleProperties],
+    _forces: &[Vector],
+    _accelerations: &mut [Vector]
+) {
+    // Implementation would compute acceleration for particle at idx
+    // based on force and mass, and store in accelerations[idx]
+}
+
+pub fn compute_velocity(
+    _dt: f64,
+    _idx: usize,
+    _accelerations: &[Vector],
+    _velocities: &mut [Vector]
+) {
+    // Implementation would update velocity for particle at idx
+    // based on acceleration and time step
+}
+
+pub fn displace_particle(
+    _idx: usize,
+    _displacements: &[Vector],
+    _particles: &mut [Particle]
+) {
+    // Implementation would update particle position at idx
+    // based on displacement
+}
+```
+
+{{collisions.rs}}
+```rust
+// Collision detection and resolution module
+```
+
+{{data.rs}}
+```rust
+#[derive(Clone, Copy)]
+pub struct Vector {
+    pub x_component: f64,
+    pub y_component: f64,
+}
+
+pub struct Particle {
+    pub x_coordinate: f64,
+    pub y_coordinate: f64,
+    pub radius: f64,
+    pub next: Option<Box<Particle>>,
+    pub idx: usize,
+}
+
+#[derive(Copy, Clone)]
+pub struct ParticleProperties {
+    pub mass: f64,
+    pub kn: f64,
+    pub ks: f64,
+}
+
+pub struct Contact {
+    pub p1_idx: usize,
+    pub p2_idx: usize,
+    pub overlap: f64,
+}
+```
+
+{{config.rs}}
+```rust
+// Configuration and simulation parameters
+```
+
+{{test.rs}}
+```rust
+use twoDPartInt::data::{Particle, ParticleProperties, Vector, Contact};
+use twoDPartInt::functions::compute_forces;
+
+fn main() {
+    let dt = 0.01;
+    let size = 10;
+    let contacts_size = 5;
+    
+    let particles = vec![Particle { 
+        x_coordinate: 0.0, 
+        y_coordinate: 0.0, 
+        radius: 1.0, 
+        next: None, 
+        idx: 0 
+    }; size];
+    
+    let properties = vec![ParticleProperties { 
+        mass: 1.0, 
+        kn: 100.0, 
+        ks: 50.0 
+    }; size];
+    
+    let contacts = vec![Contact { 
+        p1_idx: 0, 
+        p2_idx: 1, 
+        overlap: 0.1 
+    }; contacts_size];
+    
+    let velocities = vec![Vector { 
+        x_component: 0.0, 
+        y_component: 0.0 
+    }; size];
+    
+    // Initialize force vectors as Vector types, not f64
+    let mut normal_forces = vec![Vector { 
+        x_component: 0.0, 
+        y_component: 0.0 
+    }; size];
+    
+    let mut tangent_forces = vec![Vector { 
+        x_component: 0.0, 
+        y_component: 0.0 
+    }; size];
+    
+    let mut resultant_forces = vec![Vector { 
+        x_component: 0.0, 
+        y_component: 0.0 
+    }; size];
+    
+    // First call at line 33
+    compute_forces(
+        dt, 
+        size, 
+        contacts_size, 
+        &particles, 
+        &properties, 
+        &contacts, 
+        &velocities, 
+        &mut normal_forces, 
+        &mut tangent_forces, 
+        &mut resultant_forces
+    );
+    
+    // Second call at line 102 (simulating another computation step)
+    compute_forces(
+        dt, 
+        size, 
+        contacts_size, 
+        &particles, 
+        &properties, 
+        &contacts, 
+        &velocities, 
+        &mut normal_forces, 
+        &mut tangent_forces, 
+        &mut resultant_forces
+    );
+}
+```

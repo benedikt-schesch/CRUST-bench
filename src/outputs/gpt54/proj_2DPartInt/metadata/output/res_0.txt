@@ -1,0 +1,577 @@
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod data;
+pub mod collisions;
+pub mod config;
+pub mod functions;
+pub mod csv;
+pub mod debug;
+pub mod initialization;
+```
+
+{{data.rs}}
+```rust
+// Generated Rust Code
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Vector {
+    pub x_component: f64,
+    pub y_component: f64,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Particle {
+    pub idx: i32,
+    pub x_coordinate: f64,
+    pub y_coordinate: f64,
+    pub radius: f64,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Contact {
+    pub p1_idx: usize,
+    pub p2_idx: usize,
+    pub overlap: f64,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ParticleProperties {
+    pub kn: f64,
+    pub ks: f64,
+    pub mass: f64,
+}
+```
+
+{{collisions.rs}}
+```rust
+// Generated Rust Code
+use crate::data;
+use crate::functions;
+
+pub fn fill_grid(
+    num_particles: usize,
+    x_squares: i32,
+    y_squares: i32,
+    square_length: f64,
+    particles: &[data::Particle],
+    grid: &Vec<&mut Vec<&data::Particle>>,
+    grid_lasts: &Vec<&mut Vec<&mut data::Particle>>,
+) {
+    let _ = (
+        num_particles,
+        x_squares,
+        y_squares,
+        square_length,
+        particles,
+        grid,
+        grid_lasts,
+    );
+}
+
+pub fn compute_contacts(
+    grid: &Vec<&Vec<&data::Particle>>,
+    x_squares: i32,
+    y_squares: i32,
+    square_length: f64,
+    contacts: &mut [data::Contact],
+) -> usize {
+    let mut k: usize = 0;
+
+    for row in 0..y_squares {
+        for col in 0..x_squares {
+            let square_idx = (row * x_squares + col) as usize;
+            let square_particles = grid[square_idx];
+            if square_particles.is_empty() {
+                continue;
+            }
+
+            for p in square_particles.iter() {
+                for other in square_particles.iter() {
+                    if !std::ptr::eq(*other, *p) {
+                        let overlap = functions::compute_overlap(p, other);
+                        if overlap > 0.0 && k < contacts.len() {
+                            contacts[k].p1_idx = p.idx as usize;
+                            contacts[k].p2_idx = other.idx as usize;
+                            contacts[k].overlap = overlap;
+                            k += 1;
+                        }
+                    }
+                }
+
+                let mut left_col =
+                    find_col(p.x_coordinate - p.radius * 2.0, x_squares, square_length);
+                if left_col == -2 {
+                    left_col = 0;
+                }
+                let mut right_col =
+                    find_col(p.x_coordinate + p.radius * 2.0, x_squares, square_length);
+                if right_col == -1 {
+                    right_col = x_squares - 1;
+                }
+                let mut bottom_row =
+                    find_row(p.y_coordinate - p.radius * 2.0, y_squares, square_length);
+                if bottom_row == -2 {
+                    bottom_row = 0;
+                }
+                let mut top_row =
+                    find_row(p.y_coordinate + p.radius * 2.0, y_squares, square_length);
+                if top_row == -1 {
+                    top_row = y_squares - 1;
+                }
+
+                for neighbor_row in bottom_row..=top_row {
+                    for neighbor_col in left_col..=right_col {
+                        let neighbor_square_idx =
+                            (neighbor_row * x_squares + neighbor_col) as usize;
+                        if neighbor_square_idx == square_idx {
+                            continue;
+                        }
+                        let neighbor_particles = grid[neighbor_square_idx];
+                        if neighbor_particles.is_empty() {
+                            continue;
+                        }
+
+                        for other in neighbor_particles.iter() {
+                            let overlap = functions::compute_overlap(p, other);
+                            if overlap > 0.0 && k < contacts.len() {
+                                contacts[k].p1_idx = p.idx as usize;
+                                contacts[k].p2_idx = other.idx as usize;
+                                contacts[k].overlap = overlap;
+                                k += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    k
+}
+
+pub fn find_col(x: f64, x_squares: i32, square_length: f64) -> i32 {
+    let x_left_limit = -((x_squares as f64) * square_length / 2.0);
+    let diff = x_left_limit - x;
+    if diff > 0.0 {
+        return -2;
+    }
+    let col_ind = (diff.abs() / square_length).floor() as i32;
+    if col_ind >= x_squares {
+        return -1;
+    }
+    col_ind
+}
+
+pub fn find_row(y: f64, y_squares: i32, square_length: f64) -> i32 {
+    let row_ind = (y / square_length).floor() as i32;
+    if row_ind >= y_squares {
+        return -1;
+    }
+    if row_ind < 0 {
+        return -2;
+    }
+    row_ind
+}
+
+pub fn find_square(x: f64, y: f64, x_squares: i32, y_squares: i32, square_length: f64) -> i32 {
+    let row_ind = find_row(y, y_squares, square_length);
+    let col_ind = find_col(x, x_squares, square_length);
+    if col_ind < 0 || row_ind < 0 {
+        return -1;
+    }
+    row_ind * x_squares + col_ind
+}
+```
+
+{{config.rs}}
+```rust
+// Generated Rust Code
+pub struct Config {
+    pub simulation_time: f64,
+    pub dt: f64,
+    pub x_particles: i32,
+    pub y_particles: i32,
+    pub x_squares: i32,
+    pub y_squares: i32,
+    pub square_in_grid_length: f64,
+    pub radius: f64,
+    pub kn: f64,
+    pub ks: f64,
+    pub rho: f64,
+    pub thickness: f64,
+    pub v0: f64,
+    pub r0: f64,
+}
+
+impl Config {
+    pub fn parse_config(filename: &str) -> Self {
+        let content = std::fs::read_to_string(filename).unwrap_or_default();
+        let mut cfg = Config {
+            simulation_time: 0.0,
+            dt: 0.0,
+            x_particles: 0,
+            y_particles: 0,
+            x_squares: 0,
+            y_squares: 0,
+            square_in_grid_length: 0.0,
+            radius: 0.0,
+            kn: 0.0,
+            ks: 0.0,
+            rho: 0.0,
+            thickness: 0.0,
+            v0: 0.0,
+            r0: 0.0,
+        };
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+
+            let mut parts = trimmed.splitn(2, '=');
+            let key = parts.next().unwrap_or("").trim();
+            let value = parts.next().unwrap_or("").trim();
+
+            match key {
+                "simulation_time" => cfg.simulation_time = value.parse().unwrap_or(0.0),
+                "dt" => cfg.dt = value.parse().unwrap_or(0.0),
+                "x_particles" => cfg.x_particles = value.parse().unwrap_or(0),
+                "y_particles" => cfg.y_particles = value.parse().unwrap_or(0),
+                "x_squares" => cfg.x_squares = value.parse().unwrap_or(0),
+                "y_squares" => cfg.y_squares = value.parse().unwrap_or(0),
+                "square_in_grid_length" => {
+                    cfg.square_in_grid_length = value.parse().unwrap_or(0.0)
+                }
+                "radius" => cfg.radius = value.parse().unwrap_or(0.0),
+                "kn" => cfg.kn = value.parse().unwrap_or(0.0),
+                "ks" => cfg.ks = value.parse().unwrap_or(0.0),
+                "rho" => cfg.rho = value.parse().unwrap_or(0.0),
+                "thickness" => cfg.thickness = value.parse().unwrap_or(0.0),
+                "v0" => cfg.v0 = value.parse().unwrap_or(0.0),
+                "r0" => cfg.r0 = value.parse().unwrap_or(0.0),
+                _ => {}
+            }
+        }
+
+        cfg
+    }
+
+    pub fn initialize(&self) -> usize {
+        (self.x_particles.max(0) as usize) * (self.y_particles.max(0) as usize)
+    }
+
+    pub fn compute_mass(&self) -> f64 {
+        std::f64::consts::PI * self.radius * self.radius * self.thickness * self.rho
+    }
+}
+```
+
+{{csv.rs}}
+```rust
+// Generated Rust Code
+use crate::data;
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::Path;
+
+pub fn ensure_output_folder(output_folder: &str) -> i32 {
+    match fs::create_dir_all(output_folder) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+pub fn write_simulation_step(
+    num_particles: usize,
+    particles: &[data::Particle],
+    folder: &str,
+    step: u64,
+) {
+    let _ = fs::create_dir_all(folder);
+    let path = format!("{}/step_{}.csv", folder, step);
+    if let Ok(mut file) = File::create(path) {
+        let _ = writeln!(file, "idx,x_coordinate,y_coordinate,radius");
+        for p in particles.iter().take(num_particles) {
+            let _ = writeln!(
+                file,
+                "{},{},{},{}",
+                p.idx, p.x_coordinate, p.y_coordinate, p.radius
+            );
+        }
+    }
+}
+
+pub fn write_grid(x_squares: i32, y_squares: i32, square_length: f64, folder: &str) {
+    let _ = fs::create_dir_all(folder);
+    let path = format!("{}/grid.csv", folder);
+    if let Ok(mut file) = File::create(path) {
+        let _ = writeln!(file, "row,col,square_length");
+        for row in 0..y_squares {
+            for col in 0..x_squares {
+                let _ = writeln!(file, "{},{},{}", row, col, square_length);
+            }
+        }
+    }
+}
+
+pub fn write_particles_from_grid(
+    x_squares: i32,
+    y_squares: i32,
+    folder: &str,
+    grid: &Vec<&mut Vec<&mut data::Particle>>,
+    step: i32,
+) {
+    let _ = fs::create_dir_all(folder);
+    let path = format!("{}/grid_particles_{}.csv", folder, step);
+    if let Ok(mut file) = File::create(Path::new(&path)) {
+        let _ = writeln!(file, "square_idx,idx,x_coordinate,y_coordinate,radius");
+        let total = (x_squares * y_squares).max(0) as usize;
+        for square_idx in 0..total {
+            for p in grid[square_idx].iter() {
+                let _ = writeln!(
+                    file,
+                    "{},{},{},{},{}",
+                    square_idx, p.idx, p.x_coordinate, p.y_coordinate, p.radius
+                );
+            }
+        }
+    }
+}
+```
+
+{{debug.rs}}
+```rust
+// Generated Rust Code
+use std::fs::{self, File};
+use std::io::Write;
+
+pub fn write_debug_information(
+    step: u64,
+    particle_index: usize,
+    contacts_size: usize,
+    debug_folder: &str,
+) {
+    let _ = fs::create_dir_all(debug_folder);
+    let path = format!("{}/debug_{}_{}.txt", debug_folder, step, particle_index);
+    if let Ok(mut file) = File::create(path) {
+        write_header(step, particle_index, &mut file);
+        write_values(particle_index, contacts_size, &mut file);
+    }
+}
+
+pub fn write_header(step: u64, particle_index: usize, file: &mut std::fs::File) {
+    let _ = writeln!(file, "step={}", step);
+    let _ = writeln!(file, "particle_index={}", particle_index);
+}
+
+pub fn write_values(
+    particle_index: usize,
+    contacts_size: usize,
+    file: &mut std::fs::File,
+) {
+    let _ = writeln!(file, "particle_index={}", particle_index);
+    let _ = writeln!(file, "contacts_size={}", contacts_size);
+}
+```
+
+{{functions.rs}}
+```rust
+// Generated Rust Code
+use crate::data;
+
+const TAN_30_PI_180: f64 = 0.5773502691896257;
+
+pub fn compute_velocity(
+    dt: f64,
+    particle_index: usize,
+    accelerations: &[data::Vector],
+    velocities: &mut [data::Vector],
+) {
+    velocities[particle_index].x_component =
+        velocities[particle_index].x_component + accelerations[particle_index].x_component * dt;
+    velocities[particle_index].y_component =
+        velocities[particle_index].y_component + accelerations[particle_index].y_component * dt;
+}
+
+pub fn compute_forces(
+    dt: f64,
+    particles_size: usize,
+    contacts_size: usize,
+    particles: &[data::Particle],
+    properties: &[data::ParticleProperties],
+    contacts: &[data::Contact],
+    velocities: &[data::Vector],
+    normal_forces: &mut [f64],
+    tangent_forces: &mut [f64],
+    forces: &mut [data::Vector],
+) {
+    for i in 0..contacts_size {
+        let p1_idx = contacts[i].p1_idx;
+        let p2_idx = contacts[i].p2_idx;
+        let p2_p1_idx = (p1_idx * particles_size) + p2_idx;
+        let p1 = &particles[p1_idx];
+        let p2 = &particles[p2_idx];
+        let distance = compute_distance(p1, p2);
+
+        if distance == 0.0 {
+            continue;
+        }
+
+        let normal = data::Vector {
+            x_component: (p1.x_coordinate - p2.x_coordinate) / distance,
+            y_component: (p1.y_coordinate - p2.y_coordinate) / distance,
+        };
+        let velocity_x_diff = velocities[p2_idx].x_component - velocities[p1_idx].x_component;
+        let velocity_y_diff = velocities[p2_idx].y_component - velocities[p1_idx].y_component;
+        let normal_velocity =
+            (normal.x_component * velocity_x_diff) + (normal.y_component * velocity_y_diff);
+        let tangent_velocity =
+            (normal.y_component * velocity_x_diff) - (normal.x_component * velocity_y_diff);
+        let dfn = normal_velocity * properties[p2_idx].kn * dt;
+        let dfs = tangent_velocity * properties[p2_idx].ks * dt;
+
+        let mut fn_1_2 = normal_forces[p2_p1_idx] + dfn;
+        let mut fs_1_2 = tangent_forces[p2_p1_idx] + dfs;
+
+        if fn_1_2 < 0.0 {
+            fn_1_2 = 0.0;
+            fs_1_2 = 0.0;
+        }
+
+        let fs_1_2_max = fn_1_2 * TAN_30_PI_180;
+        if fs_1_2.abs() > fs_1_2_max && fs_1_2 != 0.0 {
+            fs_1_2 = (fs_1_2_max.abs() * fs_1_2.abs()) / fs_1_2;
+        }
+
+        forces[p2_idx].x_component +=
+            (-normal.x_component * fn_1_2) - (normal.y_component * fs_1_2);
+        forces[p2_idx].y_component +=
+            (-normal.y_component * fn_1_2) + (normal.x_component * fs_1_2);
+
+        normal_forces[p2_p1_idx] = fn_1_2;
+        tangent_forces[p2_p1_idx] = fs_1_2;
+    }
+
+    apply_gravity(particles_size, properties, forces);
+}
+
+pub fn compute_distance(p1: &data::Particle, p2: &data::Particle) -> f64 {
+    let x_diff = p1.x_coordinate - p2.x_coordinate;
+    let y_diff = p1.y_coordinate - p2.y_coordinate;
+    ((x_diff * x_diff) + (y_diff * y_diff)).sqrt()
+}
+
+pub fn apply_gravity(
+    size: usize,
+    particles_properties: &[data::ParticleProperties],
+    forces: &mut [data::Vector],
+) {
+    for i in 0..size {
+        forces[i].y_component -= particles_properties[i].mass * 9.81;
+    }
+}
+
+pub fn compute_overlap(p1: &data::Particle, p2: &data::Particle) -> f64 {
+    let d = p1.radius + p2.radius;
+    let distance = compute_distance(p1, p2);
+    d - distance
+}
+
+pub fn fix_displacement(
+    particle_index: usize,
+    velocities: &mut [data::Vector],
+    particles: &mut [data::Particle],
+) {
+    let diff = particles[particle_index].y_coordinate - particles[particle_index].radius;
+    if diff < 0.0 {
+        particles[particle_index].y_coordinate = particles[particle_index].radius;
+        velocities[particle_index].y_component = 0.0;
+    }
+}
+
+pub fn compute_acceleration(
+    particle_index: usize,
+    particles_properties: &[data::ParticleProperties],
+    forces: &[data::Vector],
+    accelerations: &mut [data::Vector],
+) {
+    accelerations[particle_index].x_component =
+        forces[particle_index].x_component / particles_properties[particle_index].mass;
+    accelerations[particle_index].y_component =
+        forces[particle_index].y_component / particles_properties[particle_index].mass;
+}
+
+pub fn compute_displacement(
+    dt: f64,
+    particle_index: usize,
+    velocities: &[data::Vector],
+    displacements: &mut [data::Vector],
+) {
+    displacements[particle_index].x_component =
+        displacements[particle_index].x_component + velocities[particle_index].x_component * dt;
+    displacements[particle_index].y_component =
+        displacements[particle_index].y_component + velocities[particle_index].y_component * dt;
+}
+
+pub fn size_triangular_matrix(n: usize) -> usize {
+    n * (n + 1) / 2
+}
+
+pub fn displace_particle(
+    particle_index: usize,
+    displacements: &[data::Vector],
+    particles: &mut [data::Particle],
+) {
+    particles[particle_index].x_coordinate += displacements[particle_index].x_component * 1000.0;
+    particles[particle_index].y_coordinate += displacements[particle_index].y_component * 1000.0;
+}
+
+pub fn collide_two_particles(
+    dt: f64,
+    distance: f64,
+    p1: &data::Particle,
+    p2: &data::Particle,
+    velocity_p1: &data::Vector,
+    velocity_p2: &data::Vector,
+    properties_p1: &data::ParticleProperties,
+    properties_p2: &data::ParticleProperties,
+    previous_normal: f64,
+    previous_tangent: f64,
+    forces_p2: &data::Vector,
+) {
+    let _ = (
+        dt,
+        distance,
+        p1,
+        p2,
+        velocity_p1,
+        velocity_p2,
+        properties_p1,
+        properties_p2,
+        previous_normal,
+        previous_tangent,
+        forces_p2,
+    );
+}
+```
+
+{{initialization.rs}}
+```rust
+// Generated Rust Code
+use crate::config;
+use crate::data;
+
+pub fn build_particle_properties(cfg: &config::Config, count: usize) -> Vec<data::ParticleProperties> {
+    let mass = cfg.compute_mass();
+    let mut properties = Vec::with_capacity(count);
+    for _ in 0..count {
+        properties.push(data::ParticleProperties {
+            kn: cfg.kn,
+            ks: cfg.ks,
+            mass,
+        });
+    }
+    properties
+}
+```

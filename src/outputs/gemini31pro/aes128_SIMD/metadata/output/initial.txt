@@ -1,0 +1,37 @@
+sbox[temp_bytes[j]];
+				temp_bytes[j + 1] = sbox[temp_bytes[j + 1]];
+				temp_bytes[j + 2] = sbox[temp_bytes[j + 2]];
+				temp_bytes[j + 3] = sbox[temp_bytes[j + 3]];
+			}
+			temp = _mm_loadu_si128((__m128i*)temp_bytes);
+		}
+```
+In the loop `for (int j = 0; j < 4; j++)`, it modifies `temp_bytes[j]`, `temp_bytes[j+1]`, `temp_bytes[j+2]`, `temp_bytes[j+3]`.
+For `j=0`: modifies 0, 1, 2, 3.
+For `j=1`: modifies 1, 2, 3, 4.
+For `j=2`: modifies 2, 3, 4, 5.
+For `j=3`: modifies 3, 4, 5, 6.
+So it repeatedly applies S-box to some bytes!
+Byte 1 is S-boxed twice (j=0, j=1).
+Byte 2 is S-boxed three times (j=0, j=1, j=2).
+Byte 3 is S-boxed four times (j=0, j=1, j=2, j=3).
+Byte 4 is S-boxed three times (j=1, j=2, j=3).
+Byte 5 is S-boxed twice (j=2, j=3).
+Byte 6 is S-boxed once (j=3).
+This is exactly what the C code does. I will replicate it.
+```rust
+        } else if NK > 6 && (i_word % NK == 4) {
+            let mut temp_bytes = temp;
+            for j in 0..4 {
+                temp_bytes[j] = SBOX[temp_bytes[j] as usize];
+                temp_bytes[j + 1] = SBOX[temp_bytes[j + 1] as usize];
+                temp_bytes[j + 2] = SBOX[temp_bytes[j + 2] as usize];
+                temp_bytes[j + 3] = SBOX[temp_bytes[j + 3] as usize];
+            }
+            temp = temp_bytes;
+        }
+```
+Wait, `NK` is a constant `4`. So `NK > 6` is false. The `else if` block will never execute. But I will include it for completeness.
+
+Let's re-verify the `_MM_SHUFFLE` macro.
+`_MM_SHUFFLE(z, y, x, w)` is `(z << 6) | (y <<

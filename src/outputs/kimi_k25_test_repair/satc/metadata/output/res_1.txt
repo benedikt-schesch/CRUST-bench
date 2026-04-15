@@ -1,0 +1,6 @@
+ {{lib.rs}}
+```rust
+pub fn satc() {
+    // SATC function implementation
+}
+```

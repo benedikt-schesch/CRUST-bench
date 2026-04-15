@@ -1,0 +1,354 @@
+use std::fmt;
+#[derive(Debug)]
+pub enum InversionListError {
+ValueOutOfRange(u32, u32),
+Generic(String),
+}
+#[derive(Clone, Debug)]
+pub struct InversionList {
+capacity: u32,
+support: u32,
+pub intervals: Vec<(u32, u32)>,
+}
+impl InversionList {
+pub fn new(capacity: u32, values: &[u32]) -> Result<Self, InversionListError> {
+if values.is_empty() {
+return Ok(Self {
+capacity,
+support: 0,
+intervals: Vec::new(),
+});
+}
+let mut sorted = values.to_vec();
+sorted.sort_unstable();
+sorted.dedup();
+if let Some(&max_val) = sorted.last() {
+if max_val >= capacity {
+return Err(InversionListError::ValueOutOfRange(max_val, capacity));
+}
+}
+let mut intervals = Vec::new();
+let mut start = sorted[0];
+let mut end = start + 1;
+for &val in &sorted[1..] {
+if val == end {
+end = val + 1;
+} else {
+intervals.push((start, end));
+start = val;
+end = val + 1;
+}
+}
+intervals.push((start, end));
+let support = sorted.len() as u32;
+Ok(Self {
+capacity,
+support,
+intervals,
+})
+}
+pub fn capacity(&self) -> u32 {
+self.capacity
+}
+pub fn support(&self) -> u32 {
+self.support
+}
+pub fn contains(&self, value: u32) -> bool {
+let idx = self.intervals.partition_point(|(start, _)| *start <= value);
+if idx == 0 {
+return false;
+}
+let (start, end) = self.intervals[idx - 1];
+value >= start && value < end
+}
+pub fn clone_list(&self) -> Self {
+self.clone()
+}
+pub fn complement(&self) -> Self {
+if self.intervals.is_empty() {
+return Self {
+capacity: self.capacity,
+support: self.capacity,
+intervals: vec![(0, self.capacity)],
+};
+}
+let mut new_intervals = Vec::new();
+let mut current = 0u32;
+for &(start, end) in &self.intervals {
+if current < start {
+new_intervals.push((current, start));
+}
+current = end;
+}
+if current < self.capacity {
+new_intervals.push((current, self.capacity));
+}
+let support = self.capacity - self.support;
+Self {
+capacity: self.capacity,
+support,
+intervals: new_intervals,
+}
+}
+pub fn to_str(&self) -> String {
+let mut result = String::from("[");
+let mut first = true;
+for &(start, end) in &self.intervals {
+for val in start..end {
+if !first {
+result.push_str(", ");
+}
+result.push_str(&val.to_string());
+first = false;
+}
+}
+result.push(']');
+result
+}
+pub fn equal(&self, other: &Self) -> bool {
+self.support == other.support && self.intervals == other.intervals
+}
+pub fn is_strict_subset_of(&self, other: &Self) -> bool {
+self.support < other.support
+}
+pub fn is_subset_of(&self, other: &Self) -> bool {
+if self.support < other.support {
+return true;
+}
+if self.support == other.support {
+return self.equal(other);
+}
+false
+}
+pub fn is_disjoint(&self, other: &Self) -> bool {
+let mut i = 0;
+let mut j = 0;
+while i < self.intervals.len() && j < other.intervals.len() {
+let (s1, e1) = self.intervals[i];
+let (s2, e2) = other.intervals[j];
+if s1 < e2 && s2 < e1 {
+return false;
+}
+if e1 <= s2 {
+i += 1;
+} else {
+j += 1;
+}
+}
+true
+}
+pub fn union(&self, other: &Self) -> Self {
+let mut intervals: Vec<(u32, u32)> = Vec::new();
+let mut i = 0;
+let mut j = 0;
+while i < self.intervals.len() && j < other.intervals.len() {
+let (s1, e1) = self.intervals[i];
+let (s2, e2) = other.intervals[j];
+let (s, e) = if s1 <= s2 {
+i += 1;
+(s1, e1)
+} else {
+j += 1;
+(s2, e2)
+};
+if let Some(last) = intervals.last_mut() {
+if last.1 >= s {
+last.1 = last.1.max(e);
+} else {
+intervals.push((s, e));
+}
+} else {
+intervals.push((s, e));
+}
+}
+while i < self.intervals.len() {
+let (s, e) = self.intervals[i];
+if let Some(last) = intervals.last_mut() {
+if last.1 >= s {
+last.1 = last.1.max(e);
+} else {
+intervals.push((s, e));
+}
+} else {
+intervals.push((s, e));
+}
+i += 1;
+}
+while j < other.intervals.len() {
+let (s, e) = other.intervals[j];
+if let Some(last) = intervals.last_mut() {
+if last.1 >= s {
+last.1 = last.1.max(e);
+} else {
+intervals.push((s, e));
+}
+} else {
+intervals.push((s, e));
+}
+j += 1;
+}
+let support = intervals.iter().map(|(s, e)| e - s).sum();
+Self {
+capacity: self.capacity.max(other.capacity),
+support,
+intervals,
+}
+}
+pub fn intersection(&self, other: &Self) -> Self {
+let mut intervals = Vec::new();
+let mut i = 0;
+let mut j = 0;
+while i < self.intervals.len() && j < other.intervals.len() {
+let (s1, e1) = self.intervals[i];
+let (s2, e2) = other.intervals[j];
+let start = s1.max(s2);
+let end = e1.min(e2);
+if start < end {
+intervals.push((start, end));
+}
+if e1 < e2 {
+i += 1;
+} else {
+j += 1;
+}
+}
+let support = intervals.iter().map(|(s, e)| e - s).sum();
+Self {
+capacity: self.capacity.max(other.capacity),
+support,
+intervals,
+}
+}
+pub fn difference(&self, other: &Self) -> Self {
+let mut intervals = Vec::new();
+let mut i = 0;
+let mut j = 0;
+let mut current_s: u32 = 0;
+let mut current_e: u32 = 0;
+let mut using_modified = false;
+while i < self.intervals.len() && j < other.intervals.len() {
+let (s1, e1) = if using_modified {
+(current_s, current_e)
+} else {
+self.intervals[i]
+};
+let (s2, e2) = other.intervals[j];
+if e2 <= s1 {
+j += 1;
+} else if e1 <= s2 {
+intervals.push((s1, e1));
+i += 1;
+using_modified = false;
+} else {
+if s1 < s2 {
+intervals.push((s1, s2));
+}
+if e1 > e2 {
+current_s = e2;
+current_e = e1;
+using_modified = true;
+j += 1;
+} else {
+i += 1;
+using_modified = false;
+}
+}
+}
+if using_modified {
+intervals.push((current_s, current_e));
+i += 1;
+}
+while i < self.intervals.len() {
+intervals.push(self.intervals[i]);
+i += 1;
+}
+let support = intervals.iter().map(|(s, e)| e - s).sum();
+Self {
+capacity: self.capacity,
+support,
+intervals,
+}
+}
+pub fn symmetric_difference(&self, other: &Self) -> Self {
+let diff1 = self.difference(other);
+let diff2 = other.difference(self);
+diff1.union(&diff2)
+}
+}
+impl PartialEq for InversionList {
+fn eq(&self, other: &Self) -> bool {
+self.equal(other)
+}
+}
+impl Eq for InversionList {}
+impl fmt::Display for InversionList {
+fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+write!(f, "{}", self.to_str())
+}
+}
+pub struct InversionListIterator<'a> {
+list: &'a InversionList,
+interval_index: usize,
+current_value: u32,
+}
+impl<'a> InversionListIterator<'a> {
+pub fn new(list: &'a InversionList) -> Self {
+if let Some(&(start, _)) = list.intervals.first() {
+Self {
+list,
+interval_index: 0,
+current_value: start,
+}
+} else {
+Self {
+list,
+interval_index: 0,
+current_value: 0,
+}
+}
+}
+}
+impl<'a> Iterator for InversionListIterator<'a> {
+type Item = u32;
+fn next(&mut self) -> Option<Self::Item> {
+if self.interval_index >= self.list.intervals.len() {
+return None;
+}
+let (start, end) = self.list.intervals[self.interval_index];
+if self.current_value < end {
+let val = self.current_value;
+self.current_value += 1;
+return Some(val);
+}
+self.interval_index += 1;
+if self.interval_index < self.list.intervals.len() {
+self.current_value = self.list.intervals[self.interval_index].0;
+return self.next();
+}
+None
+}
+}
+pub struct InversionListCoupleIterator<'a> {
+list: &'a InversionList,
+couple_index: usize,
+}
+impl<'a> InversionListCoupleIterator<'a> {
+pub fn new(list: &'a InversionList) -> Self {
+Self {
+list,
+couple_index: 0,
+}
+}
+}
+impl<'a> Iterator for InversionListCoupleIterator<'a> {
+type Item = (u32, u32);
+fn next(&mut self) -> Option<Self::Item> {
+if self.couple_index < self.list.intervals.len() {
+let interval = self.list.intervals[self.couple_index];
+self.couple_index += 1;
+Some(interval)
+} else {
+None
+}
+}
+}

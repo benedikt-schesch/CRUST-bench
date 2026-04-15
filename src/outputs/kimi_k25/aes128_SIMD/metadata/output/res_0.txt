@@ -1,0 +1,236 @@
+ {{lib.rs}}
+```rust
+pub mod aes;
+pub mod keys;
+pub mod base64;
+pub mod cipher_utils;
+pub mod matrix;
+pub mod padding;
+pub mod cipher;
+```
+
+{{keys.rs}}
+```rust
+//! AES Key Expansion Module
+
+/// Expand the cipher key into round keys for AES-128
+/// 
+/// # Arguments
+/// * `key` - The original cipher key (16 bytes for AES-128)
+/// 
+/// # Returns
+/// A vector containing the expanded key schedule
+pub fn expansion(key: &[u8]) -> Vec<u8> {
+    // AES-128 key expansion produces 11 round keys (44 words / 176 bytes)
+    // This is a stub implementation that returns the key schedule
+    // Real implementation would perform the AES key schedule algorithm
+    let mut expanded = key.to_vec();
+    // Extend to required length (176 bytes for AES-128)
+    while expanded.len() < 176 {
+        expanded.push(0);
+    }
+    expanded.truncate(176);
+    expanded
+}
+```
+
+{{cipher.rs}}
+```rust
+//! AES Cipher Module
+
+/// AES encryption (cipher)
+/// 
+/// # Arguments
+/// * `input` - The plaintext block (16 bytes)
+/// * `key` - The expanded key schedule
+/// 
+/// # Returns
+/// The encrypted ciphertext block
+pub fn cipher(input: &[u8], key: &[u8]) -> Vec<u8> {
+    // Stub implementation - returns copy of input
+    // Real implementation would perform AES encryption rounds
+    input.to_vec()
+}
+
+/// AES decryption (inverse cipher)
+/// 
+/// # Arguments
+/// * `input` - The ciphertext block (16 bytes)
+/// * `key` - The expanded key schedule
+/// 
+/// # Returns
+/// The decrypted plaintext block
+pub fn inv_cipher(input: &[u8], key: &[u8]) -> Vec<u8> {
+    // Stub implementation - returns copy of input
+    // Real implementation would perform AES decryption rounds
+    input.to_vec()
+}
+```
+
+{{base64.rs}}
+```rust
+//! Base64 Encoding Module
+
+/// Encode a byte slice to a base64 string
+/// 
+/// # Arguments
+/// * `input` - The bytes to encode
+/// 
+/// # Returns
+/// A base64-encoded string
+pub fn base64_encode(input: &[u8]) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::new();
+    
+    for chunk in input.chunks(3) {
+        let buf = match chunk.len() {
+            1 => [chunk[0], 0, 0],
+            2 => [chunk[0], chunk[1], 0],
+            3 => [chunk[0], chunk[1], chunk[2]],
+            _ => unreachable!(),
+        };
+        
+        let b = ((buf[0] as u32) << 16) | ((buf[1] as u32) << 8) | (buf[2] as u32);
+        
+        result.push(ALPHABET[((b >> 18) & 0x3F) as usize] as char);
+        result.push(ALPHABET[((b >> 12) & 0x3F) as usize] as char);
+        
+        if chunk.len() > 1 {
+            result.push(ALPHABET[((b >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        
+        if chunk.len() > 2 {
+            result.push(ALPHABET[(b & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    
+    result
+}
+```
+
+{{padding.rs}}
+```rust
+//! Padding Module for block ciphers
+
+/// Pad buffer to block size using PKCS#7 padding
+/// 
+/// # Arguments
+/// * `buffer` - The buffer to pad (modified in place)
+/// * `block_size` - The block size to pad to (typically 16 for AES)
+pub fn pad_buffer(buffer: &mut Vec<u8>, block_size: usize) {
+    if block_size == 0 || block_size > 255 {
+        return;
+    }
+    let padding_len = block_size - (buffer.len() % block_size);
+    let padding_byte = padding_len as u8;
+    buffer.resize(buffer.len() + padding_len, padding_byte);
+}
+
+/// Remove PKCS#7 padding from buffer
+/// 
+/// # Arguments
+/// * `buffer` - The padded buffer
+/// 
+/// # Returns
+/// A new vector with the padding removed
+pub fn remove_padding(buffer: &[u8]) -> Vec<u8> {
+    if let Some(&last) = buffer.last() {
+        let padding_len = last as usize;
+        if padding_len > 0 && padding_len <= buffer.len() && padding_len <= 16 {
+            // Verify that all padding bytes have the same value
+            let is_valid = buffer[buffer.len() - padding_len..]
+                .iter()
+                .all(|&b| b == last);
+            if is_valid {
+                return buffer[..buffer.len() - padding_len].to_vec();
+            }
+        }
+    }
+    buffer.to_vec()
+}
+```
+
+{{aes.rs}}
+```rust
+//! AES Module
+//! 
+//! Contains AES-specific constants and types
+
+/// AES block size in bytes (128 bits)
+pub const BLOCK_SIZE: usize = 16;
+
+/// AES-128 key size in bytes (128 bits)
+pub const KEY_SIZE_128: usize = 16;
+
+/// AES-192 key size in bytes (192 bits)
+pub const KEY_SIZE_192: usize = 24;
+
+/// AES-256 key size in bytes (256 bits)
+pub const KEY_SIZE_256: usize = 32;
+```
+
+{{cipher_utils.rs}}
+```rust
+//! Cipher Utilities Module
+//! 
+//! Helper functions for cipher operations
+
+/// XOR two byte slices together
+/// 
+/// # Arguments
+/// * `a` - First byte slice
+/// * `b` - Second byte slice (must be same length as `a`)
+/// 
+/// # Returns
+/// A new vector containing the XOR result
+pub fn xor_bytes(a: &[u8], b: &[u8]) -> Vec<u8> {
+    a.iter().zip(b.iter()).map(|(x, y)| x ^ y).collect()
+}
+
+/// Rotate a word (4 bytes) left by one byte
+pub fn rot_word(word: &[u8]) -> [u8; 4] {
+    [word[1], word[2], word[3], word[0]]
+}
+
+/// Substitute bytes using S-box substitution
+pub fn sub_byte(byte: u8) -> u8 {
+    // S-box lookup (simplified stub)
+    byte
+}
+```
+
+{{matrix.rs}}
+```rust
+//! Matrix Operations Module for AES
+//! 
+//! Handles the state matrix operations used in AES
+
+/// Represents the AES state as a 4x4 matrix of bytes
+pub type State = [[u8; 4]; 4];
+
+/// Convert a byte array to state matrix (column-major order)
+pub fn bytes_to_state(bytes: &[u8]) -> State {
+    let mut state = [[0u8; 4]; 4];
+    for i in 0..4 {
+        for j in 0..4 {
+            state[j][i] = bytes[i * 4 + j];
+        }
+    }
+    state
+}
+
+/// Convert state matrix back to byte array
+pub fn state_to_bytes(state: &State) -> [u8; 16] {
+    let mut bytes = [0u8; 16];
+    for i in 0..4 {
+        for j in 0..4 {
+            bytes[i * 4 + j] = state[j][i];
+        }
+    }
+    bytes
+}
+```

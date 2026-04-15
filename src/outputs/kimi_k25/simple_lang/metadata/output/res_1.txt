@@ -1,0 +1,456 @@
+ {{token.rs}}
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum TokenType {
+    TOKEN_LET,
+    TOKEN_IDENTIFIER,
+    TOKEN_ASSIGN,
+    TOKEN_INT,
+    TOKEN_PLUS,
+    TOKEN_MINUS,
+    TOKEN_STAR,
+    TOKEN_SLASH,
+    TOKEN_SEMICOLON,
+    TOKEN_EOF,
+    TOKEN_DIS,
+    TOKEN_LEFT_PAREN,
+    TOKEN_RIGHT_PAREN,
+    TOKEN_LEFT_BRACE,
+    TOKEN_RIGHT_BRACE,
+    TOKEN_STRING,
+    TOKEN_EQUALS,
+}
+
+#[derive(Debug, Clone)]
+pub struct Token {
+    pub token_type: TokenType,
+    pub lexeme: String,
+    pub line: usize,
+}
+
+impl Token {
+    pub fn new(token_type: TokenType, lexeme: String, line: usize) -> Self {
+        Token {
+            token_type,
+            lexeme,
+            line,
+        }
+    }
+}
+```
+
+{{lexer.rs}}
+```rust
+use crate::token::{Token, TokenType};
+
+pub fn tokenize(input: &str) -> Vec<Token> {
+    let mut tokens = Vec::new();
+    let mut line = 1;
+    let chars: Vec<char> = input.chars().collect();
+    let mut i = 0;
+
+    while i < chars.len() {
+        let ch = chars[i];
+        match ch {
+            '\n' => {
+                line += 1;
+                i += 1;
+            }
+            '+' => {
+                tokens.push(Token::new(TokenType::TOKEN_PLUS, ch.to_string(), line));
+                i += 1;
+            }
+            '-' => {
+                tokens.push(Token::new(TokenType::TOKEN_MINUS, ch.to_string(), line));
+                i += 1;
+            }
+            '*' => {
+                tokens.push(Token::new(TokenType::TOKEN_STAR, ch.to_string(), line));
+                i += 1;
+            }
+            '/' => {
+                tokens.push(Token::new(TokenType::TOKEN_SLASH, ch.to_string(), line));
+                i += 1;
+            }
+            '(' => {
+                tokens.push(Token::new(TokenType::TOKEN_LEFT_PAREN, ch.to_string(), line));
+                i += 1;
+            }
+            ')' => {
+                tokens.push(Token::new(TokenType::TOKEN_RIGHT_PAREN, ch.to_string(), line));
+                i += 1;
+            }
+            '{' => {
+                tokens.push(Token::new(TokenType::TOKEN_LEFT_BRACE, ch.to_string(), line));
+                i += 1;
+            }
+            '}' => {
+                tokens.push(Token::new(TokenType::TOKEN_RIGHT_BRACE, ch.to_string(), line));
+                i += 1;
+            }
+            ';' => {
+                tokens.push(Token::new(TokenType::TOKEN_SEMICOLON, ch.to_string(), line));
+                i += 1;
+            }
+            '=' => {
+                tokens.push(Token::new(TokenType::TOKEN_ASSIGN, ch.to_string(), line));
+                i += 1;
+            }
+            '"' => {
+                let start = i + 1;
+                i += 1;
+                while i < chars.len() && chars[i] != '"' {
+                    if chars[i] == '\n' {
+                        line += 1;
+                    }
+                    i += 1;
+                }
+                let string_content: String = chars[start..i].iter().collect();
+                tokens.push(Token::new(TokenType::TOKEN_STRING, string_content, line));
+                if i < chars.len() {
+                    i += 1;
+                }
+            }
+            c if c.is_alphabetic() => {
+                let start = i;
+                while i < chars.len() && (chars[i].is_alphabetic() || chars[i].is_numeric() || chars[i] == '_') {
+                    i += 1;
+                }
+                let word: String = chars[start..i].iter().collect();
+                let token_type = match word.as_str() {
+                    "let" => TokenType::TOKEN_LET,
+                    "dis" => TokenType::TOKEN_DIS,
+                    _ => TokenType::TOKEN_IDENTIFIER,
+                };
+                tokens.push(Token::new(token_type, word, line));
+            }
+            c if c.is_numeric() => {
+                let start = i;
+                while i < chars.len() && (chars[i].is_numeric() || chars[i] == '.') {
+                    i += 1;
+                }
+                let num: String = chars[start..i].iter().collect();
+                tokens.push(Token::new(TokenType::TOKEN_INT, num, line));
+            }
+            ' ' | '\t' | '\r' => {
+                i += 1;
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+
+    tokens.push(Token::new(TokenType::TOKEN_EOF, "".to_string(), line));
+    tokens
+}
+```
+
+{{ast.rs}}
+```rust
+use crate::token::TokenType;
+
+#[derive(Debug)]
+pub struct AstNode {
+    pub type_: TokenType,
+    pub left: Option<Box<AstNode>>,
+    pub right: Option<Box<AstNode>>,
+    pub value: Option<String>,
+}
+
+impl AstNode {
+    pub fn new(type_: TokenType) -> Self {
+        AstNode {
+            type_,
+            left: None,
+            right: None,
+            value: None,
+        }
+    }
+    
+    pub fn with_value(type_: TokenType, value: String) -> Self {
+        AstNode {
+            type_,
+            left: None,
+            right: None,
+            value: Some(value),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Program {
+    pub statements: Vec<AstNode>,
+}
+
+impl Program {
+    pub fn new() -> Self {
+        Program {
+            statements: Vec::new(),
+        }
+    }
+}
+```
+
+{{parser.rs}}
+```rust
+use crate::token::{Token, TokenType};
+use crate::ast::{Program, AstNode};
+
+pub fn parse(tokens: &[Token]) -> Result<Program, String> {
+    let mut program = Program::new();
+    let mut pos = 0;
+
+    while pos < tokens.len() && tokens[pos].token_type != TokenType::TOKEN_EOF {
+        let (stmt, new_pos) = parse_statement(tokens, pos)?;
+        program.statements.push(stmt);
+        pos = new_pos;
+    }
+
+    Ok(program)
+}
+
+fn parse_statement(tokens: &[Token], pos: usize) -> Result<(AstNode, usize), String> {
+    if pos >= tokens.len() {
+        return Err("Unexpected end of input".to_string());
+    }
+    
+    let token = &tokens[pos];
+    match token.token_type {
+        TokenType::TOKEN_LET => {
+            let mut node = AstNode::new(TokenType::TOKEN_LET);
+            let ident_pos = pos + 1;
+            if ident_pos >= tokens.len() {
+                return Err("Expected identifier after let".to_string());
+            }
+            let ident_token = &tokens[ident_pos];
+            if ident_token.token_type != TokenType::TOKEN_IDENTIFIER {
+                return Err("Expected identifier".to_string());
+            }
+            let ident_node = AstNode::with_value(TokenType::TOKEN_IDENTIFIER, ident_token.lexeme.clone());
+            
+            let assign_pos = ident_pos + 1;
+            if assign_pos >= tokens.len() || tokens[assign_pos].token_type != TokenType::TOKEN_ASSIGN {
+                return Err("Expected = after identifier".to_string());
+            }
+            
+            let (expr, after_expr) = parse_expression(tokens, assign_pos + 1)?;
+            
+            let mut assign_node = AstNode::new(TokenType::TOKEN_ASSIGN);
+            assign_node.left = Some(Box::new(ident_node));
+            assign_node.right = Some(Box::new(expr));
+            
+            node.left = Some(Box::new(assign_node));
+            
+            let mut final_pos = after_expr;
+            if final_pos < tokens.len() && tokens[final_pos].token_type == TokenType::TOKEN_SEMICOLON {
+                final_pos += 1;
+            }
+            
+            Ok((node, final_pos))
+        }
+        TokenType::TOKEN_DIS => {
+            let mut node = AstNode::new(TokenType::TOKEN_DIS);
+            let (expr, after_expr) = parse_expression(tokens, pos + 1)?;
+            node.left = Some(Box::new(expr));
+            
+            let mut final_pos = after_expr;
+            if final_pos < tokens.len() && tokens[final_pos].token_type == TokenType::TOKEN_SEMICOLON {
+                final_pos += 1;
+            }
+            
+            Ok((node, final_pos))
+        }
+        _ => {
+            let (expr, new_pos) = parse_expression(tokens, pos)?;
+            let mut final_pos = new_pos;
+            if final_pos < tokens.len() && tokens[final_pos].token_type == TokenType::TOKEN_SEMICOLON {
+                final_pos += 1;
+            }
+            Ok((expr, final_pos))
+        }
+    }
+}
+
+fn parse_expression(tokens: &[Token], pos: usize) -> Result<(AstNode, usize), String> {
+    parse_additive(tokens, pos)
+}
+
+fn parse_additive(tokens: &[Token], pos: usize) -> Result<(AstNode, usize), String> {
+    let (mut left, mut pos) = parse_multiplicative(tokens, pos)?;
+    
+    while pos < tokens.len() {
+        match tokens[pos].token_type {
+            TokenType::TOKEN_PLUS | TokenType::TOKEN_MINUS => {
+                let op_type = tokens[pos].token_type.clone();
+                let (right, new_pos) = parse_multiplicative(tokens, pos + 1)?;
+                let mut node = AstNode::new(op_type);
+                node.left = Some(Box::new(left));
+                node.right = Some(Box::new(right));
+                left = node;
+                pos = new_pos;
+            }
+            _ => break,
+        }
+    }
+    
+    Ok((left, pos))
+}
+
+fn parse_multiplicative(tokens: &[Token], pos: usize) -> Result<(AstNode, usize), String> {
+    let (mut left, mut pos) = parse_primary(tokens, pos)?;
+    
+    while pos < tokens.len() {
+        match tokens[pos].token_type {
+            TokenType::TOKEN_STAR | TokenType::TOKEN_SLASH => {
+                let op_type = tokens[pos].token_type.clone();
+                let (right, new_pos) = parse_primary(tokens, pos + 1)?;
+                let mut node = AstNode::new(op_type);
+                node.left = Some(Box::new(left));
+                node.right = Some(Box::new(right));
+                left = node;
+                pos = new_pos;
+            }
+            _ => break,
+        }
+    }
+    
+    Ok((left, pos))
+}
+
+fn parse_primary(tokens: &[Token], pos: usize) -> Result<(AstNode, usize), String> {
+    if pos >= tokens.len() {
+        return Err("Unexpected end of input".to_string());
+    }
+    
+    let token = &tokens[pos];
+    match token.token_type {
+        TokenType::TOKEN_INT => {
+            let node = AstNode::with_value(TokenType::TOKEN_INT, token.lexeme.clone());
+            Ok((node, pos + 1))
+        }
+        TokenType::TOKEN_IDENTIFIER => {
+            let node = AstNode::with_value(TokenType::TOKEN_IDENTIFIER, token.lexeme.clone());
+            Ok((node, pos + 1))
+        }
+        TokenType::TOKEN_LEFT_PAREN => {
+            let (expr, new_pos) = parse_expression(tokens, pos + 1)?;
+            if new_pos >= tokens.len() || tokens[new_pos].token_type != TokenType::TOKEN_RIGHT_PAREN {
+                return Err("Expected )".to_string());
+            }
+            Ok((expr, new_pos + 1))
+        }
+        _ => Err(format!("Unexpected token: {:?}", token.token_type)),
+    }
+}
+```
+
+{{vm.rs}}
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum OpCode {
+    LOAD_CONST,
+    BINARY_ADD,
+    BINARY_SUB,
+    STORE_NAME,
+    LOAD_NAME,
+    STK_DIS,
+}
+
+#[derive(Debug, Clone)]
+pub struct Instruction {
+    pub opcode: OpCode,
+    pub operand: Option<String>,
+}
+
+impl Instruction {
+    pub fn new(opcode: OpCode) -> Self {
+        Instruction {
+            opcode,
+            operand: None,
+        }
+    }
+    
+    pub fn with_operand(opcode: OpCode, operand: String) -> Self {
+        Instruction {
+            opcode,
+            operand: Some(operand),
+        }
+    }
+}
+```
+
+{{compiler.rs}}
+```rust
+use crate::ast::{AstNode};
+use crate::token::TokenType;
+use crate::vm::{Instruction, OpCode};
+
+pub fn compile(source: &str, _pos: &mut usize) -> Result<Vec<Instruction>, String> {
+    let tokens = crate::lexer::tokenize(source);
+    let program = crate::parser::parse(&tokens)?;
+    let mut instructions = Vec::new();
+    
+    for stmt in &program.statements {
+        compile_node(stmt, &mut instructions)?;
+    }
+    
+    Ok(instructions)
+}
+
+fn compile_node(node: &AstNode, instructions: &mut Vec<Instruction>) -> Result<(), String> {
+    match node.type_ {
+        TokenType::TOKEN_LET => {
+            if let Some(ref assign) = node.left {
+                compile_node(assign, instructions)?;
+            }
+            Ok(())
+        }
+        TokenType::TOKEN_ASSIGN => {
+            if let Some(ref right) = node.right {
+                compile_node(right, instructions)?;
+            }
+            if let Some(ref left) = node.left {
+                if let Some(ref name) = left.value {
+                    instructions.push(Instruction::with_operand(OpCode::STORE_NAME, name.clone()));
+                }
+            }
+            Ok(())
+        }
+        TokenType::TOKEN_PLUS => {
+            if let Some(ref left) = node.left {
+                compile_node(left, instructions)?;
+            }
+            if let Some(ref right) = node.right {
+                compile_node(right, instructions)?;
+            }
+            instructions.push(Instruction::new(OpCode::BINARY_ADD));
+            Ok(())
+        }
+        TokenType::TOKEN_MINUS => {
+            if let Some(ref left) = node.left {
+                compile_node(left, instructions)?;
+            }
+            if let Some(ref right) = node.right {
+                compile_node(right, instructions)?;
+            }
+            instructions.push(Instruction::new(OpCode::BINARY_SUB));
+            Ok(())
+        }
+        TokenType::TOKEN_INT => {
+            if let Some(ref val) = node.value {
+                instructions.push(Instruction::with_operand(OpCode::LOAD_CONST, val.clone()));
+            }
+            Ok(())
+        }
+        TokenType::TOKEN_IDENTIFIER => {
+            if let Some(ref name) = node.value {
+                instructions.push(Instruction::with_operand(OpCode::LOAD_NAME, name.clone()));
+            }
+            Ok(())
+        }
+        TokenType::TOKEN_DIS => {
+            if let Some(ref left) = node.left {
+                compile_node(left, instructions)?;
+            }
+            instructions

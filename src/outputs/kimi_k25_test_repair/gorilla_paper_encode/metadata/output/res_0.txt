@@ -1,0 +1,156 @@
+ {{lib.rs}}
+```rust
+pub mod gorilla;
+```
+
+{{gorilla.rs}}
+```rust
+pub struct BitWriter {
+    buffer: Vec<u8>,
+    current_byte: u8,
+    bit_count: u8,
+}
+
+impl BitWriter {
+    pub fn new() -> Self {
+        BitWriter {
+            buffer: Vec::new(),
+            current_byte: 0,
+            bit_count: 0,
+        }
+    }
+
+    pub fn write_bit(&mut self, bit: bool) {
+        if bit {
+            self.current_byte |= 1 << (7 - self.bit_count);
+        }
+        self.bit_count += 1;
+        if self.bit_count == 8 {
+            self.buffer.push(self.current_byte);
+            self.current_byte = 0;
+            self.bit_count = 0;
+        }
+    }
+
+    pub fn finish(mut self) -> Vec<u8> {
+        if self.bit_count > 0 {
+            self.buffer.push(self.current_byte);
+        }
+        self.buffer
+    }
+}
+
+pub struct BitReader<'a> {
+    buffer: &'a [u8],
+    byte_pos: usize,
+    bit_pos: u8,
+}
+
+impl<'a> BitReader<'a> {
+    pub fn new(buffer: &'a [u8]) -> Self {
+        BitReader {
+            buffer,
+            byte_pos: 0,
+            bit_pos: 0,
+        }
+    }
+
+    pub fn read_bit(&mut self) -> Option<bool> {
+        if self.byte_pos >= self.buffer.len() {
+            return None;
+        }
+        let byte = self.buffer[self.byte_pos];
+        let bit = (byte >> (7 - self.bit_pos)) & 1 == 1;
+        self.bit_pos += 1;
+        if self.bit_pos == 8 {
+            self.bit_pos = 0;
+            self.byte_pos += 1;
+        }
+        Some(bit)
+    }
+}
+
+pub struct FloatEncoder {
+    writer: BitWriter,
+    prev_bits: u64,
+    first: bool,
+}
+
+impl FloatEncoder {
+    pub fn new() -> Self {
+        FloatEncoder {
+            writer: BitWriter::new(),
+            prev_bits: 0,
+            first: true,
+        }
+    }
+
+    pub fn encode(&mut self, value: f64) {
+        let bits = value.to_bits();
+        if self.first {
+            for i in (0..64).rev() {
+                self.writer.write_bit((bits >> i) & 1 == 1);
+            }
+            self.first = false;
+        } else {
+            let xor = bits ^ self.prev_bits;
+            if xor == 0 {
+                self.writer.write_bit(false);
+            } else {
+                self.writer.write_bit(true);
+                for i in (0..64).rev() {
+                    self.writer.write_bit((xor >> i) & 1 == 1);
+                }
+            }
+        }
+        self.prev_bits = bits;
+    }
+
+    pub fn finish(self) -> Vec<u8> {
+        self.writer.finish()
+    }
+}
+
+pub struct FloatDecoder<'a> {
+    reader: BitReader<'a>,
+    prev_bits: u64,
+    first: bool,
+}
+
+impl<'a> FloatDecoder<'a> {
+    pub fn new(data: &'a [u8]) -> Self {
+        FloatDecoder {
+            reader: BitReader::new(data),
+            prev_bits: 0,
+            first: true,
+        }
+    }
+
+    pub fn decode(&mut self) -> Option<f64> {
+        if self.first {
+            let mut bits: u64 = 0;
+            for _ in 0..64 {
+                let bit = self.reader.read_bit()?;
+                bits = (bits << 1) | (bit as u64);
+            }
+            self.prev_bits = bits;
+            self.first = false;
+            Some(f64::from_bits(bits))
+        } else {
+            let same = self.reader.read_bit()?;
+            if !same {
+                Some(f64::from_bits(self.prev_bits))
+            } else {
+                let mut xor: u64 = 0;
+                for _ in 0..64 {
+                    let bit = self.reader.read_bit()?;
+                    xor = (xor << 1) | (bit as u64);
+                }
+                let bits = self.prev_bits ^ xor;
+                self.prev_bits = bits;
+                Some(f64::from_bits(bits))
+            }
+        }
+    }
+}
+```

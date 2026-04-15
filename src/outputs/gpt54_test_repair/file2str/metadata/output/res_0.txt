@@ -1,0 +1,23 @@
+{{file2str.rs}}
+```rust
+use std::fs;
+
+pub fn file2strl(path: &str, len: &mut u32) -> Option<String> {
+    let bytes = match fs::read(path) {
+        Ok(data) => data,
+        Err(_) => return None,
+    };
+
+    *len = u32::try_from(bytes.len()).ok()?;
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+pub fn file2str(path: &str) -> Option<String> {
+    let bytes = match fs::read(path) {
+        Ok(data) => data,
+        Err(_) => return None,
+    };
+
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+```

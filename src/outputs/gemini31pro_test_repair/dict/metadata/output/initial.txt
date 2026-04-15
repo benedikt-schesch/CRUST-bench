@@ -1,0 +1,73 @@
+```rust
+// Generated Rust Code
+use core::cmp::Ordering;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash as StdHash, Hasher};
+use std::sync::Mutex;
+
+/// A collection of constants matching the original C #defines.
+pub const HASH_MOD: u64 = 1000000007;
+pub const HASH_BASE: u64 = 256;
+pub const DEFAULT_STEP: usize = 2;
+pub const DEFAULT_MOD: usize = 8;
+
+/// Enum corresponding to the C enum `dict_type_t`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DictType {
+    Char,
+    WChar,
+    I32,
+    U32,
+    F32,
+    I64,
+    U64,
+    F64,
+    Ptr,
+    Str,
+    Struct,
+}
+
+/// A safe function pointer type for deep-copying values.
+pub type DictDeepCopy = fn(dest: &mut [u8], src: &[u8]);
+/// A safe function pointer type for destructors.
+pub type DictDestructor = fn(data: &mut [u8]);
+/// A safe function pointer type for comparisons.
+pub type DictCmpr = fn(a: &[u8], b: &[u8]) -> i32;
+/// A safe function pointer type for hashing.
+pub type DictHash = fn(data: &[u8]) -> u64;
+/// A safe function pointer type for memory allocation (unused in safe Rust).
+pub type DictMalloc = fn(size: usize) -> Vec<u8>;
+/// A safe function pointer type for freeing allocated memory (unused in safe Rust).
+pub type DictFree = fn(_: Vec<u8>);
+
+/// Corresponds to `dict_alloc_t` in C.
+#[derive(Clone)]
+pub struct DictAlloc {
+    pub malloc: Option<DictMalloc>,
+    pub free: Option<DictFree>,
+}
+
+/// Corresponds to `dict_key_attr_t` in C.
+#[derive(Clone)]
+pub struct DictKeyAttr {
+    pub type_: DictType,
+    pub size: usize,
+    pub copy: Option<DictDeepCopy>,
+    pub free: Option<DictDestructor>,
+    pub hash: Option<DictHash>,
+    pub cmpr: Option<DictCmpr>,
+}
+
+/// Corresponds to `dict_val_attr_t` in C.
+#[derive(Clone)]
+pub struct DictValAttr {
+    pub size: usize,
+    pub free: Option<DictDestructor>,
+}
+
+/// Corresponds to `dict_args_t` in C.
+#[derive(Clone)]
+pub struct DictArgs {
+    pub key: DictKeyAttr,
+    pub val: DictValAttr,
+    pub alloc

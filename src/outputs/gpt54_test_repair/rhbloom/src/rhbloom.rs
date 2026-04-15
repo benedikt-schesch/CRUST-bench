@@ -1,0 +1,258 @@
+// Generated Rust Code
+pub struct RHBloom {
+count: usize,
+nbuckets: usize,
+buckets: Vec<u64>,
+k: usize,
+m: usize,
+bits: Vec<u8>,
+}
+
+impl RHBloom {
+fn key(x: u64) -> u64 {
+(x << 8) >> 8
+}
+
+fn dib(x: u64) -> i32 {
+(x >> 56) as i32
+}
+
+fn set_key_dib(key: u64, dib: i32) -> u64 {
+Self::key(key) | ((dib as u64) << 56)
+}
+
+pub fn new(n: usize, p: f64) -> Self {
+let n = n.max(16);
+
+let p = if p <= 0.0 {
+f64::MIN_POSITIVE
+} else if p >= 1.0 {
+1.0 - f64::EPSILON
+} else {
+p
+};
+
+let ln2 = std::f64::consts::LN_2;
+let target_bits = (-(n as f64) * p.ln() / (ln2 * ln2)).ceil() as usize;
+let target_bits = target_bits.max(8);
+
+let mut m0 = 8usize;
+while m0 < target_bits {
+m0 <<= 1;
+}
+
+let k0 = (((m0 as f64) / (n as f64)) * ln2).round() as usize;
+let k0 = k0.max(1);
+
+Self {
+count: 0,
+nbuckets: 0,
+buckets: Vec::new(),
+k: k0,
+m: m0,
+bits: Vec::new(),
+}
+}
+
+pub fn memsize(&self) -> usize {
+let mut size = std::mem::size_of::<RHBloom>();
+size += if !self.bits.is_empty() {
+self.bits.len()
+} else {
+self.buckets.len() * std::mem::size_of::<u64>()
+};
+size
+}
+
+pub fn clear(&mut self) {
+if !self.bits.is_empty() {
+self.bits.fill(0);
+} else if !self.buckets.is_empty() {
+self.buckets.fill(0);
+}
+self.count = 0;
+}
+
+pub fn upgraded(&self) -> bool {
+!self.bits.is_empty()
+}
+
+pub fn testadd(&mut self, key: u64, add: bool) -> bool {
+let mut key = Self::key(key);
+let mut i = 0usize;
+let mut j = (key as usize) & (self.m - 1);
+
+loop {
+if add {
+self.bits[j >> 3] |= 1u8 << (j & 7);
+} else if ((self.bits[j >> 3] >> (j & 7)) & 1) == 0 {
+return false;
+}
+
+if i == self.k.saturating_sub(1) {
+break;
+}
+
+key = key.wrapping_mul(0x94d0_49bb_1331_11eb);
+key ^= key >> 31;
+j = (key as usize) & (self.m - 1);
+i += 1;
+}
+
+true
+}
+
+pub fn free(&mut self) {
+self.count = 0;
+self.nbuckets = 0;
+self.buckets.clear();
+self.bits.clear();
+}
+
+pub fn mix(key: u64) -> u64 {
+let mut key = key;
+key ^= key >> 30;
+key = key.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+key ^= key >> 27;
+key = key.wrapping_mul(0x94d0_49bb_1331_11eb);
+key ^= key >> 31;
+key
+}
+
+pub fn grow(&mut self) -> bool {
+let nbuckets_old = self.nbuckets;
+let buckets_old = self.buckets.clone();
+let nbuckets_new = if nbuckets_old == 0 {
+16
+} else {
+nbuckets_old * 2
+};
+
+if nbuckets_new * std::mem::size_of::<u64>() >= self.m >> 3 {
+self.bits = vec![0u8; self.m >> 3];
+self.count = 0;
+self.nbuckets = 0;
+self.buckets.clear();
+
+for &entry in &buckets_old {
+if Self::dib(entry) != 0 {
+self.testadd(Self::key(entry), true);
+}
+}
+} else {
+self.bits.clear();
+self.buckets = vec![0u64; nbuckets_new];
+self.count = 0;
+self.nbuckets = nbuckets_new;
+
+for &entry in &buckets_old {
+if Self::dib(entry) != 0 {
+self.addkey(Self::key(entry));
+}
+}
+}
+
+true
+}
+
+pub fn add(&mut self, key: u64) -> bool {
+let key = Self::mix(key);
+
+loop {
+if !self.bits.is_empty() {
+self.testadd(key, true);
+return true;
+}
+
+if self.count == (self.nbuckets >> 1) {
+if !self.grow() {
+return false;
+}
+continue;
+}
+
+break;
+}
+
+self.addkey(key)
+}
+
+pub fn addkey(&mut self, key: u64) -> bool {
+let mut key = Self::key(key);
+let mut dib = 1i32;
+let mut i = (key as usize) & (self.nbuckets - 1);
+
+loop {
+if Self::dib(self.buckets[i]) == 0 {
+self.buckets[i] = Self::set_key_dib(key, dib);
+self.count += 1;
+return true;
+}
+
+if Self::key(self.buckets[i]) == key {
+return true;
+}
+
+if Self::dib(self.buckets[i]) < dib {
+let tmp = self.buckets[i];
+self.buckets[i] = Self::set_key_dib(key, dib);
+key = Self::key(tmp);
+dib = Self::dib(tmp);
+}
+
+dib += 1;
+i = (i + 1) & (self.nbuckets - 1);
+}
+}
+
+pub fn test(&self, key: u64) -> bool {
+let key = Self::mix(key);
+
+if !self.bits.is_empty() {
+let mut key = Self::key(key);
+let mut i = 0usize;
+let mut j = (key as usize) & (self.m - 1);
+
+loop {
+if ((self.bits[j >> 3] >> (j & 7)) & 1) == 0 {
+return false;
+}
+
+if i == self.k.saturating_sub(1) {
+break;
+}
+
+key = key.wrapping_mul(0x94d0_49bb_1331_11eb);
+key ^= key >> 31;
+j = (key as usize) & (self.m - 1);
+i += 1;
+}
+
+return true;
+}
+
+if self.buckets.is_empty() {
+return false;
+}
+
+let key = Self::key(key);
+let mut dib = 1i32;
+let mut i = (key as usize) & (self.nbuckets - 1);
+
+loop {
+if Self::dib(self.buckets[i]) == 0 {
+return false;
+}
+
+let yes = Self::key(self.buckets[i]) == key;
+let no = Self::dib(self.buckets[i]) < dib;
+
+if yes || no {
+return yes;
+}
+
+dib += 1;
+i = (i + 1) & (self.nbuckets - 1);
+}
+}
+}

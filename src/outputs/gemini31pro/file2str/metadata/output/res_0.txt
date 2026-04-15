@@ -1,0 +1,38 @@
+str::file2str::*;` would fail with `could not find file2str in file2str`.
+How can I fix this?
+If I am asked to fix `lib.rs`, and `lib.rs` is the crate root, then `pub mod file2str;` SHOULD work.
+Is there any other way to export `file2str`?
+What if I do:
+```rust
+pub mod file2str;
+pub use crate::file2str::*;
+```
+If I do `pub use crate::file2str::*;`, then everything in `file2str.rs` is exported to the crate root.
+If `file2str.rs` contains a module `file2str`, then it is exported to the crate root.
+Then `use file2str::file2str::*;` would find it!
+Wait, if `file2str.rs` contains a module `file2str`, then `pub mod file2str;` ALREADY exports it as `crate::file2str`.
+Wait, if `file2str.rs` contains a module `file2str`, then the path is `crate::file2str::file2str`.
+If the binary does `use file2str::file2str::*;`, it means `external_crate::file2str::*`.
+So it looks for `file2str` in the external crate.
+If `lib.rs` has `pub mod file2str;`, then `external_crate::file2str` IS the module `file2str.rs`.
+So it finds it!
+Why would it fail?
+
+Let's reconsider the error:
+`could not find file2str in file2str`
+What if the first `file2str` is the MODULE `file2str.rs`, and the second `file2str` is a module INSIDE `file2str.rs`?
+If the binary does `use file2str::file2str::*;`, and the first `file2str` resolves to the MODULE `file2str.rs` (how? maybe the binary has `mod file2str;`?), then it looks for `file2str` inside `file2str.rs`.
+If `file2str.rs` doesn't have `file2str`, it fails.
+But I can't change the binary. I can only change `lib.rs`.
+If the binary has `use file2str::file2str::*;`, and it expects `file2str` to be a module inside `file2str.rs`, then `lib.rs` should be:
+```rust
+pub mod file2str {
+    pub mod file2str;
+}
+```
+But `file2str.rs` is a file. I can't define `pub mod file2str` with a block if it's also a file, unless I move the file.
+Wait, if `lib.rs` is:
+```rust
+pub mod file2str;
+```
+And the binary does `use file

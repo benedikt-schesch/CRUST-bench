@@ -1,0 +1,5 @@
+```rust
+{{lib.rs}}
+```rust
+pub mod tinyfseq;
+```

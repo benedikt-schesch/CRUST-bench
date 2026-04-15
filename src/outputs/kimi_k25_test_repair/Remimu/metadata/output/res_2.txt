@@ -1,0 +1,167 @@
+ {{lib.rs}}
+```rust
+pub mod my_regex;
+```
+
+{{my_regex.rs}}
+```rust
+//! My Regex module
+
+/// Example function from my_regex module
+pub fn example_function() -> &'static str {
+    "Hello from my_regex"
+}
+
+/// Token types for regex parsing
+#[derive(Debug, Clone, PartialEq)]
+pub enum RegexToken {
+    Literal(char),
+    Wildcard,  // .
+    Star,      // *
+    Plus,      // +
+    Question,  // ?
+    OpenParen, // (
+    CloseParen,// )
+    Or,        // |
+    Start,     // ^
+    End,       // $
+    CharClass(Vec<char>), // [abc]
+}
+
+impl Default for RegexToken {
+    fn default() -> Self {
+        RegexToken::Literal('\0')
+    }
+}
+
+// Placeholder for regex functionality
+pub struct RegexPattern {
+    pattern: String,
+}
+
+impl RegexPattern {
+    pub fn new(pattern: &str) -> Self {
+        RegexPattern {
+            pattern: pattern.to_string(),
+        }
+    }
+
+    pub fn pattern(&self) -> &str {
+        &self.pattern
+    }
+}
+
+/// Parse a regex pattern into tokens
+pub fn regex_parse(pattern: &str) -> Vec<RegexToken> {
+    let mut tokens = Vec::new();
+    let mut chars = pattern.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        let token = match c {
+            '.' => RegexToken::Wildcard,
+            '*' => RegexToken::Star,
+            '+' => RegexToken::Plus,
+            '?' => RegexToken::Question,
+            '(' => RegexToken::OpenParen,
+            ')' => RegexToken::CloseParen,
+            '|' => RegexToken::Or,
+            '^' => RegexToken::Start,
+            '$' => RegexToken::End,
+            '[' => {
+                // Parse character class
+                let mut class_chars = Vec::new();
+                while let Some(next_c) = chars.next() {
+                    if next_c == ']' {
+                        break;
+                    }
+                    class_chars.push(next_c);
+                }
+                RegexToken::CharClass(class_chars)
+            }
+            _ => RegexToken::Literal(c),
+        };
+        tokens.push(token);
+    }
+    tokens
+}
+
+/// Print regex tokens for debugging
+pub fn print_regex_tokens(tokens: &[RegexToken]) {
+    for (i, token) in tokens.iter().enumerate() {
+        println!("Token {}: {:?}", i, token);
+    }
+}
+
+/// Simple regex matching (placeholder implementation)
+/// Returns true if the pattern matches the text
+pub fn regex_match(pattern: &str, text: &str) -> bool {
+    // This is a simplified implementation
+    // In a real regex engine, this would use the parsed tokens
+    let tokens = regex_parse(pattern);
+    match_regex_tokens(&tokens, text)
+}
+
+/// Helper function to match tokens against text
+fn match_regex_tokens(tokens: &[RegexToken], text: &str) -> bool {
+    // Very simplified matching logic
+    if tokens.is_empty() {
+        return text.is_empty();
+    }
+
+    match &tokens[0] {
+        RegexToken::Literal(c) => {
+            if let Some(first) = text.chars().next() {
+                if first == *c {
+                    return match_regex_tokens(&tokens[1..], &text[1..]);
+                }
+            }
+            false
+        }
+        RegexToken::Wildcard => {
+            if !text.is_empty() {
+                return match_regex_tokens(&tokens[1..], &text[1..]);
+            }
+            false
+        }
+        _ => {
+            // For other tokens, just skip for this placeholder
+            match_regex_tokens(&tokens[1..], text)
+        }
+    }
+}
+```
+
+{{my_regex_test.rs}}
+```rust
+use my_regex::{regex_parse, regex_match, RegexToken};
+
+fn main() {
+    // Test 1: Initialize tokens vector with default values
+    let _tokens_buffer = vec![RegexToken::default(); 1024];
+    
+    // Test 2: Parse regex pattern
+    // The function takes only the pattern string as argument
+    let pattern = "[0-9]+\\.[0-9]+";
+    let result = regex_parse(pattern);
+    
+    // Check if parsing succeeded (returns Vec<RegexToken>, not Result)
+    // We verify by checking the vector is not empty and contains expected tokens
+    assert!(!result.is_empty(), "Regex parsing failed");
+    
+    // Print tokens for debugging
+    println!("Parsed tokens:");
+    for (i, token) in result.iter().enumerate() {
+        println!("Token {}: {:?}", i, token);
+    }
+    
+    // Test 3: Regex matching
+    // Function signature: regex_match(pattern: &str, text: &str) -> bool
+    let text = "23.53";
+    let match_result = regex_match(pattern, text);
+    
+    // The function returns bool, not a length, so we check if it matches
+    assert!(match_result, "Pattern should match the text");
+    
+    println!("Regex test passed successfully!");
+}
+```

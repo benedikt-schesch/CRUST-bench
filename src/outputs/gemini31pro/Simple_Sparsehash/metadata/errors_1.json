@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `Simple_Sparsehash::simple_sparsehash`", "file_path": "Simple_Sparsehash/src/bin/test.rs", "row": "1", "col": "5", "error_snippet": "|\n1 | use Simple_Sparsehash::simple_sparsehash;\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `simple_sparsehash` in the root"}]

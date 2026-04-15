@@ -1,0 +1,1260 @@
+{{annotation.rs}}
+```rust
+use std::fmt::Display;
+
+use crate::utils::cursor::{pgn_cursor_revisit_whitespace, pgn_cursor_skip_whitespace};
+
+#[repr(i8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PgnAnnotation {
+    Unknown = -1,
+    Null = 0,
+    GoodMove,
+    Mistake,
+    BrilliantMove,
+    Blunder,
+    InterestingMove,
+    DubiousMove,
+}
+
+impl From<i8> for PgnAnnotation {
+    fn from(value: i8) -> Self {
+        match value {
+            -1 => Self::Unknown,
+            0 => Self::Null,
+            1 => Self::GoodMove,
+            2 => Self::Mistake,
+            3 => Self::BrilliantMove,
+            4 => Self::Blunder,
+            5 => Self::InterestingMove,
+            6 => Self::DubiousMove,
+            _ => {
+                if value >= 0 {
+                    match value {
+                        0 => Self::Null,
+                        1 => Self::GoodMove,
+                        2 => Self::Mistake,
+                        3 => Self::BrilliantMove,
+                        4 => Self::Blunder,
+                        5 => Self::InterestingMove,
+                        6 => Self::DubiousMove,
+                        _ => Self::Unknown,
+                    }
+                } else {
+                    Self::Unknown
+                }
+            }
+        }
+    }
+}
+
+impl PgnAnnotation {
+    pub fn pgn_annotation_nag_from_string(str: &str, consumed: &mut usize) -> Self {
+        let bytes = str.as_bytes();
+        let mut annotation = PgnAnnotation::Unknown;
+        let mut cursor = 0usize;
+
+        if bytes.get(cursor).copied() != Some(b'$') {
+            return annotation;
+        }
+
+        while bytes.get(cursor).copied() == Some(b'$') {
+            cursor += 1;
+            assert!(bytes
+                .get(cursor)
+                .map(|b| b.is_ascii_digit())
+                .unwrap_or(false));
+
+            let start = cursor;
+            while bytes
+                .get(cursor)
+                .map(|b| b.is_ascii_digit())
+                .unwrap_or(false)
+            {
+                cursor += 1;
+            }
+
+            let num: i8 = str[start..cursor].parse::<i16>().unwrap() as i8;
+            annotation = PgnAnnotation::from(num);
+            pgn_cursor_skip_whitespace(str, &mut cursor);
+        }
+
+        pgn_cursor_revisit_whitespace(str, &mut cursor);
+        *consumed += cursor;
+        annotation
+    }
+
+    pub fn pgn_annotation_from_string(str: &str, consumed: &mut usize) -> Self {
+        let bytes = str.as_bytes();
+        let mut annotation = PgnAnnotation::Unknown;
+
+        if bytes.is_empty() {
+            return annotation;
+        }
+        if bytes[0] == b'!' {
+            *consumed += 1;
+            annotation = PgnAnnotation::GoodMove;
+        }
+        if bytes[0] == b'?' {
+            *consumed += 1;
+            annotation = PgnAnnotation::Mistake;
+        }
+        if bytes.len() < 2 {
+            return annotation;
+        }
+        if bytes[0] == b'!' && bytes[1] == b'!' {
+            *consumed += 1;
+            annotation = PgnAnnotation::BrilliantMove;
+        }
+        if bytes[0] == b'!' && bytes[1] == b'?' {
+            *consumed += 1;
+            annotation = PgnAnnotation::InterestingMove;
+        }
+        if bytes[0] == b'?' && bytes[1] == b'!' {
+            *consumed += 1;
+            annotation = PgnAnnotation::DubiousMove;
+        }
+        if bytes[0] == b'?' && bytes[1] == b'?' {
+            *consumed += 1;
+            annotation = PgnAnnotation::Blunder;
+        }
+        annotation
+    }
+}
+
+impl Display for PgnAnnotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PgnAnnotation::Unknown => write!(f, ""),
+            PgnAnnotation::Null => write!(f, "$0"),
+            PgnAnnotation::GoodMove => write!(f, "!"),
+            PgnAnnotation::Mistake => write!(f, "?"),
+            PgnAnnotation::BrilliantMove => write!(f, "!!"),
+            PgnAnnotation::Blunder => write!(f, "??"),
+            PgnAnnotation::InterestingMove => write!(f, "!?"),
+            PgnAnnotation::DubiousMove => write!(f, "?!"),
+        }
+    }
+}
+
+impl From<&str> for PgnAnnotation {
+    fn from(s: &str) -> Self {
+        let mut consumed = 0;
+        Self::pgn_annotation_from_string(s, &mut consumed)
+    }
+}
+```
+
+{{check.rs}}
+```rust
+#[repr(i8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PgnCheck {
+    Mate = -1,
+    None = 0,
+    Single,
+    Double,
+}
+
+impl PgnCheck {
+    pub fn __pgn_check_from_string(str: &str, consumed: &mut usize) -> Self {
+        let bytes = str.as_bytes();
+        let mut cursor = 0usize;
+        let mut check = PgnCheck::None;
+
+        match bytes.get(cursor).copied() {
+            Some(b'+') => {
+                let mut pluses = 0usize;
+                while bytes.get(cursor).copied() == Some(b'+') {
+                    pluses += 1;
+                    cursor += 1;
+                }
+                assert!(pluses <= 2);
+                check = match pluses {
+                    0 => PgnCheck::None,
+                    1 => PgnCheck::Single,
+                    2 => PgnCheck::Double,
+                    _ => unreachable!(),
+                };
+            }
+            Some(b'#') => {
+                check = PgnCheck::Mate;
+                cursor += 1;
+            }
+            _ => {}
+        }
+
+        *consumed += cursor;
+        check
+    }
+}
+
+impl From<&str> for PgnCheck {
+    fn from(s: &str) -> Self {
+        let mut consumed = 0;
+        Self::__pgn_check_from_string(s, &mut consumed)
+    }
+}
+```
+
+{{comments.rs}}
+```rust
+use crate::utils::cursor::pgn_cursor_skip_whitespace;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PgnCommentPosition {
+    Unknown = 0,
+    BeforeMove,
+    BetweenMove,
+    AfterMove,
+    AfterAlternative,
+}
+
+const PGN_COMMENTS_INITIAL_SIZE: usize = 1;
+const PGN_COMMENTS_GROW_SIZE: usize = 1;
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct PgnComment {
+    pub position: PgnCommentPosition,
+    pub value: String,
+}
+
+impl PgnComment {
+    pub fn new() -> Self {
+        Self {
+            position: PgnCommentPosition::Unknown,
+            value: String::new(),
+        }
+    }
+
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+
+    pub fn cleanup(&mut self) {
+        self.value.clear();
+        self.position = PgnCommentPosition::Unknown;
+    }
+
+    pub fn from_string(str: &str, consumed: &mut usize) -> Self {
+        let bytes = str.as_bytes();
+        let mut cursor = 0usize;
+        let mut comment = PgnComment::new();
+
+        assert_eq!(bytes.get(cursor).copied(), Some(b'{'));
+        cursor += 1;
+
+        let mut left_brace_count = 1u32;
+        let mut right_brace_count = 0u32;
+
+        loop {
+            let ch = *bytes.get(cursor).expect("unterminated comment");
+            if ch == 0 {
+                panic!("unterminated comment");
+            }
+            if ch == b'{' {
+                left_brace_count += 1;
+            }
+            if ch == b'}' {
+                right_brace_count += 1;
+            }
+            if right_brace_count == left_brace_count {
+                break;
+            }
+            comment.value.push(ch as char);
+            cursor += 1;
+        }
+
+        assert_eq!(bytes.get(cursor).copied(), Some(b'}'));
+        cursor += 1;
+
+        *consumed += cursor;
+        comment
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct PgnComments {
+    pub values: Vec<PgnComment>,
+}
+
+impl PgnComments {
+    pub fn new() -> Self {
+        let _ = PGN_COMMENTS_INITIAL_SIZE;
+        let _ = PGN_COMMENTS_GROW_SIZE;
+        Self { values: Vec::new() }
+    }
+
+    pub fn push(&mut self, comment: PgnComment) {
+        self.values.push(comment);
+    }
+
+    pub fn poll(&mut self, pos: PgnCommentPosition, str: &str) -> usize {
+        let bytes = str.as_bytes();
+        let mut cursor = 0usize;
+
+        if bytes.get(cursor).copied() == Some(b'{') {
+            while bytes.get(cursor).copied() == Some(b'{') {
+                let mut local_consumed = 0usize;
+                let mut comment = PgnComment::from_string(&str[cursor..], &mut local_consumed);
+                cursor += local_consumed;
+                comment.position = pos;
+                self.push(comment);
+                pgn_cursor_skip_whitespace(str, &mut cursor);
+            }
+            assert_ne!(bytes.get(cursor).copied(), Some(b'{'));
+            assert_ne!(bytes.get(cursor).copied(), Some(b'}'));
+            pgn_cursor_skip_whitespace(str, &mut cursor);
+        }
+
+        cursor
+    }
+
+    pub fn get_first_after_alternative_index(&self) -> Option<usize> {
+        self.values
+            .iter()
+            .position(|c| c.position == PgnCommentPosition::AfterAlternative)
+    }
+
+    pub fn cleanup(self) {}
+}
+```
+
+{{coordinate.rs}}
+```rust
+pub const UNKNOWN: usize = 0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PgnCoordinate {
+    pub file: Option<char>,
+    pub rank: Option<i32>,
+}
+
+pub fn pgn_coordinate_file_as_index(file: char) -> i32 {
+    let base = if file.is_ascii_uppercase() { 'A' } else { 'a' } as i32;
+    file as i32 - base
+}
+```
+
+{{metadata.rs}}
+```rust
+use std::collections::HashMap;
+
+use crate::utils::buffer::PgnBuffer;
+use crate::utils::cursor::pgn_cursor_skip_newline;
+
+const PGN_METADATA_INITIAL_SIZE: usize = 8;
+const PGN_METADATA_GROW_SIZE: usize = 8;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PgnMetadataItem {
+    key: PgnBuffer,
+    value: PgnBuffer,
+}
+
+impl PgnMetadataItem {
+    pub fn new() -> Self {
+        Self {
+            key: PgnBuffer::new(),
+            value: PgnBuffer::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PgnMetadata {
+    items: HashMap<String, String>,
+}
+
+impl PgnMetadata {
+    pub fn new() -> Self {
+        let _ = PGN_METADATA_INITIAL_SIZE;
+        let _ = PGN_METADATA_GROW_SIZE;
+        Self {
+            items: HashMap::new(),
+        }
+    }
+
+    pub fn from_string_with_consumption(s: &str, consumed: &mut usize) -> Self {
+        let bytes = s.as_bytes();
+        let mut cursor = 0usize;
+
+        if bytes.get(cursor).copied() != Some(b'[') {
+            return Self::new();
+        }
+
+        let mut metadata = Self::new();
+        let mut key_buffer = PgnBuffer::new();
+        let mut value_buffer = PgnBuffer::new();
+
+        loop {
+            if bytes.get(cursor).copied() != Some(b'[') {
+                break;
+            }
+            cursor += 1;
+
+            while bytes.get(cursor).copied() != Some(b' ') {
+                key_buffer.append(bytes[cursor] as char);
+                cursor += 1;
+            }
+            key_buffer.append_null_terminator();
+
+            cursor += 1;
+            assert_eq!(bytes.get(cursor).copied(), Some(b'"'));
+            cursor += 1;
+
+            while bytes.get(cursor).copied() != Some(b'"') {
+                value_buffer.append(bytes[cursor] as char);
+                cursor += 1;
+            }
+            value_buffer.append_null_terminator();
+
+            metadata.insert(key_buffer.as_str(), value_buffer.as_str());
+            key_buffer.reset();
+            value_buffer.reset();
+
+            cursor += 1;
+            assert_eq!(bytes.get(cursor).copied(), Some(b']'));
+            cursor += 1;
+
+            pgn_cursor_skip_newline(s, &mut cursor);
+        }
+
+        *consumed += cursor;
+        metadata
+    }
+
+    pub fn from_string(s: &str) -> Self {
+        let mut consumed = 0;
+        Self::from_string_with_consumption(s, &mut consumed)
+    }
+
+    pub fn insert(&mut self, key: &str, value: &str) {
+        self.items.insert(key.to_string(), value.to_string());
+    }
+
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.items.get(key).map(String::as_str)
+    }
+
+    pub fn delete(&mut self, key: &str) {
+        self.items.remove(key);
+    }
+}
+```
+
+{{moves.rs}}
+```rust
+use std::fmt::Display;
+
+use crate::annotation::PgnAnnotation;
+use crate::check::PgnCheck;
+use crate::comments::{PgnCommentPosition, PgnComments};
+use crate::coordinate::PgnCoordinate;
+use crate::piece::PgnPiece;
+use crate::score::PgnScore;
+use crate::utils::cursor::{pgn_cursor_revisit_whitespace, pgn_cursor_skip_whitespace};
+
+pub const PGN_CASTLING_NONE: u8 = 0;
+pub const PGN_CASTLING_KINGSIDE: u8 = 2;
+pub const PGN_CASTLING_QUEENSIDE: u8 = 3;
+pub const PGN_MOVES_INITIAL_SIZE: usize = 32;
+pub const PGN_MOVES_GROW_SIZE: usize = 32;
+pub const PGN_MOVE_NOTATION_SIZE: usize = 16;
+pub const PGN_ALTERNATIVE_MOVES_INITIAL_SIZE: usize = 1;
+pub const PGN_ALTERNATIVE_MOVES_GROW_SIZE: usize = 1;
+
+const PGN_EXPECT_WHITE: i32 = 0;
+const PGN_EXPECT_BLACK: i32 = 1;
+
+#[derive(Debug)]
+pub struct PgnMove {
+    pub piece: PgnPiece,
+    pub promoted_to: PgnPiece,
+    pub notation: String,
+    pub castles: u8,
+    pub captures: bool,
+    pub en_passant: bool,
+    pub check: PgnCheck,
+    pub from: PgnCoordinate,
+    pub dest: PgnCoordinate,
+    pub annotation: PgnAnnotation,
+    pub comments: Option<PgnComments>,
+    pub alternatives: Option<PgnAlternativeMoves>,
+}
+
+impl Default for PgnMove {
+    fn default() -> Self {
+        Self {
+            piece: PgnPiece::Unknown,
+            promoted_to: PgnPiece::Unknown,
+            notation: String::new(),
+            castles: PGN_CASTLING_NONE,
+            captures: false,
+            en_passant: false,
+            check: PgnCheck::None,
+            from: PgnCoordinate {
+                file: None,
+                rank: None,
+            },
+            dest: PgnCoordinate {
+                file: None,
+                rank: None,
+            },
+            annotation: PgnAnnotation::Unknown,
+            comments: None,
+            alternatives: None,
+        }
+    }
+}
+
+impl PgnMove {
+    pub fn from_string_with_consumption(s: &str, consumed: &mut usize) -> Self {
+        let bytes = s.as_bytes();
+        let mut mv = PgnMove::default();
+        let mut cursor = 0usize;
+
+        if bytes.get(cursor).copied() == Some(b'O') {
+            cursor += 1;
+            assert_eq!(bytes.get(cursor).copied(), Some(b'-'));
+            cursor += 1;
+            assert_eq!(bytes.get(cursor).copied(), Some(b'O'));
+            mv.castles = PGN_CASTLING_KINGSIDE;
+            cursor += 1;
+
+            if bytes.get(cursor).copied() == Some(b'-') {
+                cursor += 1;
+                assert_eq!(bytes.get(cursor).copied(), Some(b'O'));
+                mv.castles = PGN_CASTLING_QUEENSIDE;
+                cursor += 1;
+            }
+
+            mv.check = PgnCheck::__pgn_check_from_string(&s[cursor..], &mut cursor);
+            mv.annotation = PgnAnnotation::pgn_annotation_from_string(&s[cursor..], &mut cursor);
+
+            let skipped_whitespace_before_ep = pgn_cursor_skip_whitespace(s, &mut cursor);
+
+            if bytes.get(cursor).copied() == Some(b'e') && bytes.get(cursor + 1).copied() == Some(b'.') {
+                assert!(skipped_whitespace_before_ep);
+                assert_eq!(bytes.get(cursor).copied(), Some(b'e'));
+                cursor += 1;
+                assert_eq!(bytes.get(cursor).copied(), Some(b'.'));
+                cursor += 1;
+                assert_eq!(bytes.get(cursor).copied(), Some(b'p'));
+                cursor += 1;
+                assert_eq!(bytes.get(cursor).copied(), Some(b'.'));
+                cursor += 1;
+                mv.en_passant = true;
+            }
+
+            let skipped_whitespace_after_ep = if mv.en_passant {
+                pgn_cursor_skip_whitespace(s, &mut cursor)
+            } else {
+                skipped_whitespace_before_ep
+            };
+
+            if mv.annotation == PgnAnnotation::Unknown {
+                mv.annotation =
+                    PgnAnnotation::pgn_annotation_nag_from_string(&s[cursor..], &mut cursor);
+                if mv.annotation != PgnAnnotation::Unknown {
+                    assert!(skipped_whitespace_after_ep);
+                }
+            }
+
+            pgn_cursor_revisit_whitespace(s, &mut cursor);
+            mv.notation = s[..cursor.min(s.len())].to_string();
+            *consumed += cursor;
+            return mv;
+        }
+
+        mv.piece = bytes
+            .get(cursor)
+            .copied()
+            .map(|b| PgnPiece::from(b as char))
+            .unwrap_or(PgnPiece::Unknown);
+        cursor += 1;
+
+        if mv.piece == PgnPiece::Unknown {
+            mv.piece = PgnPiece::Pawn;
+            cursor -= 1;
+        }
+
+        if bytes
+            .get(cursor)
+            .map(|b| b.is_ascii_lowercase() && *b != b'x')
+            .unwrap_or(false)
+        {
+            mv.from.file = Some(bytes[cursor] as char);
+            cursor += 1;
+        }
+
+        if bytes.get(cursor).map(|b| b.is_ascii_digit()).unwrap_or(false) {
+            mv.from.rank = Some((bytes[cursor] - b'0') as i32);
+            cursor += 1;
+        }
+
+        mv.captures = bytes
+            .get(cursor)
+            .map(|b| *b == b'x' || *b == b':')
+            .unwrap_or(false);
+        if mv.captures {
+            cursor += 1;
+        }
+
+        if bytes.get(cursor).map(|b| b.is_ascii_lowercase()).unwrap_or(false) {
+            mv.dest.file = Some(bytes[cursor] as char);
+            cursor += 1;
+            assert!(bytes.get(cursor).map(|b| b.is_ascii_digit()).unwrap_or(false));
+            mv.dest.rank = Some((bytes[cursor] - b'0') as i32);
+            cursor += 1;
+        } else {
+            mv.dest = mv.from;
+            mv.from = PgnCoordinate {
+                file: None,
+                rank: None,
+            };
+        }
+
+        mv.promoted_to = bytes
+            .get(cursor)
+            .copied()
+            .map(|b| PgnPiece::from(b as char))
+            .unwrap_or(PgnPiece::Unknown);
+
+        if mv.promoted_to == PgnPiece::Unknown {
+            match bytes.get(cursor).copied() {
+                Some(b'(') => {
+                    cursor += 1;
+                    mv.promoted_to = bytes
+                        .get(cursor)
+                        .copied()
+                        .map(|b| PgnPiece::from(b as char))
+                        .unwrap_or(PgnPiece::Unknown);
+                    assert!(mv.promoted_to != PgnPiece::Unknown);
+                    cursor += 1;
+                    assert_eq!(bytes.get(cursor).copied(), Some(b')'));
+                    cursor += 1;
+                }
+                Some(b'=') | Some(b'/') => {
+                    cursor += 1;
+                    mv.promoted_to = bytes
+                        .get(cursor)
+                        .copied()
+                        .map(|b| PgnPiece::from(b as char))
+                        .unwrap_or(PgnPiece::Unknown);
+                    assert!(mv.promoted_to != PgnPiece::Unknown);
+                    cursor += 1;
+                }
+                _ => {}
+            }
+        }
+
+        assert!(mv.dest.file.is_some());
+        assert!(mv.dest.rank.is_some());
+
+        mv.check = PgnCheck::__pgn_check_from_string(&s[cursor..], &mut cursor);
+        mv.annotation = PgnAnnotation::pgn_annotation_from_string(&s[cursor..], &mut cursor);
+        let skipped_whitespace_before_ep = pgn_cursor_skip_whitespace(s, &mut cursor);
+
+        if bytes.get(cursor).copied() == Some(b'e') && bytes.get(cursor + 1).copied() == Some(b'.') {
+            assert!(skipped_whitespace_before_ep);
+            assert_eq!(bytes.get(cursor).copied(), Some(b'e'));
+            cursor += 1;
+            assert_eq!(bytes.get(cursor).copied(), Some(b'.'));
+            cursor += 1;
+            assert_eq!(bytes.get(cursor).copied(), Some(b'p'));
+            cursor += 1;
+            assert_eq!(bytes.get(cursor).copied(), Some(b'.'));
+            cursor += 1;
+            mv.en_passant = true;
+        }
+
+        let skipped_whitespace_after_ep = if mv.en_passant {
+            pgn_cursor_skip_whitespace(s, &mut cursor)
+        } else {
+            skipped_whitespace_before_ep
+        };
+
+        if mv.annotation == PgnAnnotation::Unknown {
+            mv.annotation = PgnAnnotation::pgn_annotation_nag_from_string(&s[cursor..], &mut cursor);
+            if mv.annotation != PgnAnnotation::Unknown {
+                assert!(skipped_whitespace_after_ep);
+            }
+        }
+
+        pgn_cursor_revisit_whitespace(s, &mut cursor);
+        mv.notation = s[..cursor.min(s.len())].to_string();
+        *consumed += cursor;
+        mv
+    }
+}
+
+impl From<&str> for PgnMove {
+    fn from(s: &str) -> Self {
+        let mut consumed = 0;
+        Self::from_string_with_consumption(s, &mut consumed)
+    }
+}
+
+impl Display for PgnMove {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut out = String::new();
+
+        match self.castles {
+            PGN_CASTLING_NONE => {}
+            PGN_CASTLING_KINGSIDE => out.push_str("O-O"),
+            PGN_CASTLING_QUEENSIDE => out.push_str("O-O-O"),
+            _ => {}
+        }
+
+        if self.castles == PGN_CASTLING_NONE {
+            assert!(self.piece != PgnPiece::Unknown);
+            if self.piece != PgnPiece::Pawn {
+                out.push(self.piece as u8 as char);
+            }
+            if let Some(file) = self.from.file {
+                out.push(file);
+            }
+            if let Some(rank) = self.from.rank {
+                out.push(char::from(b'0' + rank as u8));
+            }
+            if self.captures {
+                out.push('x');
+            }
+            out.push(self.dest.file.expect("destination file required"));
+            out.push(char::from(b'0' + self.dest.rank.expect("destination rank required") as u8));
+
+            if self.promoted_to != PgnPiece::Unknown {
+                assert!(self.piece == PgnPiece::Pawn);
+                assert!(self.promoted_to != PgnPiece::Pawn);
+                out.push('=');
+                out.push(self.promoted_to as u8 as char);
+            }
+        }
+
+        match self.check {
+            PgnCheck::None => {}
+            PgnCheck::Mate => out.push('#'),
+            PgnCheck::Single => out.push('+'),
+            PgnCheck::Double => {
+                out.push('+');
+                out.push('+');
+            }
+        }
+
+        if self.annotation as i8 >= PgnAnnotation::GoodMove as i8
+            && self.annotation as i8 <= PgnAnnotation::DubiousMove as i8
+        {
+            out.push_str(&self.annotation.to_string());
+        }
+
+        if self.en_passant {
+            out.push(' ');
+            out.push_str("e.p.");
+        }
+
+        if (self.annotation as i8) > (PgnAnnotation::DubiousMove as i8)
+            || self.annotation == PgnAnnotation::Null
+        {
+            out.push(' ');
+            out.push_str(&self.annotation.to_string());
+        }
+
+        write!(f, "{out}")
+    }
+}
+
+#[derive(Debug)]
+pub struct PgnMoves {
+    pub values: Vec<PgnMovesItem>,
+}
+
+impl From<&str> for PgnMoves {
+    fn from(s: &str) -> Self {
+        let mut consumed = 0;
+        Self::from_string_with_consumption(s, &mut consumed)
+    }
+}
+
+impl PgnMoves {
+    pub fn new() -> Self {
+        let _ = PGN_MOVES_INITIAL_SIZE;
+        let _ = PGN_MOVES_GROW_SIZE;
+        Self { values: Vec::new() }
+    }
+
+    fn from_string_recurse(s: &str, consumed: &mut usize, moves: &mut Self, expect: i32) {
+        let bytes = s.as_bytes();
+        if bytes.first().copied() == Some(b')') || bytes.is_empty() {
+            return;
+        }
+
+        let mut cursor = 0usize;
+        let mut item = PgnMovesItem {
+            white: PgnMove::default(),
+            black: PgnMove::default(),
+        };
+
+        let mut comments: Option<PgnComments> = None;
+        pgn_cursor_skip_whitespace(s, &mut cursor);
+
+        if s[cursor..].starts_with('{') {
+            let mut c = comments.take().unwrap_or_else(PgnComments::new);
+            cursor += c.poll(PgnCommentPosition::BeforeMove, &s[cursor..]);
+            comments = Some(c);
+        }
+
+        assert!(bytes.get(cursor).map(|b| b.is_ascii_digit()).unwrap_or(false));
+        while bytes.get(cursor).map(|b| b.is_ascii_digit()).unwrap_or(false) {
+            cursor += 1;
+        }
+
+        let mut dots_count = 0;
+        assert_eq!(bytes.get(cursor).copied(), Some(b'.'));
+        while bytes.get(cursor).copied() == Some(b'.') {
+            cursor += 1;
+            dots_count += 1;
+        }
+
+        if expect == PGN_EXPECT_WHITE {
+            assert_eq!(dots_count, 1);
+        }
+        if expect == PGN_EXPECT_BLACK {
+            assert_eq!(dots_count, 3);
+        }
+
+        pgn_cursor_skip_whitespace(s, &mut cursor);
+
+        if s[cursor..].starts_with('{') {
+            let mut c = comments.take().unwrap_or_else(PgnComments::new);
+            cursor += c.poll(PgnCommentPosition::BetweenMove, &s[cursor..]);
+            comments = Some(c);
+        }
+
+        if dots_count == 3 {
+            item.black = PgnMove::from_string_with_consumption(&s[cursor..], &mut cursor);
+            pgn_cursor_skip_whitespace(s, &mut cursor);
+
+            if s[cursor..].starts_with('{') {
+                let mut c = comments.take().unwrap_or_else(PgnComments::new);
+                cursor += c.poll(PgnCommentPosition::AfterMove, &s[cursor..]);
+                comments = Some(c);
+            }
+
+            cursor += PgnAlternativeMoves::poll(
+                &mut item.black.alternatives,
+                &mut comments,
+                &s[cursor..],
+                PGN_EXPECT_BLACK,
+            );
+
+            pgn_cursor_skip_whitespace(s, &mut cursor);
+
+            if s[cursor..].starts_with('{') {
+                let mut c = comments.take().unwrap_or_else(PgnComments::new);
+                cursor += c.poll(PgnCommentPosition::AfterMove, &s[cursor..]);
+                comments = Some(c);
+            }
+
+            if let Some(c) = comments.take() {
+                item.black.comments = Some(c);
+            }
+
+            moves.push(item);
+            Self::from_string_recurse(&s[cursor..], &mut cursor, moves, PGN_EXPECT_WHITE);
+            *consumed += cursor;
+            return;
+        }
+
+        item.white = PgnMove::from_string_with_consumption(&s[cursor..], &mut cursor);
+        pgn_cursor_skip_whitespace(s, &mut cursor);
+
+        if s[cursor..].starts_with('{') {
+            let mut c = comments.take().unwrap_or_else(PgnComments::new);
+            cursor += c.poll(PgnCommentPosition::AfterMove, &s[cursor..]);
+            comments = Some(c);
+        }
+
+        cursor += PgnAlternativeMoves::poll(
+            &mut item.white.alternatives,
+            &mut comments,
+            &s[cursor..],
+            PGN_EXPECT_WHITE,
+        );
+
+        pgn_cursor_skip_whitespace(s, &mut cursor);
+
+        if s[cursor..].starts_with('{') {
+            let mut c = comments.take().unwrap_or_else(PgnComments::new);
+            cursor += c.poll(PgnCommentPosition::AfterMove, &s[cursor..]);
+            comments = Some(c);
+        }
+
+        if let Some(c) = comments.take() {
+            item.white.comments = Some(c);
+        }
+
+        if PgnScore::from(&s[cursor..]) != PgnScore::Unknown {
+            moves.push(item);
+            *consumed += cursor;
+            return;
+        }
+
+        if bytes.get(cursor).copied() == Some(b')') || bytes.get(cursor).is_none() {
+            moves.push(item);
+            *consumed += cursor;
+            return;
+        }
+
+        pgn_cursor_skip_whitespace(s, &mut cursor);
+
+        if s[cursor..].starts_with('{') {
+            let mut c = comments.take().unwrap_or_else(PgnComments::new);
+            cursor += c.poll(PgnCommentPosition::BeforeMove, &s[cursor..]);
+            comments = Some(c);
+        }
+
+        if bytes.get(cursor).map(|b| b.is_ascii_digit()).unwrap_or(false) {
+            while bytes.get(cursor).map(|b| b.is_ascii_digit()).unwrap_or(false) {
+                cursor += 1;
+            }
+            for _ in 0..3 {
+                assert_eq!(bytes.get(cursor).copied(), Some(b'.'));
+                cursor += 1;
+            }
+        }
+
+        pgn_cursor_skip_whitespace(s, &mut cursor);
+
+        if s[cursor..].starts_with('{') {
+            let mut c = comments.take().unwrap_or_else(PgnComments::new);
+            cursor += c.poll(PgnCommentPosition::BetweenMove, &s[cursor..]);
+            comments = Some(c);
+        }
+
+        item.black = PgnMove::from_string_with_consumption(&s[cursor..], &mut cursor);
+        pgn_cursor_skip_whitespace(s, &mut cursor);
+
+        if s[cursor..].starts_with('{') {
+            let mut c = comments.take().unwrap_or_else(PgnComments::new);
+            cursor += c.poll(PgnCommentPosition::AfterMove, &s[cursor..]);
+            comments = Some(c);
+        }
+
+        cursor += PgnAlternativeMoves::poll(
+            &mut item.black.alternatives,
+            &mut comments,
+            &s[cursor..],
+            PGN_EXPECT_BLACK,
+        );
+
+        pgn_cursor_skip_whitespace(s, &mut cursor);
+
+        if s[cursor..].starts_with('{') {
+            let mut c = comments.take().unwrap_or_else(PgnComments::new);
+            cursor += c.poll(PgnCommentPosition::AfterMove, &s[cursor..]);
+            comments = Some(c);
+        }
+
+        if let Some(c) = comments.take() {
+            item.black.comments = Some(c);
+        }
+
+        moves.push(item);
+
+        if PgnScore::from(&s[cursor..]) != PgnScore::Unknown {
+            *consumed += cursor;
+            return;
+        }
+
+        Self::from_string_recurse(&s[cursor..], &mut cursor, moves, PGN_EXPECT_WHITE);
+        *consumed += cursor;
+    }
+
+    pub fn from_string_with_consumption(s: &str, consumed: &mut usize) -> Self {
+        let mut moves = Self::new();
+        Self::from_string_recurse(s, consumed, &mut moves, PGN_EXPECT_WHITE);
+        moves
+    }
+
+    pub fn push(&mut self, moves: PgnMovesItem) {
+        self.values.push(moves);
+    }
+}
+
+#[derive(Debug)]
+pub struct PgnMovesItem {
+    pub white: PgnMove,
+    pub black: PgnMove,
+}
+
+#[derive(Debug)]
+pub struct PgnAlternativeMoves {
+    pub values: Vec<Box<PgnMoves>>,
+}
+
+impl PgnAlternativeMoves {
+    pub fn new() -> Self {
+        let _ = PGN_ALTERNATIVE_MOVES_INITIAL_SIZE;
+        let _ = PGN_ALTERNATIVE_MOVES_GROW_SIZE;
+        Self { values: Vec::new() }
+    }
+
+    pub fn poll(
+        alt: &mut Option<Self>,
+        placeholder: &mut Option<PgnComments>,
+        s: &str,
+        expect: i32,
+    ) -> usize {
+        let bytes = s.as_bytes();
+        let mut cursor = 0usize;
+
+        while bytes.get(cursor).copied() == Some(b'(') {
+            cursor += 1;
+            if alt.is_none() {
+                *alt = Some(Self::new());
+            }
+
+            pgn_cursor_skip_whitespace(s, &mut cursor);
+
+            let mut inner_consumed = 0usize;
+            let inner_moves = PgnMoves::from_string_with_consumption(&s[cursor..], &mut inner_consumed);
+            cursor += inner_consumed;
+            alt.as_mut().unwrap().push(inner_moves);
+
+            pgn_cursor_skip_whitespace(s, &mut cursor);
+            assert_eq!(bytes.get(cursor).copied(), Some(b')'));
+            cursor += 1;
+
+            pgn_cursor_skip_whitespace(s, &mut cursor);
+
+            if s[cursor..].starts_with('{') {
+                let mut c = placeholder.take().unwrap_or_else(PgnComments::new);
+                cursor += c.poll(PgnCommentPosition::AfterAlternative, &s[cursor..]);
+                *placeholder = Some(c);
+            }
+        }
+
+        let _ = expect;
+        cursor
+    }
+
+    pub fn push(&mut self, moves: PgnMoves) {
+        self.values.push(Box::new(moves));
+    }
+}
+```
+
+{{pgn.rs}}
+```rust
+use crate::metadata::PgnMetadata;
+use crate::moves::{PgnMove, PgnMoves};
+use crate::score::PgnScore;
+use crate::utils::cursor::pgn_cursor_skip_whitespace;
+
+#[derive(Debug)]
+pub struct Pgn {
+    pub metadata: Option<Box<PgnMetadata>>,
+    pub moves: Option<Box<PgnMoves>>,
+    pub score: PgnScore,
+}
+
+impl Pgn {
+    pub fn new() -> Self {
+        Self {
+            metadata: None,
+            moves: None,
+            score: PgnScore::Unknown,
+        }
+    }
+
+    pub fn parse_metadata(s: &str) -> PgnMetadata {
+        PgnMetadata::from_string(s)
+    }
+
+    pub fn parse_move(s: &str) -> PgnMove {
+        PgnMove::from(s)
+    }
+
+    pub fn parse_moves(s: &str) -> PgnMoves {
+        PgnMoves::from(s)
+    }
+
+    pub fn parse_score(s: &str) -> PgnScore {
+        PgnScore::from(s)
+    }
+
+    pub fn parse(&mut self, s: &str) -> usize {
+        let mut cursor = 0usize;
+
+        let mut metadata_consumed = 0usize;
+        let metadata = PgnMetadata::from_string_with_consumption(&s[cursor..], &mut metadata_consumed);
+        cursor += metadata_consumed;
+        self.metadata = Some(Box::new(metadata));
+
+        pgn_cursor_skip_whitespace(s, &mut cursor);
+
+        let mut moves_consumed = 0usize;
+        let moves = PgnMoves::from_string_with_consumption(&s[cursor..], &mut moves_consumed);
+        cursor += moves_consumed;
+        self.moves = Some(Box::new(moves));
+
+        let mut score_consumed = 0usize;
+        self.score = {
+            let score = PgnScore::from(&s[cursor..]);
+            if score != PgnScore::Unknown {
+                score_consumed = score.to_string().len();
+            }
+            score
+        };
+        cursor += score_consumed;
+
+        cursor
+    }
+}
+```
+
+{{piece.rs}}
+```rust
+use std::fmt::Display;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PgnPiece {
+    Unknown = 0,
+    Pawn = b'P',
+    Rook = b'R',
+    Knight = b'N',
+    Bishop = b'B',
+    Queen = b'Q',
+    King = b'K',
+}
+
+impl From<char> for PgnPiece {
+    fn from(ch: char) -> Self {
+        match ch {
+            'P' => Self::Pawn,
+            'R' => Self::Rook,
+            'N' => Self::Knight,
+            'B' => Self::Bishop,
+            'Q' => Self::Queen,
+            'K' => Self::King,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl Display for PgnPiece {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PgnPiece::Pawn => write!(f, "Pawn"),
+            PgnPiece::Rook => write!(f, "Rook"),
+            PgnPiece::Knight => write!(f, "Knight"),
+            PgnPiece::Bishop => write!(f, "Bishop"),
+            PgnPiece::Queen => write!(f, "Queen"),
+            PgnPiece::King => write!(f, "King"),
+            PgnPiece::Unknown => Err(std::fmt::Error),
+        }
+    }
+}
+```
+
+{{score.rs}}
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PgnScore {
+    Unknown = 0,
+    Ongoing,
+    Draw,
+    WhiteWon,
+    BlackWon,
+    Forfeit,
+    WhiteForfeit,
+    BlackForfeit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PgnScoreSingle {
+    Zero = 0,
+    One,
+    Half,
+}
+
+impl PgnScore {
+    fn parse_single(s: &str, consumed: &mut usize) -> Option<PgnScoreSingle> {
+        if s.len() >= 3 && &s[..3] == "1/2" {
+            *consumed += 3;
+            Some(PgnScoreSingle::Half)
+        } else if s.starts_with('0') {
+            *consumed += 1;
+            Some(PgnScoreSingle::Zero)
+        } else if s.starts_with('1') {
+            *consumed += 1;
+            Some(PgnScoreSingle::One)
+        } else {
+            None
+        }
+    }
+
+    fn from_string_with_consumption(s: &str, consumed: &mut usize) -> Self {
+        let bytes = s.as_bytes();
+        let mut cursor = 0usize;
+
+        if bytes.get(cursor).copied() == Some(b'*') {
+            cursor += 1;
+            *consumed += cursor;
+            return Self::Ongoing;
+        }
+
+        let white = match Self::parse_single(&s[cursor..], &mut cursor) {
+            Some(v) => v,
+            None => return Self::Unknown,
+        };
+
+        if bytes.get(cursor).copied() != Some(b'-') {
+            return Self::Unknown;
+        }
+        cursor += 1;
+
+        let black = match Self::parse_single(&s[cursor..], &mut cursor) {
+            Some(v) => v,
+            None => return Self::Unknown,
+        };
+
+        *consumed += cursor;
+
+        match (white, black) {
+            (PgnScoreSingle::Half, PgnScoreSingle::Half) => Self::Draw,
+            (PgnScoreSingle::One, PgnScoreSingle::Zero) => Self::WhiteWon,
+            (PgnScoreSingle::Zero, PgnScoreSingle::One) => Self::BlackWon,
+            (PgnScoreSingle::Zero, PgnScoreSingle::Zero) => Self::Forfeit,
+            (PgnScoreSingle::Zero, PgnScoreSingle::Half) => Self::WhiteForfeit,
+            (PgnScoreSingle::Half, PgnScoreSingle::Zero) => Self::BlackForfeit,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl From<&str> for PgnScore {
+    fn from(s: &str) -> Self {
+        let mut consumed = 0;
+        Self::from_string_with_consumption(s, &mut consumed)
+    }
+}
+
+impl std::fmt::Display for PgnScore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PgnScore::Unknown => write!(f, ""),
+            PgnScore::Ongoing => write!(f, "*"),
+            PgnScore::Draw => write!(f, "1/2-1/2"),
+            PgnScore::WhiteWon => write!(f, "1-0"),
+            PgnScore::BlackWon => write!(f, "0-1"),
+            PgnScore::Forfeit => write!(f, "0-0"),
+            PgnScore::WhiteForfeit => write!(f, "0-1/2"),
+            PgnScore::BlackForfeit => write!(f, "1/2-0"),
+        }
+    }
+}
+```

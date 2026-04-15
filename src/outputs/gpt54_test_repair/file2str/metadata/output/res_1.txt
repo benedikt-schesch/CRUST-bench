@@ -1,0 +1,35 @@
+{{lib.rs}}
+```rust
+pub mod file2str;
+```
+
+{{file2str.rs}}
+```rust
+use std::fs;
+
+pub fn file2strl(path: &str, len: &mut u32) -> Option<String> {
+    let bytes = match fs::read(path) {
+        Ok(data) => data,
+        Err(_) => return None,
+    };
+
+    let content = String::from_utf8_lossy(&bytes).into_owned();
+    *len = u32::try_from(content.len()).ok()?;
+    Some(content)
+}
+
+pub fn file2str(path: &str) -> Option<String> {
+    let bytes = match fs::read(path) {
+        Ok(data) => data,
+        Err(_) => return None,
+    };
+
+    let mut content = String::from_utf8_lossy(&bytes).into_owned();
+
+    if !content.ends_with('\n') {
+        content.push('\n');
+    }
+
+    Some(content)
+}
+```

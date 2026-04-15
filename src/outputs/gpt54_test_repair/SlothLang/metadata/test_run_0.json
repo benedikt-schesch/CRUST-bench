@@ -1,0 +1,43 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test test_parser_gamut ... FAILED
+test test_parser_hello_world ... FAILED
+test test_program_execution_count ... FAILED
+
+failures:
+
+---- test_parser_gamut stdout ----
+TESTING PARSER (2/3)
+
+thread 'test_parser_gamut' (226206) panicked at SlothLang/src/bin/tests.rs:25:45:
+index out of bounds: the len is 0 but the index is 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_parser_hello_world stdout ----
+TESTING PARSER (1/3)
+
+thread 'test_parser_hello_world' (226207) panicked at SlothLang/src/bin/tests.rs:8:43:
+index out of bounds: the len is 0 but the index is 0
+
+---- test_program_execution_count stdout ----
+TESTING PROGRAM EXECUTION (3/3)
+Returned: 0
+
+thread 'test_program_execution_count' (226208) panicked at SlothLang/src/bin/tests.rs:48:1:
+assertion `left == right` failed
+  left: 0
+ right: 11
+
+
+failures:
+    test_parser_gamut
+    test_parser_hello_world
+    test_program_execution_count
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

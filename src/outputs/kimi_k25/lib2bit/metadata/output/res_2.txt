@@ -1,0 +1,43 @@
+ {{twobit.rs}}
+```rust
+//! Module for working with 2bit file format.
+
+use std::fs::File;
+use std::io;
+use std::path::Path;
+
+/// Main structure for handling TwoBit files.
+pub struct TwoBit {
+    file: File,
+}
+
+/// Header structure for TwoBit format.
+pub struct TwoBitHeader;
+
+/// Chromosome/Contig Length structure.
+pub struct TwoBitCL;
+
+/// Masked index structure for TwoBit format.
+pub struct TwoBitMaskedIdx;
+
+impl TwoBit {
+    /// Open a 2bit file.
+    ///
+    /// # Arguments
+    /// * `filename` - Path to the 2bit file
+    /// * `mask` - Whether to load mask information
+    ///
+    /// # Returns
+    /// * `Ok(TwoBit)` on success
+    /// * `Err(io::Error)` if the file cannot be opened
+    pub fn twobit_open<P: AsRef<Path>>(filename: P, _mask: bool) -> io::Result<Self> {
+        let file = File::open(filename)?;
+        Ok(TwoBit { file })
+    }
+}
+```
+
+{{lib.rs}}
+```rust
+pub mod twobit;
+```

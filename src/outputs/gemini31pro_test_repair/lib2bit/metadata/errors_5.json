@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `lib2bit::twobit`", "file_path": "lib2bit/src/bin/test.rs", "row": "1", "col": "14", "error_snippet": "|\n1 | use lib2bit::twobit::{TwoBit, TwoBitHeader, TwoBitCL, TwoBitMaskedIdx};\n  |              ^^^^^^ could not find `twobit` in `lib2bit`"}]

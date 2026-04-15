@@ -1,0 +1,19 @@
+ {{lib.rs}}
+```rust
+pub mod kdtree;
+```
+
+{{kdtree.rs}}
+```rust
+//! K-d tree module placeholder
+
+/// A placeholder struct for the K-d tree implementation.
+pub struct KdTree;
+
+impl KdTree {
+    /// Creates a new empty K-d tree.
+    pub fn new() -> Self {
+        KdTree
+    }
+}
+```

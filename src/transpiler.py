@@ -53,7 +53,7 @@ class Transpiler:
                 with open(
                     output_metadata_path / "initial.txt", "w", encoding="utf-8"
                 ) as f:
-                    f.write(response)
+                    f.write(response or "")
 
     def dump_transpilation_prompt(self, prompt, benchmark):
         metadata_path = benchmark.rust_path / "metadata"

@@ -1,0 +1,965 @@
+{{blake2b.rs}}
+```rust
+// Generated Rust Code
+pub const BLAKE2B_BLOCKBYTES: usize = 128;
+pub const BLAKE2B_OUTBYTES: usize = 64;
+pub const BLAKE2B_KEYBYTES: usize = 64;
+pub const BLAKE2B_SALTBYTES: usize = 16;
+pub const BLAKE2B_PERSONALBYTES: usize = 16;
+
+#[derive(Debug, Clone)]
+pub struct Blake2bState {
+    pub h: [u64; 8],
+    pub t: [u64; 2],
+    pub f: [u64; 2],
+    pub buf: [u8; BLAKE2B_BLOCKBYTES],
+    pub buflen: usize,
+    pub outlen: usize,
+    pub last_node: u8,
+}
+
+#[repr(packed)]
+#[derive(Debug, Clone)]
+pub struct Blake2bParam {
+    pub digest_length: u8,
+    pub key_length: u8,
+    pub fanout: u8,
+    pub depth: u8,
+    pub leaf_length: u32,
+    pub node_offset: u32,
+    pub xof_length: u32,
+    pub node_depth: u8,
+    pub inner_length: u8,
+    pub reserved: [u8; 14],
+    pub salt: [u8; BLAKE2B_SALTBYTES],
+    pub personal: [u8; BLAKE2B_PERSONALBYTES],
+}
+
+const BLAKE2B_IV: [u64; 8] = [
+    0x6a09e667f3bcc908u64,
+    0xbb67ae8584caa73bu64,
+    0x3c6ef372fe94f82bu64,
+    0xa54ff53a5f1d36f1u64,
+    0x510e527fade682d1u64,
+    0x9b05688c2b3e6c1fu64,
+    0x1f83d9abfb41bd6bu64,
+    0x5be0cd19137e2179u64,
+];
+
+const BLAKE2B_SIGMA: [[usize; 16]; 12] = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    [14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3],
+    [11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4],
+    [7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8],
+    [9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13],
+    [2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9],
+    [12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11],
+    [13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10],
+    [6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5],
+    [10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    [14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3],
+];
+
+const DEFAULT_PERSONAL: &[u8; BLAKE2B_PERSONALBYTES] = b"ckb-default-hash";
+
+fn load64(src: &[u8]) -> u64 {
+    let mut a = [0u8; 8];
+    a.copy_from_slice(&src[..8]);
+    u64::from_le_bytes(a)
+}
+
+fn store32(dst: &mut [u8], w: u32) {
+    dst[..4].copy_from_slice(&w.to_le_bytes());
+}
+
+fn store64(dst: &mut [u8], w: u64) {
+    dst[..8].copy_from_slice(&w.to_le_bytes());
+}
+
+fn rotr64(w: u64, c: u32) -> u64 {
+    (w >> c) | (w << (64 - c))
+}
+
+fn secure_zero_memory(v: &mut [u8]) {
+    for b in v.iter_mut() {
+        *b = 0;
+    }
+}
+
+fn blake2b_set_lastnode(s: &mut Blake2bState) {
+    s.f[1] = u64::MAX;
+}
+
+fn blake2b_is_lastblock(s: &Blake2bState) -> bool {
+    s.f[0] != 0
+}
+
+fn blake2b_set_lastblock(s: &mut Blake2bState) {
+    if s.last_node != 0 {
+        blake2b_set_lastnode(s);
+    }
+    s.f[0] = u64::MAX;
+}
+
+fn blake2b_increment_counter(s: &mut Blake2bState, inc: u64) {
+    s.t[0] = s.t[0].wrapping_add(inc);
+    s.t[1] = s.t[1].wrapping_add((s.t[0] < inc) as u64);
+}
+
+fn blake2b_init0(s: &mut Blake2bState) {
+    s.h = [0u64; 8];
+    s.t = [0u64; 2];
+    s.f = [0u64; 2];
+    s.buf = [0u8; BLAKE2B_BLOCKBYTES];
+    s.buflen = 0;
+    s.outlen = 0;
+    s.last_node = 0;
+    for i in 0..8 {
+        s.h[i] = BLAKE2B_IV[i];
+    }
+}
+
+fn blake2b_param_bytes(p: &Blake2bParam) -> [u8; BLAKE2B_OUTBYTES] {
+    let mut out = [0u8; BLAKE2B_OUTBYTES];
+    out[0] = p.digest_length;
+    out[1] = p.key_length;
+    out[2] = p.fanout;
+    out[3] = p.depth;
+    out[4..8].copy_from_slice(&p.leaf_length.to_le_bytes());
+    out[8..12].copy_from_slice(&p.node_offset.to_le_bytes());
+    out[12..16].copy_from_slice(&p.xof_length.to_le_bytes());
+    out[16] = p.node_depth;
+    out[17] = p.inner_length;
+    out[18..32].copy_from_slice(&p.reserved);
+    out[32..48].copy_from_slice(&p.salt);
+    out[48..64].copy_from_slice(&p.personal);
+    out
+}
+
+fn g(v: &mut [u64; 16], m: &[u64; 16], r: usize, i: usize, a: usize, b: usize, c: usize, d: usize) {
+    v[a] = v[a]
+        .wrapping_add(v[b])
+        .wrapping_add(m[BLAKE2B_SIGMA[r][2 * i]]);
+    v[d] = rotr64(v[d] ^ v[a], 32);
+    v[c] = v[c].wrapping_add(v[d]);
+    v[b] = rotr64(v[b] ^ v[c], 24);
+    v[a] = v[a]
+        .wrapping_add(v[b])
+        .wrapping_add(m[BLAKE2B_SIGMA[r][2 * i + 1]]);
+    v[d] = rotr64(v[d] ^ v[a], 16);
+    v[c] = v[c].wrapping_add(v[d]);
+    v[b] = rotr64(v[b] ^ v[c], 63);
+}
+
+fn round(v: &mut [u64; 16], m: &[u64; 16], r: usize) {
+    g(v, m, r, 0, 0, 4, 8, 12);
+    g(v, m, r, 1, 1, 5, 9, 13);
+    g(v, m, r, 2, 2, 6, 10, 14);
+    g(v, m, r, 3, 3, 7, 11, 15);
+    g(v, m, r, 4, 0, 5, 10, 15);
+    g(v, m, r, 5, 1, 6, 11, 12);
+    g(v, m, r, 6, 2, 7, 8, 13);
+    g(v, m, r, 7, 3, 4, 9, 14);
+}
+
+fn blake2b_compress(s: &mut Blake2bState, block: &[u8; BLAKE2B_BLOCKBYTES]) {
+    let mut m = [0u64; 16];
+    let mut v = [0u64; 16];
+
+    for i in 0..16 {
+        m[i] = load64(&block[i * 8..i * 8 + 8]);
+    }
+    for i in 0..8 {
+        v[i] = s.h[i];
+    }
+    v[8] = BLAKE2B_IV[0];
+    v[9] = BLAKE2B_IV[1];
+    v[10] = BLAKE2B_IV[2];
+    v[11] = BLAKE2B_IV[3];
+    v[12] = BLAKE2B_IV[4] ^ s.t[0];
+    v[13] = BLAKE2B_IV[5] ^ s.t[1];
+    v[14] = BLAKE2B_IV[6] ^ s.f[0];
+    v[15] = BLAKE2B_IV[7] ^ s.f[1];
+
+    for r in 0..12 {
+        round(&mut v, &m, r);
+    }
+
+    for i in 0..8 {
+        s.h[i] ^= v[i] ^ v[i + 8];
+    }
+}
+
+pub fn blake2b_init(state: &mut Blake2bState, outlen: usize) -> i32 {
+    if outlen == 0 || outlen > BLAKE2B_OUTBYTES {
+        return -1;
+    }
+
+    let mut p = Blake2bParam {
+        digest_length: outlen as u8,
+        key_length: 0,
+        fanout: 1,
+        depth: 1,
+        leaf_length: 0,
+        node_offset: 0,
+        xof_length: 0,
+        node_depth: 0,
+        inner_length: 0,
+        reserved: [0u8; 14],
+        salt: [0u8; BLAKE2B_SALTBYTES],
+        personal: [0u8; BLAKE2B_PERSONALBYTES],
+    };
+
+    let mut tmp = [0u8; 4];
+    store32(&mut tmp, 0);
+    p.leaf_length = u32::from_le_bytes(tmp);
+    store32(&mut tmp, 0);
+    p.node_offset = u32::from_le_bytes(tmp);
+    store32(&mut tmp, 0);
+    p.xof_length = u32::from_le_bytes(tmp);
+
+    for i in 0..BLAKE2B_PERSONALBYTES {
+        p.personal[i] = DEFAULT_PERSONAL[i];
+    }
+
+    blake2b_init_param(state, &p)
+}
+
+pub fn blake2b_init_key(state: &mut Blake2bState, outlen: usize, key: &[u8]) -> i32 {
+    let keylen = key.len();
+    if outlen == 0 || outlen > BLAKE2B_OUTBYTES {
+        return -1;
+    }
+    if keylen == 0 || keylen > BLAKE2B_KEYBYTES {
+        return -1;
+    }
+
+    let p = Blake2bParam {
+        digest_length: outlen as u8,
+        key_length: keylen as u8,
+        fanout: 1,
+        depth: 1,
+        leaf_length: 0,
+        node_offset: 0,
+        xof_length: 0,
+        node_depth: 0,
+        inner_length: 0,
+        reserved: [0u8; 14],
+        salt: [0u8; BLAKE2B_SALTBYTES],
+        personal: [0u8; BLAKE2B_PERSONALBYTES],
+    };
+
+    if blake2b_init_param(state, &p) < 0 {
+        return -1;
+    }
+
+    let mut block = [0u8; BLAKE2B_BLOCKBYTES];
+    block[..keylen].copy_from_slice(key);
+    blake2b_update(state, &block);
+    secure_zero_memory(&mut block);
+    0
+}
+
+pub fn blake2b_init_param(state: &mut Blake2bState, param: &Blake2bParam) -> i32 {
+    let p = blake2b_param_bytes(param);
+    blake2b_init0(state);
+    for i in 0..8 {
+        state.h[i] ^= load64(&p[i * 8..(i + 1) * 8]);
+    }
+    state.outlen = param.digest_length as usize;
+    0
+}
+
+pub fn blake2b_update(state: &mut Blake2bState, input: &[u8]) -> i32 {
+    let mut in_offset = 0usize;
+    let mut inlen = input.len();
+
+    if inlen > 0 {
+        let left = state.buflen;
+        let fill = BLAKE2B_BLOCKBYTES - left;
+
+        if inlen > fill {
+            state.buflen = 0;
+            state.buf[left..left + fill].copy_from_slice(&input[in_offset..in_offset + fill]);
+            blake2b_increment_counter(state, BLAKE2B_BLOCKBYTES as u64);
+
+            let block = state.buf;
+            blake2b_compress(state, &block);
+
+            in_offset += fill;
+            inlen -= fill;
+
+            while inlen > BLAKE2B_BLOCKBYTES {
+                blake2b_increment_counter(state, BLAKE2B_BLOCKBYTES as u64);
+                let mut block = [0u8; BLAKE2B_BLOCKBYTES];
+                block.copy_from_slice(&input[in_offset..in_offset + BLAKE2B_BLOCKBYTES]);
+                blake2b_compress(state, &block);
+                in_offset += BLAKE2B_BLOCKBYTES;
+                inlen -= BLAKE2B_BLOCKBYTES;
+            }
+        }
+
+        state.buf[state.buflen..state.buflen + inlen]
+            .copy_from_slice(&input[in_offset..in_offset + inlen]);
+        state.buflen += inlen;
+    }
+
+    0
+}
+
+pub fn blake2b_final(state: &mut Blake2bState, out: &mut [u8]) -> i32 {
+    let mut buffer = [0u8; BLAKE2B_OUTBYTES];
+
+    if out.len() < state.outlen {
+        return -1;
+    }
+    if blake2b_is_lastblock(state) {
+        return -1;
+    }
+
+    blake2b_increment_counter(state, state.buflen as u64);
+    blake2b_set_lastblock(state);
+
+    for i in state.buflen..BLAKE2B_BLOCKBYTES {
+        state.buf[i] = 0;
+    }
+
+    let block = state.buf;
+    blake2b_compress(state, &block);
+
+    for i in 0..8 {
+        store64(&mut buffer[i * 8..(i + 1) * 8], state.h[i]);
+    }
+
+    out[..state.outlen].copy_from_slice(&buffer[..state.outlen]);
+    secure_zero_memory(&mut buffer);
+    0
+}
+
+pub fn blake2b(out: &mut [u8], input: &[u8], key: Option<&[u8]>) -> i32 {
+    let outlen = out.len();
+
+    if outlen == 0 || outlen > BLAKE2B_OUTBYTES {
+        return -1;
+    }
+
+    if let Some(k) = key {
+        if k.len() > BLAKE2B_KEYBYTES {
+            return -1;
+        }
+    }
+
+    let mut s = Blake2bState {
+        h: [0u64; 8],
+        t: [0u64; 2],
+        f: [0u64; 2],
+        buf: [0u8; BLAKE2B_BLOCKBYTES],
+        buflen: 0,
+        outlen: 0,
+        last_node: 0,
+    };
+
+    let init_ret = if let Some(k) = key {
+        if !k.is_empty() {
+            blake2b_init_key(&mut s, outlen, k)
+        } else {
+            blake2b_init(&mut s, outlen)
+        }
+    } else {
+        blake2b_init(&mut s, outlen)
+    };
+
+    if init_ret < 0 {
+        return -1;
+    }
+
+    blake2b_update(&mut s, input);
+    blake2b_final(&mut s, out);
+    0
+}
+
+pub fn blake2(out: &mut [u8], input: &[u8], key: Option<&[u8]>) -> i32 {
+    blake2b(out, input, key)
+}
+```
+
+{{merkle_tree.rs}}
+```rust
+// Generated Rust Code
+use std::sync::Mutex;
+
+pub const CBMT_NODE_SIZE: usize = 4;
+// pub const CBMT_NODE_SIZE: usize = 32;
+pub const CBMT_ERROR_OVER_CAPACITY: i32 = -1;
+pub const CBMT_ERROR_QUEUE_EMPTY: i32 = -2;
+pub const CBMT_ERROR_PROOF_ROOT: i32 = -3;
+pub const CBMT_ERROR_BUILD_PROOF: i32 = -4;
+pub const CBMT_ERROR_INVALID_CAPACITY: i32 = -5;
+pub const CBMT_ERROR_VERIFY_FAILED: i32 = -6;
+pub const CBMT_FATAL_BUILD_PROOF: i32 = -99;
+
+#[derive(Debug, Default)]
+pub struct CbmtBuffer<'a> {
+    pub data: &'a mut [u8],
+    pub capacity: usize,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CbmtNode {
+    pub bytes: [u8; CBMT_NODE_SIZE],
+}
+
+#[derive(Debug, Clone)]
+pub struct CbmtIndices {
+    pub values: Vec<u32>,
+    pub capacity: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct CbmtProof {
+    pub indices: CbmtIndices,
+    pub lemmas: Vec<CbmtNode>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CbmtTree {
+    pub nodes: Vec<CbmtNode>,
+    pub length: usize,
+    pub capacity: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct CbmtLeaves {
+    pub nodes: Vec<CbmtNode>,
+}
+
+#[derive(Debug)]
+pub struct CbmtQueue<'a> {
+    pub buffer: CbmtBuffer<'a>,
+    pub width: usize,
+    pub length: usize,
+    pub capacity: usize,
+    pub tail: usize,
+    pub head: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct CbmtNodePair {
+    pub index: u32,
+    pub node: CbmtNode,
+}
+
+pub type CbmtNodeMergeFn<Ctx> = fn(ctx: &mut Ctx, left: &CbmtNode, right: &CbmtNode) -> CbmtNode;
+
+fn cbmt_is_left(index: u32) -> bool {
+    (index & 1) == 1
+}
+
+fn cbmt_parent(index: u32) -> u32 {
+    if index == 0 {
+        0
+    } else {
+        (index - 1) >> 1
+    }
+}
+
+fn cbmt_sibling(index: u32) -> u32 {
+    if index == 0 {
+        0
+    } else {
+        ((index + 1) ^ 1) - 1
+    }
+}
+
+fn write_bytes_at(buf: &mut [u8], slot: usize, width: usize, item: &[u8]) {
+    let start = slot * width;
+    buf[start..start + width].copy_from_slice(&item[..width]);
+}
+
+pub fn cbmt_universal_swap(left: &mut [u8], right: &mut [u8], width: usize) {
+    let len = width.min(left.len()).min(right.len());
+    let mut i = 0usize;
+    while i < len {
+        let tmp = left[i];
+        left[i] = right[i];
+        right[i] = tmp;
+        i += 1;
+    }
+}
+
+pub fn cbmt_simple_bubble_sort<T>(slice: &mut [T], cmp: fn(&T, &T) -> i32) {
+    if slice.len() < 2 {
+        return;
+    }
+    for i in 0..(slice.len() - 1) {
+        for j in (i + 1)..slice.len() {
+            if cmp(&slice[i], &slice[j]) > 0 {
+                slice.swap(i, j);
+            }
+        }
+    }
+}
+
+pub fn cbmt_uint32_reverse_cmp(left: &u32, right: &u32) -> i32 {
+    right.wrapping_sub(*left) as i32
+}
+
+pub fn cbmt_buffer_init<'a>(buffer: &mut CbmtBuffer<'a>, data: &'a mut [u8]) {
+    buffer.data = data;
+    buffer.capacity = buffer.data.len();
+}
+
+pub fn cbmt_leaves_init(leaves: &mut CbmtLeaves, nodes: Vec<CbmtNode>) {
+    leaves.nodes = nodes;
+}
+
+pub fn cbmt_indices_init(indices: &mut CbmtIndices, values: Vec<u32>) {
+    indices.capacity = values.len();
+    indices.values = values;
+}
+
+pub fn cbmt_queue_init<'a>(
+    queue: &mut CbmtQueue<'a>,
+    buffer: CbmtBuffer<'a>,
+    width: usize,
+    capacity: usize,
+) -> i32 {
+    if capacity * width > buffer.capacity {
+        return CBMT_ERROR_OVER_CAPACITY;
+    }
+    if buffer.capacity % width != 0 {
+        return CBMT_ERROR_INVALID_CAPACITY;
+    }
+    queue.buffer = buffer;
+    queue.capacity = capacity;
+    queue.width = width;
+    queue.length = 0;
+    queue.head = 0;
+    queue.tail = 0;
+    0
+}
+
+pub fn cbmt_queue_push_back(queue: &mut CbmtQueue, item: &[u8]) -> i32 {
+    if queue.length >= queue.capacity {
+        return CBMT_ERROR_OVER_CAPACITY;
+    }
+    write_bytes_at(queue.buffer.data, queue.head, queue.width, item);
+    queue.head = (queue.head + 1) % queue.capacity;
+    queue.length += 1;
+    0
+}
+
+pub fn cbmt_queue_push_front(queue: &mut CbmtQueue, item: &[u8]) -> i32 {
+    if queue.length >= queue.capacity {
+        return CBMT_ERROR_OVER_CAPACITY;
+    }
+    queue.tail = (queue.tail + queue.capacity - 1) % queue.capacity;
+    write_bytes_at(queue.buffer.data, queue.tail, queue.width, item);
+    queue.length += 1;
+    0
+}
+
+pub fn cbmt_queue_pop_front(queue: &mut CbmtQueue, item: &mut [u8]) -> i32 {
+    if queue.length == 0 {
+        return CBMT_ERROR_QUEUE_EMPTY;
+    }
+    let start = queue.tail * queue.width;
+    item[..queue.width].copy_from_slice(&queue.buffer.data[start..start + queue.width]);
+    queue.tail = (queue.tail + 1) % queue.capacity;
+    queue.length -= 1;
+    0
+}
+
+pub fn cbmt_queue_front<'a>(queue: &'a CbmtQueue<'a>) -> Option<&'a [u8]> {
+    if queue.length == 0 {
+        return None;
+    }
+    let start = queue.tail * queue.width;
+    Some(&queue.buffer.data[start..start + queue.width])
+}
+
+pub fn cbmt_node_copy(dest: &mut CbmtNode, src: &CbmtNode) {
+    dest.bytes.copy_from_slice(&src.bytes);
+}
+
+pub fn cbmt_node_cmp(left: &CbmtNode, right: &CbmtNode) -> i32 {
+    let left_value = i32::from_le_bytes(left.bytes);
+    let right_value = i32::from_le_bytes(right.bytes);
+    left_value.wrapping_sub(right_value)
+}
+
+pub fn cbmt_node_pair_reverse_cmp(left: &CbmtNodePair, right: &CbmtNodePair) -> i32 {
+    right.index.wrapping_sub(left.index) as i32
+}
+
+pub fn cbmt_tree_build_proof(tree: &CbmtTree, leaf_indices: &CbmtIndices) -> Result<CbmtProof, i32> {
+    if tree.length == 0 || leaf_indices.values.is_empty() {
+        return Err(CBMT_ERROR_BUILD_PROOF);
+    }
+
+    let leaves_count = ((tree.length >> 1) + 1) as u32;
+    let mut queue: Vec<u32> = Vec::with_capacity(leaf_indices.values.len());
+
+    for &idx in &leaf_indices.values {
+        queue.push(idx + (leaves_count - 1));
+    }
+
+    cbmt_simple_bubble_sort(&mut queue, cbmt_uint32_reverse_cmp);
+
+    if queue.is_empty() {
+        return Err(CBMT_ERROR_BUILD_PROOF);
+    }
+
+    let first_value = queue[0];
+    if first_value >= ((leaves_count << 1) - 1) {
+        return Err(CBMT_ERROR_BUILD_PROOF);
+    }
+
+    let mut lemmas: Vec<CbmtNode> = Vec::new();
+
+    while !queue.is_empty() {
+        let index = queue.remove(0);
+        if index == 0 {
+            if !queue.is_empty() {
+                return Err(CBMT_FATAL_BUILD_PROOF);
+            }
+            break;
+        }
+
+        let sibling = cbmt_sibling(index);
+        if !queue.is_empty() && queue[0] == sibling {
+            queue.remove(0);
+        } else {
+            lemmas.push(tree.nodes[sibling as usize].clone());
+        }
+
+        let parent = cbmt_parent(index);
+        if parent != 0 {
+            queue.push(parent);
+        }
+    }
+
+    let mut indices = CbmtIndices {
+        values: leaf_indices
+            .values
+            .iter()
+            .map(|v| *v + (leaves_count - 1))
+            .collect(),
+        capacity: leaf_indices.capacity,
+    };
+
+    if indices.values.len() >= 2 {
+        for i in 0..(indices.values.len() - 1) {
+            for j in (i + 1)..indices.values.len() {
+                let left_index = indices.values[i] as usize;
+                let right_index = indices.values[j] as usize;
+                let order = cbmt_node_cmp(&tree.nodes[left_index], &tree.nodes[right_index]);
+                if order > 0 {
+                    indices.values.swap(i, j);
+                }
+            }
+        }
+    }
+
+    Ok(CbmtProof { indices, lemmas })
+}
+
+pub fn cbmt_tree_root(tree: &CbmtTree) -> CbmtNode {
+    if tree.length == 0 {
+        CbmtNode {
+            bytes: [0u8; CBMT_NODE_SIZE],
+        }
+    } else {
+        tree.nodes[0].clone()
+    }
+}
+
+pub fn cbmt_proof_root<Ctx>(
+    proof: &CbmtProof,
+    root: &mut CbmtNode,
+    leaves: &CbmtLeaves,
+    merge: CbmtNodeMergeFn<Ctx>,
+    merge_ctx: &mut Ctx,
+    _nodes_buffer: CbmtBuffer,
+    _pairs_buffer: CbmtBuffer,
+) -> i32 {
+    if leaves.nodes.len() != proof.indices.values.len() || leaves.nodes.is_empty() {
+        return CBMT_ERROR_PROOF_ROOT;
+    }
+
+    let mut leaves_clone = leaves.nodes.clone();
+    cbmt_simple_bubble_sort(&mut leaves_clone, cbmt_node_cmp);
+
+    let mut queue: Vec<CbmtNodePair> = Vec::with_capacity(leaves.nodes.len());
+    for (i, node) in leaves_clone.iter().enumerate() {
+        queue.push(CbmtNodePair {
+            index: proof.indices.values[i],
+            node: node.clone(),
+        });
+    }
+
+    cbmt_simple_bubble_sort(&mut queue, cbmt_node_pair_reverse_cmp);
+
+    let mut lemmas_offset = 0usize;
+
+    while !queue.is_empty() {
+        let pair_current = queue.remove(0);
+        let index = pair_current.index;
+        let node = pair_current.node;
+
+        if index == 0 {
+            if proof.lemmas.len() == lemmas_offset && queue.is_empty() {
+                cbmt_node_copy(root, &node);
+                return 0;
+            } else {
+                return CBMT_ERROR_PROOF_ROOT;
+            }
+        }
+
+        let sibling_opt = if !queue.is_empty() && queue[0].index == cbmt_sibling(index) {
+            Some(queue.remove(0).node)
+        } else if lemmas_offset < proof.lemmas.len() {
+            let n = proof.lemmas[lemmas_offset].clone();
+            lemmas_offset += 1;
+            Some(n)
+        } else {
+            None
+        };
+
+        if let Some(sibling) = sibling_opt {
+            let parent = if cbmt_is_left(index) {
+                merge(merge_ctx, &node, &sibling)
+            } else {
+                merge(merge_ctx, &sibling, &node)
+            };
+
+            queue.push(CbmtNodePair {
+                index: cbmt_parent(index),
+                node: parent,
+            });
+
+            cbmt_simple_bubble_sort(&mut queue, cbmt_node_pair_reverse_cmp);
+        }
+    }
+
+    0
+}
+
+type NoCtxMergeFn = fn(Option<&mut ()>, &CbmtNode, &CbmtNode) -> CbmtNode;
+
+static NOCTX_MERGE_FN: Mutex<Option<NoCtxMergeFn>> = Mutex::new(None);
+
+fn cbmt_noctx_merge_adapter(_ctx: &mut (), left: &CbmtNode, right: &CbmtNode) -> CbmtNode {
+    let merge_fn = get_noctx_merge_fn().unwrap_or(default_noctx_merge);
+    merge_fn(None, left, right)
+}
+
+fn default_noctx_merge(_ctx: Option<&mut ()>, _left: &CbmtNode, _right: &CbmtNode) -> CbmtNode {
+    CbmtNode::default()
+}
+
+fn set_noctx_merge_fn(f: NoCtxMergeFn) {
+    if let Ok(mut guard) = NOCTX_MERGE_FN.lock() {
+        *guard = Some(f);
+    }
+}
+
+fn clear_noctx_merge_fn() {
+    if let Ok(mut guard) = NOCTX_MERGE_FN.lock() {
+        *guard = None;
+    }
+}
+
+fn get_noctx_merge_fn() -> Option<NoCtxMergeFn> {
+    match NOCTX_MERGE_FN.lock() {
+        Ok(guard) => *guard,
+        Err(_) => None,
+    }
+}
+
+pub fn cbmt_proof_verify(
+    proof: &CbmtProof,
+    expected_root: &CbmtNode,
+    leaves: &CbmtLeaves,
+    merge: fn(Option<&mut ()>, &CbmtNode, &CbmtNode) -> CbmtNode,
+) -> i32 {
+    let mut target_root = CbmtNode::default();
+    let mut empty1 = [];
+    let mut empty2 = [];
+    let nodes_buffer = CbmtBuffer {
+        data: &mut empty1,
+        capacity: 0,
+    };
+    let pairs_buffer = CbmtBuffer {
+        data: &mut empty2,
+        capacity: 0,
+    };
+
+    set_noctx_merge_fn(merge);
+    let ret = cbmt_proof_root(
+        proof,
+        &mut target_root,
+        leaves,
+        cbmt_noctx_merge_adapter,
+        &mut (),
+        nodes_buffer,
+        pairs_buffer,
+    );
+    clear_noctx_merge_fn();
+
+    if ret != 0 {
+        return ret;
+    }
+    if target_root.bytes != expected_root.bytes {
+        return CBMT_ERROR_VERIFY_FAILED;
+    }
+    0
+}
+
+pub fn cbmt_build_merkle_root(
+    leaves: &CbmtLeaves,
+    merge: fn(Option<&mut ()>, &CbmtNode, &CbmtNode) -> CbmtNode,
+) -> Result<CbmtNode, i32> {
+    let length = leaves.nodes.len();
+    if length == 0 {
+        return Ok(CbmtNode {
+            bytes: [0u8; CBMT_NODE_SIZE],
+        });
+    }
+
+    let mut queue: Vec<CbmtNode> = Vec::with_capacity((length + 1) >> 1);
+
+    let mut i = length as isize - 1;
+    while i > 0 {
+        let left = &leaves.nodes[(i - 1) as usize];
+        let right = &leaves.nodes[i as usize];
+        let merged = merge(None, left, right);
+        queue.push(merged);
+        i -= 2;
+    }
+
+    if length % 2 == 1 {
+        queue.insert(0, leaves.nodes[0].clone());
+    }
+
+    while queue.len() > 1 {
+        let right = queue.remove(0);
+        let left = queue.remove(0);
+        let merged = merge(None, &left, &right);
+        queue.push(merged);
+    }
+
+    Ok(queue.remove(0))
+}
+
+pub fn cbmt_build_merkle_tree(
+    tree: &mut CbmtTree,
+    leaves: &CbmtLeaves,
+    merge: fn(Option<&mut ()>, &CbmtNode, &CbmtNode) -> CbmtNode,
+) -> i32 {
+    tree.capacity = leaves.nodes.len().saturating_mul(2).saturating_sub(1);
+    tree.nodes.clear();
+
+    if !leaves.nodes.is_empty() {
+        let length = leaves.nodes.len() * 2 - 1;
+        tree.length = length;
+        tree.nodes = vec![CbmtNode::default(); length];
+
+        let offset = leaves.nodes.len() - 1;
+        for i in 0..leaves.nodes.len() {
+            tree.nodes[offset + i] = leaves.nodes[i].clone();
+        }
+
+        for i in 0..(leaves.nodes.len() - 1) {
+            let rev_idx = leaves.nodes.len() - 2 - i;
+            let left = tree.nodes[(rev_idx << 1) + 1].clone();
+            let right = tree.nodes[(rev_idx << 1) + 2].clone();
+            tree.nodes[rev_idx] = merge(None, &left, &right);
+        }
+    } else {
+        tree.length = 0;
+    }
+
+    0
+}
+
+fn cbmt_build_tree_merge_adapter<Ctx>(
+    ctx: &mut BuildTreeMergeCtx<'_, Ctx>,
+    left: &CbmtNode,
+    right: &CbmtNode,
+) -> CbmtNode {
+    (ctx.merge)(ctx.merge_ctx, left, right)
+}
+
+struct BuildTreeMergeCtx<'a, Ctx> {
+    merge: CbmtNodeMergeFn<Ctx>,
+    merge_ctx: &'a mut Ctx,
+}
+
+pub fn cbmt_build_merkle_proof<Ctx>(
+    proof: &mut CbmtProof,
+    leaves: &CbmtLeaves,
+    leaf_indices: &CbmtIndices,
+    merge: CbmtNodeMergeFn<Ctx>,
+    merge_ctx: &mut Ctx,
+    _nodes_buffer: CbmtBuffer,
+    _indices_buffer: CbmtBuffer,
+    _lemmas_buffer: CbmtBuffer,
+) -> i32 {
+    let mut tree = CbmtTree::default();
+
+    let mut adapter_ctx = BuildTreeMergeCtx { merge, merge_ctx };
+
+    let ret = cbmt_proof_build_tree_with_ctx(&mut tree, leaves, &mut adapter_ctx);
+    if ret != 0 {
+        ret
+    } else {
+        match cbmt_tree_build_proof(&tree, leaf_indices) {
+            Ok(p) => {
+                *proof = p;
+                0
+            }
+            Err(e) => e,
+        }
+    }
+}
+
+fn cbmt_proof_build_tree_with_ctx<Ctx>(
+    tree: &mut CbmtTree,
+    leaves: &CbmtLeaves,
+    adapter_ctx: &mut BuildTreeMergeCtx<'_, Ctx>,
+) -> i32 {
+    tree.capacity = leaves.nodes.len().saturating_mul(2).saturating_sub(1);
+    tree.nodes.clear();
+
+    if !leaves.nodes.is_empty() {
+        let length = leaves.nodes.len() * 2 - 1;
+        tree.length = length;
+        tree.nodes = vec![CbmtNode::default(); length];
+
+        let offset = leaves.nodes.len() - 1;
+        for i in 0..leaves.nodes.len() {
+            tree.nodes[offset + i] = leaves.nodes[i].clone();
+        }
+
+        for i in 0..(leaves.nodes.len() - 1) {
+            let rev_idx = leaves.nodes.len() - 2 - i;
+            let left = tree.nodes[(rev_idx << 1) + 1].clone();
+            let right = tree.nodes[(rev_idx << 1) + 2].clone();
+            tree.nodes[rev_idx] = cbmt_build_tree_merge_adapter(adapter_ctx, &left, &right);
+        }
+    } else {
+        tree.length = 0;
+    }
+
+    0
+}
+```
+
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod blake2b;
+pub mod merkle_tree;
+```

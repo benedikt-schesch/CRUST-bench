@@ -1,0 +1,984 @@
+ {{mvptree.rs}}
+```rust
+use std::fs::File;
+use std::io::{self, Write, Read, Seek, SeekFrom};
+use std::ptr;
+use std::os::raw::c_int;
+use std::sync::Arc;
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::mem;
+
+pub const TAG: &str = "phashmvp2010";
+pub const VERSION: u32 = 0x01000000;
+pub const HEADER_SIZE: usize = 32;
+pub const FILE_OFFSET_BITS: usize = 64;
+pub const ERROR_MSGS: [&str; 25] = [
+    "no error",
+    "bad argument",
+    "no distance function found",
+    "mem alloc error",
+    "no leaf node created",
+    "no internal node created",
+    "no path array alloc'd",
+    "could not select vantage points",
+    "could not calculate range from an sv1",
+    "could not calculate range from an sv2",
+    "points too compact",
+    "could not sort points",
+    "could not open file",
+    "could not close file",
+    "mmap error",
+    "unmap error",
+    "no write",
+    "could not extend file",
+    "could not remap file",
+    "datatypes in conflict",
+    "no. retrieved exceeds k",
+    "empty tree",
+    "distance value either NaN or less than zero",
+    "could not open file",
+    "unrecognized node",
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MVPDataType {
+    ByteArray = 1,
+    UInt16Array = 2,
+    UInt32Array = 4,
+    UInt64Array = 8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeType {
+    InternalNode = 1,
+    LeafNode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MVPError {
+    Success,
+    ArgErr,
+    NoDistanceFunc,
+    MemAlloc,
+    NoLeaf,
+    NoInternal,
+    PathAlloc,
+    VpNoSelect,
+    NoSv1Range,
+    NoSv2Range,
+    NoSpace,
+    NoSort,
+    FileOpen,
+    FileClose,
+    MemMap,
+    Munmap,
+    NoWrite,
+    FileTruncate,
+    MremapFail,
+    TypeMismatch,
+    KNearestCap,
+    EmptyTree,
+    NoSplits,
+    BadDistVal,
+    FileNotFound,
+    Unrecognized,
+}
+
+#[derive(Debug, Clone)]
+pub struct MVPDatapoint {
+    pub id: String,
+    pub data: Vec<u8>,
+    pub path: Vec<f32>,
+    pub datalen: usize,
+    pub data_type: MVPDataType,
+}
+
+pub type DistanceFunction = fn(&MVPDatapoint, &MVPDatapoint) -> f32;
+
+pub struct InternalNode {
+    pub node_type: NodeType,
+    pub sv1: Option<Arc<MVPDatapoint>>,
+    pub sv2: Option<Arc<MVPDatapoint>>,
+    pub m1: Vec<f32>,
+    pub m2: Vec<f32>,
+    pub child_nodes: Vec<Option<Rc<RefCell<Node>>>>,
+}
+
+impl InternalNode {
+    pub fn new(bf: u32) -> Self {
+        let bf = bf as usize;
+        let length_m1 = bf.saturating_sub(1);
+        let length_m2 = length_m1 * bf;
+        let fanout = bf * bf;
+        
+        InternalNode {
+            node_type: NodeType::InternalNode,
+            sv1: None,
+            sv2: None,
+            m1: vec![0.0; length_m1],
+            m2: vec![0.0; length_m2],
+            child_nodes: vec![None; fanout],
+        }
+    }
+}
+
+pub struct LeafNode {
+    pub node_type: NodeType,
+    pub sv1: Option<Arc<MVPDatapoint>>,
+    pub sv2: Option<Arc<MVPDatapoint>>,
+    pub points: Vec<Option<Arc<MVPDatapoint>>>,
+    pub d1: Vec<f32>,
+    pub d2: Vec<f32>,
+    pub nbpoints: usize,
+}
+
+impl LeafNode {
+    pub fn new(leafcap: u32) -> Self {
+        let capacity = leafcap as usize;
+        LeafNode {
+            node_type: NodeType::LeafNode,
+            sv1: None,
+            sv2: None,
+            points: vec![None; capacity],
+            d1: vec![0.0; capacity],
+            d2: vec![0.0; capacity],
+            nbpoints: 0,
+        }
+    }
+}
+
+pub enum Node {
+    Leaf(LeafNode),
+    Internal(InternalNode),
+}
+
+pub struct MVPTree {
+    pub branch_factor: usize,
+    pub path_length: usize,
+    pub leaf_capacity: usize,
+    pub datatype: MVPDataType,
+    pub pos: i64,
+    pub size: i64,
+    pub pgsize: i64,
+    pub buf: Vec<u8>,
+    pub node: Option<Rc<RefCell<Node>>>,
+    pub distance_function: DistanceFunction,
+    pub knearest: usize,
+}
+
+impl MVPTree {
+    pub fn new(branch_factor: usize, path_length: usize, leaf_capacity: usize, datatype: MVPDataType, distance_function: DistanceFunction) -> Self {
+        MVPTree {
+            branch_factor,
+            path_length,
+            leaf_capacity,
+            datatype,
+            pos: 0,
+            size: 0,
+            pgsize: 4096,
+            buf: Vec::new(),
+            node: None,
+            distance_function,
+            knearest: 0,
+        }
+    }
+
+    fn is_nan(x: f32) -> bool {
+        x != x
+    }
+
+    fn select_vantage_points(&self, points: &[Arc<MVPDatapoint>]) -> Result<(usize, usize), MVPError> {
+        let nb = points.len();
+        if nb == 0 {
+            return Err(MVPError::VpNoSelect);
+        }
+        
+        let mut sv1_pos = 0;
+        let mut sv2_pos = 0;
+        let mut max_dist = 0.0f32;
+        
+        for i in 0..nb {
+            for j in (i + 1)..nb {
+                let d = (self.distance_function)(&points[i], &points[j]);
+                if Self::is_nan(d) || d < 0.0 {
+                    return Err(MVPError::BadDistVal);
+                }
+                if d > max_dist {
+                    max_dist = d;
+                    sv1_pos = i;
+                    sv2_pos = j;
+                }
+            }
+        }
+        
+        Ok((sv1_pos, sv2_pos))
+    }
+
+    fn find_distance_range_for_vp(&self, points: &mut [Arc<MVPDatapoint>], vp: &MVPDatapoint, lvl: usize) -> Result<(), MVPError> {
+        for point in points.iter_mut() {
+            let d = (self.distance_function)(point, vp);
+            if Self::is_nan(d) || d < 0.0 {
+                return Err(MVPError::BadDistVal);
+            }
+            if lvl < self.path_length {
+                let point_mut = Arc::make_mut(point);
+                if point_mut.path.len() <= lvl {
+                    point_mut.path.resize(lvl + 1, 0.0);
+                }
+                point_mut.path[lvl] = d;
+            }
+        }
+        Ok(())
+    }
+
+    fn find_splits(&self, points: &[Arc<MVPDatapoint>], vp: &MVPDatapoint, length_m: usize) -> Result<Vec<f32>, MVPError> {
+        let nb = points.len();
+        if nb == 0 || length_m == 0 {
+            return Ok(vec![]);
+        }
+        
+        let mut dists: Vec<f32> = points.iter()
+            .map(|p| {
+                let d = (self.distance_function)(p, vp);
+                if Self::is_nan(d) || d < 0.0 {
+                    f32::NAN
+                } else {
+                    d
+                }
+            })
+            .collect();
+        
+        if dists.iter().any(|&d| Self::is_nan(d)) {
+            return Err(MVPError::BadDistVal);
+        }
+        
+        dists.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        
+        let mut m = vec![0.0; length_m];
+        for i in 0..length_m {
+            let index = ((i + 1) * nb / (length_m + 1)).max(0).min(nb - 1);
+            m[i] = dists[index];
+        }
+        
+        Ok(m)
+    }
+
+    fn sort_points(&self, points: &[Arc<MVPDatapoint>], sv1_pos: usize, sv2_pos: usize, vp: &MVPDatapoint, pivots: &[f32]) -> Result<(Vec<Vec<Arc<MVPDatapoint>>>, Vec<usize>), MVPError> {
+        let bf = self.branch_factor;
+        let length_m1 = bf.saturating_sub(1);
+        
+        let mut bins: Vec<Vec<Arc<MVPDatapoint>>> = vec![Vec::new(); bf];
+        let mut counts = vec![0; bf];
+        
+        for (i, point) in points.iter().enumerate() {
+            if i == sv1_pos || i == sv2_pos {
+                continue;
+            }
+            
+            let d = (self.distance_function)(vp, point);
+            if Self::is_nan(d) || d < 0.0 {
+                return Err(MVPError::BadDistVal);
+            }
+            
+            let mut placed = false;
+            for k in 0..length_m1 {
+                if d <= pivots[k] {
+                    bins[k].push(Arc::clone(point));
+                    counts[k] += 1;
+                    placed = true;
+                    break;
+                }
+            }
+            
+            if !placed {
+                bins[length_m1].push(Arc::clone(point));
+                counts[length_m1] += 1;
+            }
+        }
+        
+        Ok((bins, counts))
+    }
+
+    fn mvptree_add_internal(&self, node: Option<Rc<RefCell<Node>>>, points: &mut [Arc<MVPDatapoint>], lvl: usize) -> Result<Option<Rc<RefCell<Node>>>, MVPError> {
+        if points.is_empty() {
+            return Ok(node);
+        }
+        
+        let nbpoints = points.len();
+        let bf = self.branch_factor;
+        let length_m1 = bf.saturating_sub(1);
+        
+        if node.is_none() {
+            if nbpoints <= self.leaf_capacity + 2 {
+                let new_node = Rc::new(RefCell::new(Node::Leaf(LeafNode::new(self.leaf_capacity as u32))));
+                let mut node_ref = new_node.borrow_mut();
+                
+                if let Node::Leaf(ref mut leaf) = *node_ref {
+                    let (sv1_pos, sv2_pos) = self.select_vantage_points(points)?;
+                    
+                    leaf.sv1 = Some(Arc::clone(&points[sv1_pos]));
+                    leaf.sv2 = if nbpoints > 1 && sv2_pos < nbpoints {
+                        Some(Arc::clone(&points[sv2_pos]))
+                    } else {
+                        None
+                    };
+                    
+                    self.find_distance_range_for_vp(points, leaf.sv1.as_ref().unwrap(), lvl)?;
+                    if leaf.sv2.is_some() {
+                        self.find_distance_range_for_vp(points, leaf.sv2.as_ref().unwrap(), lvl + 1)?;
+                    }
+                    
+                    let mut count = 0;
+                    for (i, point) in points.iter().enumerate() {
+                        if i == sv1_pos || i == sv2_pos {
+                            continue;
+                        }
+                        if count < self.leaf_capacity {
+                            leaf.d1[count] = (self.distance_function)(point, leaf.sv1.as_ref().unwrap());
+                            leaf.d2[count] = if let Some(ref sv2) = leaf.sv2 {
+                                (self.distance_function)(point, sv2)
+                            } else {
+                                0.0
+                            };
+                            leaf.points[count] = Some(Arc::clone(point));
+                            count += 1;
+                        }
+                    }
+                    leaf.nbpoints = count;
+                }
+                
+                drop(node_ref);
+                return Ok(Some(new_node));
+            } else {
+                let new_node = Rc::new(RefCell::new(Node::Internal(InternalNode::new(bf as u32))));
+                let mut node_ref = new_node.borrow_mut();
+                
+                if let Node::Internal(ref mut internal) = *node_ref {
+                    let (sv1_pos, sv2_pos) = self.select_vantage_points(points)?;
+                    
+                    internal.sv1 = Some(Arc::clone(&points[sv1_pos]));
+                    internal.sv2 = Some(Arc::clone(&points[sv2_pos]));
+                    
+                    self.find_distance_range_for_vp(points, internal.sv1.as_ref().unwrap(), lvl)?;
+                    
+                    let m1 = self.find_splits(points, internal.sv1.as_ref().unwrap(), length_m1)?;
+                    internal.m1 = m1.clone();
+                    
+                    let (bins, _counts) = self.sort_points(points, sv1_pos, sv2_pos, internal.sv1.as_ref().unwrap(), &m1)?;
+                    
+                    for i in 0..bf {
+                        if i >= bins.len() {
+                            continue;
+                        }
+                        let mut bin_points: Vec<Arc<MVPDatapoint>> = bins[i].clone();
+                        
+                        if !bin_points.is_empty() {
+                            self.find_distance_range_for_vp(&mut bin_points, internal.sv2.as_ref().unwrap(), lvl + 1)?;
+                            
+                            let m2_slice_start = i * length_m1;
+                            let m2_slice_end = m2_slice_start + length_m1;
+                            let m2_pivots = if m2_slice_end <= internal.m2.len() {
+                                &internal.m2[m2_slice_start..m2_slice_end]
+                            } else {
+                                &[]
+                            };
+                            
+                            let (bins2, _counts2) = self.sort_points(&bin_points, usize::MAX, usize::MAX, internal.sv2.as_ref().unwrap(), m2_pivots)?;
+                            
+                            for j in 0..bf {
+                                if j >= bins2.len() {
+                                    continue;
+                                }
+                                let child = self.mvptree_add_internal(None, &mut bins2[j].clone(), lvl + 2)?;
+                                let idx = i * bf + j;
+                                if idx < internal.child_nodes.len() {
+                                    internal.child_nodes[idx] = child;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                drop(node_ref);
+                return Ok(Some(new_node));
+            }
+        } else {
+            let existing = node.unwrap();
+            let mut node_ref = existing.borrow_mut();
+            
+            match &mut *node_ref {
+                Node::Leaf(leaf) => {
+                    if leaf.nbpoints + nbpoints <= self.leaf_capacity {
+                        if let Some(ref sv1) = leaf.sv1 {
+                            self.find_distance_range_for_vp(points, sv1, lvl)?;
+                        }
+                        
+                        let mut pos = 0;
+                        if leaf.sv2.is_none() && !points.is_empty() {
+                            leaf.sv2 = Some(Arc::clone(&points[0]));
+                            pos = 1;
+                        }
+                        
+                        if let Some(ref sv2) = leaf.sv2 {
+                            self.find_distance_range_for_vp(points, sv2, lvl + 1)?;
+                        }
+                        
+                        let mut count = leaf.nbpoints;
+                        for i in pos..nbpoints {
+                            if count >= self.leaf_capacity {
+                                break;
+                            }
+                            if let Some(ref sv1) = leaf.sv1 {
+                                leaf.d1[count] = (self.distance_function)(&points[i], sv1);
+                            }
+                            if let Some(ref sv2) = leaf.sv2 {
+                                leaf.d2[count] = (self.distance_function)(&points[i], sv2);
+                            }
+                            leaf.points[count] = Some(Arc::clone(&points[i]));
+                            count += 1;
+                        }
+                        leaf.nbpoints = count;
+                    } else {
+                        let mut new_points: Vec<Arc<MVPDatapoint>> = Vec::new();
+                        
+                        if let Some(ref sv1) = leaf.sv1 {
+                            new_points.push(Arc::clone(sv1));
+                        }
+                        if let Some(ref sv2) = leaf.sv2 {
+                            new_points.push(Arc::clone(sv2));
+                        }
+                        
+                        for i in 0..leaf.nbpoints {
+                            if let Some(ref p) = leaf.points[i] {
+                                new_points.push(Arc::clone(p));
+                            }
+                        }
+                        
+                        for point in points.iter() {
+                            new_points.push(Arc::clone(point));
+                        }
+                        
+                        drop(node_ref);
+                        return self.mvptree_add_internal(None, &mut new_points, lvl);
+                    }
+                },
+                Node::Internal(internal) => {
+                    if let Some(ref sv1) = internal.sv1 {
+                        self.find_distance_range_for_vp(points, sv1, lvl)?;
+                    }
+                    
+                    let m1 = if internal.m1.len() == length_m1 {
+                        internal.m1.clone()
+                    } else {
+                        vec![0.0; length_m1]
+                    };
+                    
+                    let (bins, _counts) = self.sort_points(points, usize::MAX, usize::MAX, internal.sv1.as_ref().unwrap(), &m1)?;
+                    
+                    for i in 0..bf {
+                        if i >= bins.len() || bins[i].is_empty() {
+                            continue;
+                        }
+                        
+                        let mut bin_points = bins[i].clone();
+                        
+                        if let Some(ref sv2) = internal.sv2 {
+                            self.find_distance_range_for_vp(&mut bin_points, sv2, lvl + 1)?;
+                        }
+                        
+                        let m2_slice_start = i * length_m1;
+                        let m2_slice_end = m2_slice_start + length_m1;
+                        let m2_pivots = if m2_slice_end <= internal.m2.len() {
+                            &internal.m2[m2_slice_start..m2_slice_end]
+                        } else {
+                            &[]
+                        };
+                        
+                        let (bins2, _counts2) = self.sort_points(&bin_points, usize::MAX, usize::MAX, internal.sv2.as_ref().unwrap(), m2_pivots)?;
+                        
+                        for j in 0..bf {
+                            if j >= bins2.len() {
+                                continue;
+                            }
+                            let idx = i * bf + j;
+                            if idx >= internal.child_nodes.len() {
+                                continue;
+                            }
+                            
+                            let child_node = internal.child_nodes[idx].clone();
+                            let new_child = self.mvptree_add_internal(child_node, &mut bins2[j].clone(), lvl + 2)?;
+                            internal.child_nodes[idx] = new_child;
+                        }
+                    }
+                }
+            }
+            
+            drop(node_ref);
+            return Ok(Some(existing));
+        }
+    }
+
+    pub fn add(&mut self, points: Vec<MVPDatapoint>) -> MVPError {
+        if points.is_empty() {
+            return MVPError::Success;
+        }
+        
+        if self.datatype as u8 == 0 {
+            self.datatype = points[0].data_type;
+        }
+        
+        if points[0].data_type != self.datatype {
+            return MVPError::TypeMismatch;
+        }
+        
+        let mut arc_points: Vec<Arc<MVPDatapoint>> = points.into_iter()
+            .map(|mut p| {
+                p.path = vec![0.0; self.path_length];
+                Arc::new(p)
+            })
+            .collect();
+        
+        match self.mvptree_add_internal(self.node.clone(), &mut arc_points, 0) {
+            Ok(new_node) => {
+                self.node = new_node;
+                MVPError::Success
+            },
+            Err(e) => e
+        }
+    }
+
+    fn mvptree_retrieve_internal(&self, node: &Node, target: &mut MVPDatapoint, radius: f32, results: &mut Vec<Arc<MVPDatapoint>>, lvl: usize) -> Result<(), MVPError> {
+        let bf = self.branch_factor;
+        let length_m1 = bf.saturating_sub(1);
+        
+        match node {
+            Node::Leaf(leaf) => {
+                if let Some(ref sv1) = leaf.sv1 {
+                    let d1 = (self.distance_function)(target, sv1);
+                    if Self::is_nan(d1) || d1 < 0.0 {
+                        return Err(MVPError::BadDistVal);
+                    }
+                    
+                    if lvl < self.path_length {
+                        if target.path.len() <= lvl {
+                            target.path.resize(lvl + 1, 0.0);
+                        }
+                        target.path[lvl] = d1;
+                    }
+                    
+                    if d1 <= radius {
+                        results.push(Arc::clone(sv1));
+                        if results.len() >= self.knearest {
+                            return Err(MVPError::KNearestCap);
+                        }
+                    }
+                    
+                    if let Some(ref sv2) = leaf.sv2 {
+                        let d2 = (self.distance_function)(target, sv2);
+                        if Self::is_nan(d2) || d2 < 0.0 {
+                            return Err(MVPError::BadDistVal);
+                        }
+                        
+                        if d2 <= radius {
+                            results.push(Arc::clone(sv2));
+                            if results.len() >= self.knearest {
+                                return Err(MVPError::KNearestCap);
+                            }
+                        }
+                        
+                        if lvl + 1 < self.path_length {
+                            if target.path.len() <= lvl + 1 {
+                                target.path.resize(lvl + 2, 0.0);
+                            }
+                            target.path[lvl + 1] = d2;
+                        }
+                        
+                        for i in 0..leaf.nbpoints {
+                            if let Some(ref point) = leaf.points[i] {
+                                if d1 - radius <= leaf.d1[i] && d1 + radius >= leaf.d1[i] {
+                                    if d2 - radius <= leaf.d2[i] && d2 + radius >= leaf.d2[i] {
+                                        let endpath = (lvl + 1).min(self.path_length);
+                                        let mut skip = false;
+                                        
+                                        for j in 0..endpath {
+                                            if target.path[j] - radius <= point.path[j] &&
+                                               target.path[j] + radius >= point.path[j] {
+                                                continue;
+                                            } else {
+                                                skip = true;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        if !skip {
+                                            let d = (self.distance_function)(target, point);
+                                            if Self::is_nan(d) || d < 0.0 {
+                                                return Err(MVPError::BadDistVal);
+                                            }
+                                            if d <= radius {
+                                                results.push(Arc::clone(point));
+                                                if results.len() >= self.knearest {
+                                                    return Err(MVPError::KNearestCap);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            Node::Internal(internal) => {
+                if let Some(ref sv1) = internal.sv1 {
+                    let d1 = (self.distance_function)(target, sv1);
+                    if Self::is_nan(d1) || d1 < 0.0 {
+                        return Err(MVPError::BadDistVal);
+                    }
+                    
+                    if d1 <= radius {
+                        results.push(Arc::clone(sv1));
+                        if results.len() >= self.knearest {
+                            return Err(MVPError::KNearestCap);
+                        }
+                    }
+                    
+                    if lvl < self.path_length {
+                        if target.path.len() <= lvl {
+                            target.path.resize(lvl + 1, 0.0);
+                        }
+                        target.path[lvl] = d1;
+                    }
+                    
+                    if let Some(ref sv2) = internal.sv2 {
+                        let d2 = (self.distance_function)(target, sv2);
+                        if Self::is_nan(d2) || d2 < 0.0 {
+                            return Err(MVPError::BadDistVal);
+                        }
+                        
+                        if d2 <= radius {
+                            results.push(Arc::clone(sv2));
+                            if results.len() >= self.knearest {
+                                return Err(MVPError::KNearestCap);
+                            }
+                        }
+                        
+                        if lvl + 1 < self.path_length {
+                            if target.path.len() <= lvl + 1 {
+                                target.path.resize(lvl + 2, 0.0);
+                            }
+                            target.path[lvl + 1] = d2;
+                        }
+                        
+                        for i in 0..length_m1 {
+                            if d1 - radius <= internal.m1[i] {
+                                for j in 0..length_m1 {
+                                    if d2 - radius <= internal.m2[i * length_m1 + j] {
+                                        let idx = i * bf + j;
+                                        if let Some(ref child) = internal.child_nodes[idx] {
+                                            if let Err(e) = self.mvptree_retrieve_internal(&*child.borrow(), target, radius, results, lvl + 2) {
+                                                if e == MVPError::KNearestCap {
+                                                    return Err(e);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                let last_m2_idx = i * length_m1 + length_m1 - 1;
+                                if last_m2_idx < internal.m2.len() && d2 + radius >= internal.m2[last_m2_idx] {
+                                    let idx = i * bf + length_m1;
+                                    if let Some(ref child) = internal.child_nodes[idx] {
+                                        if let Err(e) = self.mvptree_retrieve_internal(&*child.borrow(), target, radius, results, lvl + 2) {
+                                            if e == MVPError::KNearestCap {
+                                                return Err(e);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        let last_m1_idx = length_m1 - 1;
+                        if last_m1_idx < internal.m1.len() && d1 + radius >= internal.m1[last_m1_idx] {
+                            for j in 0..length_m1 {
+                                let m2_idx = length_m1 * length_m1 + j;
+                                if m2_idx < internal.m2.len() && d2 - radius <= internal.m2[m2_idx] {
+                                    let idx = bf * length_m1 + j;
+                                    if let Some(ref child) = internal.child_nodes[idx] {
+                                        if let Err(e) = self.mvptree_retrieve_internal(&*child.borrow(), target, radius, results, lvl + 2) {
+                                            if e == MVPError::KNearestCap {
+                                                return Err(e);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            let last_m2_idx = length_m1 * length_m1 + length_m1 - 1;
+                            if last_m2_idx < internal.m2.len() && d2 + radius >= internal.m2[last_m2_idx] {
+                                let idx = bf * length_m1 + length_m1;
+                                if let Some(ref child) = internal.child_nodes[idx] {
+                                    if let Err(e) = self.mvptree_retrieve_internal(&*child.borrow(), target, radius, results, lvl + 2) {
+                                        if e == MVPError::KNearestCap {
+                                            return Err(e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    pub fn retrieve(&self, target: &MVPDatapoint, knearest: usize, radius: f32) -> Result<Vec<MVPDatapoint>, MVPError> {
+        if knearest == 0 || radius < 0.0 {
+            return Err(MVPError::ArgErr);
+        }
+        
+        if self.node.is_none() {
+            return Err(MVPError::EmptyTree);
+        }
+        
+        let mut target_copy = target.clone();
+        target_copy.path = vec![0.0; self.path_length];
+        
+        let mut results: Vec<Arc<MVPDatapoint>> = Vec::new();
+        
+        if let Err(e) = self.mvptree_retrieve_internal(&*self.node.as_ref().unwrap().borrow(), &mut target_copy, radius, &mut results, 0) {
+            if e != MVPError::KNearestCap {
+                return Err(e);
+            }
+        }
+        
+        let result_points: Vec<MVPDatapoint> = results.iter().map(|arc| (**arc).clone()).collect();
+        Ok(result_points)
+    }
+
+    fn write_datapoint(&self, dp: &MVPDatapoint, buf: &mut Vec<u8>, pos: &mut usize) -> i64 {
+        let start = *pos as i64;
+        
+        if buf.len() < *pos + 1 + 4 + 1 + 256 + 4 + dp.data.len() + self.path_length * 4 + 100 {
+            buf.resize(*pos + 1 + 4 + 1 + 256 + 4 + dp.data.len() + self.path_length * 4 + 100, 0);
+        }
+        
+        let active: u8 = 1;
+        let id_bytes = dp.id.as_bytes();
+        let idlen = id_bytes.len() as u8;
+        let datalen = dp.datalen as u32;
+        let bytelength = (1 + idlen as u32 + 4 + datalen * (self.datatype as u32) + (self.path_length as u32) * 4) as u32;
+        
+        buf[*pos] = active;
+        *pos += 1;
+        
+        buf[*pos..*pos + 4].copy_from_slice(&bytelength.to_le_bytes());
+        *pos += 4;
+        
+        buf[*pos] = idlen;
+        *pos += 1;
+        
+        buf[*pos..*pos + id_bytes.len()].copy_from_slice(id_bytes);
+        *pos += id_bytes.len();
+        
+        buf[*pos..*pos + 4].copy_from_slice(&datalen.to_le_bytes());
+        *pos += 4;
+        
+        buf[*pos..*pos + dp.data.len()].copy_from_slice(&dp.data);
+        *pos += dp.data.len();
+        
+        for i in 0..self.path_length {
+            if i < dp.path.len() {
+                buf[*pos..*pos + 4].copy_from_slice(&dp.path[i].to_le_bytes());
+            } else {
+                buf[*pos..*pos + 4].copy_from_slice(&0.0f32.to_le_bytes());
+            }
+            *pos += 4;
+        }
+        
+        start
+    }
+
+    fn mvptree_write_internal(&self, node: &Node, buf: &mut Vec<u8>, pos: &mut usize, lvl: usize) -> Result<i64, MVPError> {
+        let start_pos = *pos as i64;
+        
+        match node {
+            Node::Leaf(leaf) => {
+                let node_type: u8 = NodeType::LeafNode as u8;
+                
+                if buf.len() < *pos + 1 {
+                    buf.resize(*pos + self.pgsize as usize, 0);
+                }
+                
+                buf[*pos] = node_type;
+                *pos += 1;
+                
+                if let Some(ref sv1) = leaf.sv1 {
+                    self.write_datapoint(sv1, buf, pos);
+                } else {
+                    *pos += 5;
+                }
+                
+                if let Some(ref sv2) = leaf.sv2 {
+                    self.write_datapoint(sv2, buf, pos);
+                } else {
+                    *pos += 5;
+                }
+                
+                let nbpoints = leaf.nbpoints as u32;
+                if buf.len() < *pos + 4 {
+                    buf.resize(*pos + self.pgsize as usize, 0);
+                }
+                buf[*pos..*pos + 4].copy_from_slice(&nbpoints.to_le_bytes());
+                *pos += 4;
+                
+                let saved_pos = *pos;
+                *pos += self.leaf_capacity * (8 + 8);
+                
+                for i in 0..leaf.nbpoints {
+                    if let Some(ref point) = leaf.points[i] {
+                        if buf.len() < *pos + 100 {
+                            buf.resize(buf.len() + self.pgsize as usize, 0);
+                        }
+                        
+                        buf[saved_pos..saved_pos + 4].copy_from_slice(&leaf.d1[i].to_le_bytes());
+                        saved_pos += 4;
+                        buf[saved_pos..saved_pos + 4].copy_from_slice(&leaf.d2[i].to_le_bytes());
+                        saved_pos += 4;
+                        
+                        let offset = self.write_datapoint(point, buf, pos);
+                        buf[saved_pos..saved_pos + 8].copy_from_slice(&offset.to_le_bytes());
+                        saved_pos += 8;
+                    }
+                }
+            },
+            Node::Internal(internal) => {
+                let node_type: u8 = NodeType::InternalNode as u8;
+                let bf = self.branch_factor;
+                let length_m1 = bf - 1;
+                let length_m2 = (bf - 1) * bf;
+                let fanout = bf * bf;
+                
+                if buf.len() < *pos + 1 {
+                    buf.resize(*pos + self.pgsize as usize, 0);
+                }
+                
+                buf[*pos] = node_type;
+                *pos += 1;
+                
+                if let Some(ref sv1) = internal.sv1 {
+                    self.write_datapoint(sv1, buf, pos);
+                } else {
+                    *pos += 5;
+                }
+                
+                if let Some(ref sv2) = internal.sv2 {
+                    self.write_datapoint(sv2, buf, pos);
+                } else {
+                    *pos += 5;
+                }
+                
+                if buf.len() < *pos + length_m1 * 4 + length_m2 * 4 {
+                    buf.resize(*pos + length_m1 * 4 + length_m2 * 4 + self.pgsize as usize, 0);
+                }
+                
+                for i in 0..length_m1 {
+                    buf[*pos..*pos + 4].copy_from_slice(&internal.m1[i].to_le_bytes());
+                    *pos += 4;
+                }
+                
+                for i in 0..length_m2 {
+                    buf[*pos..*pos + 4].copy_from_slice(&internal.m2[i].to_le_bytes());
+                    *pos += 4;
+                }
+                
+                let saved_pos = *pos;
+                *pos += fanout * 9;
+                
+                for i in 0..fanout {
+                    if let Some(ref child) = internal.child_nodes[i] {
+                        let offset = self.mvptree_write_internal(&*child.borrow(), buf, pos, lvl + 2)?;
+                        buf[saved_pos] = 0u8;
+                        saved_pos += 1;
+                        buf[saved_pos..saved_pos + 8].copy_from_slice(&offset.to_le_bytes());
+                        saved_pos += 8;
+                    } else {
+                        buf[saved_pos] = 0u8;
+                        saved_pos += 1;
+                        buf[saved_pos..saved_pos + 8].copy_from_slice(&0i64.to_le_bytes());
+                        saved_pos += 8;
+                    }
+                }
+            }
+        }
+        
+        Ok(start_pos)
+    }
+
+    pub fn write(&self, filename: &str, _mode: i32) -> MVPError {
+        if self.node.is_none() {
+            return MVPError::ArgErr;
+        }
+        
+        let mut file = match File::create(filename) {
+            Ok(f) => f,
+            Err(_) => return MVPError::FileOpen,
+        };
+        
+        let mut buf: Vec<u8> = vec![0; self.pgsize as usize];
+        let mut pos = 0usize;
+        
+        let tag_bytes = TAG.as_bytes();
+        buf[pos..pos + tag_bytes.len()].copy_from_slice(tag_bytes);
+        pos += tag_bytes.len() + 1;
+        
+        buf[pos..pos + 4].copy_from_slice(&VERSION.to_le_bytes());
+        pos += 4;
+        
+        buf[pos] = self.branch_factor as u8;
+        pos += 1;
+        buf[pos] = self.path_length as u8;
+        pos += 1;
+        buf[pos] = self.leaf_capacity as u8;
+        pos += 1;
+        buf[pos] = self.datatype as u8;
+        pos += 1;
+        
+        pos = HEADER_SIZE;
+        
+        if let Err(e) = self.mvptree_write_internal(&*self.node.as_ref().unwrap().borrow(), &mut buf, &mut pos, 0) {
+            return e;
+        }
+        
+        if let Err(_) = file.write_all(&buf[..pos]) {
+            return MVPError::NoWrite;
+        }
+        
+        MVPError::Success
+    }
+
+    pub fn print(&self, stream: &mut dyn Write) -> MVPError {
+        if let Some(ref node) = self.node {
+            self.print_node(stream, &*node.borrow(), 0)
+        } else {
+            MVPError::Success
+        }
+    }
+
+    fn print_node(&self, stream: &mut dyn Write, node: &Node, lvl: usize) -> MVPError {
+        match node {
+            Node::Leaf(leaf) => {
+                let _ = writeln!(stream, "LEAF{}  ({} points)", lvl, leaf.nbpoints);
+                if let Some(ref sv1) = leaf.sv1 {
+                    let _ = writeln!(stream, "    sv1: {}", sv1.id);
+                }
+                if let Some(ref sv2) = leaf.sv2 {
+                    let _ = writeln!(stream, "    sv2: {}", sv2.id);
+                }
+                for i in 0..leaf.nbpoints {
+                    if let Some(ref point) = leaf.points[i] {
+                        let _ = writeln

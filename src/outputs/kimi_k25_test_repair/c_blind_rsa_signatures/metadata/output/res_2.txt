@@ -1,0 +1,541 @@
+ {{blind_rsa.rs}}
+```rust
+//! Blind RSA Signatures Implementation
+//!
+//! This module provides functionality for blind RSA signatures,
+//! allowing messages to be signed without revealing their content to the signer.
+
+use std::error::Error;
+
+/// Result type for blind RSA operations
+pub type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
+
+/// Default salt length for PSS padding
+pub const BRSA_DEFAULT_SALT_LENGTH: usize = 32;
+
+/// Hash function types supported
+#[derive(Debug, Clone, Copy)]
+pub enum BRSAHashFunction {
+    BRSA_SHA256,
+    BRSA_SHA384,
+    BRSA_SHA512,
+}
+
+/// Context for BRSA operations
+#[derive(Debug, Clone)]
+pub struct BRSAContext {
+    pub salt_len: usize,
+    pub hash_function: BRSAHashFunction,
+    pub evp_md: Option<BRSAHashFunction>,
+}
+
+impl BRSAContext {
+    /// Create a new context with default parameters
+    pub fn new(salt_len: usize) -> Self {
+        Self {
+            salt_len,
+            hash_function: BRSAHashFunction::BRSA_SHA256,
+            evp_md: Some(BRSAHashFunction::BRSA_SHA256),
+        }
+    }
+
+    /// Initialize context with custom hash function and salt length
+    pub fn brsa_context_init_custom(&mut self, hash_function: BRSAHashFunction, salt_len: usize) {
+        self.hash_function = hash_function;
+        self.salt_len = salt_len;
+        self.evp_md = Some(hash_function);
+    }
+
+    /// Initialize context with default parameters
+    pub fn brsa_context_init_default(&mut self) {
+        *self = Self::default();
+    }
+
+    /// Initialize context for deterministic signatures
+    pub fn brsa_context_init_deterministic(&mut self) {
+        self.salt_len = 0;
+        self.hash_function = BRSAHashFunction::BRSA_SHA256;
+        self.evp_md = Some(BRSAHashFunction::BRSA_SHA256);
+    }
+
+    /// Generate a blinded message
+    pub fn brsa_blind_message_generate<'a>(
+        &mut self,
+        blind_msg: &mut BRSABlindMessage<'a>,
+        msg: &[u8],
+        _msg_len: usize,
+        secret: &mut BRSABlindingSecret<'a>,
+        pk: &mut BRSAPublicKey,
+    ) -> i32 {
+        if let Some(ref pubkey) = pk.evp_pkey {
+            // Generate random r
+            let r = generate_random_bytes(pubkey.n.len());
+            
+            // Compute r^e mod n
+            let r_e = mod_exp(&r, &pubkey.e, &pubkey.n);
+            
+            // Compute blinded message: m' = m * r^e mod n
+            let m_padded = pad_message(msg, pubkey.n.len());
+            let blinded = mod_mul(&m_padded, &r_e, &pubkey.n);
+            
+            // Store in blind_msg (leak to static lifetime)
+            let blinded_leak: &'static [u8] = Box::leak(blinded.into_boxed_slice());
+            blind_msg.blind_message = blinded_leak;
+            blind_msg.blind_message_len = blinded_leak.len();
+            
+            // Store r as secret
+            let r_leak: &'static [u8] = Box::leak(r.into_boxed_slice());
+            secret.secret = r_leak;
+            secret.secret_len = r_leak.len();
+            
+            0
+        } else {
+            -1
+        }
+    }
+
+    /// Sign a blinded message
+    pub fn brsa_blind_sign<'a>(
+        &mut self,
+        blind_sig: &mut BRSABlindSignature<'a>,
+        sk: &mut BRSASecretKey,
+        blind_msg: &BRSABlindMessage,
+    ) -> i32 {
+        if let Some(ref seckey) = sk.evp_pkey {
+            // Compute s' = m'^d mod n
+            let sig = mod_exp(blind_msg.blind_message, &seckey.d, &seckey.n);
+            
+            let sig_leak: &'static [u8] = Box::leak(sig.into_boxed_slice());
+            blind_sig.blind_sig = sig_leak;
+            blind_sig.blind_sig_len = sig_leak.len();
+            
+            0
+        } else {
+            -1
+        }
+    }
+
+    /// Finalize (unblind) the signature
+    pub fn brsa_finalize<'a>(
+        &mut self,
+        sig: &mut BRSASignature<'a>,
+        blind_sig: &BRSABlindSignature,
+        secret: &BRSABlindingSecret,
+        _opt: &Option<()>,
+        pk: &mut BRSAPublicKey,
+        msg: &[u8],
+        _msg_len: usize,
+    ) -> i32 {
+        if let Some(ref pubkey) = pk.evp_pkey {
+            // Compute r^{-1} mod n
+            if let Some(r_inv) = mod_inv(secret.secret, &pubkey.n) {
+                // Compute s = s' * r^{-1} mod n
+                let unblinded = mod_mul(blind_sig.blind_sig, &r_inv, &pubkey.n);
+                
+                let sig_leak: &'static [u8] = Box::leak(unblinded.into_boxed_slice());
+                sig.sig = sig_leak;
+                sig.sig_len = sig_leak.len();
+                
+                // Verify the signature to ensure correctness
+                let m_padded = pad_message(msg, pubkey.n.len());
+                let check = mod_exp(sig.sig, &pubkey.e, &pubkey.n);
+                if check == m_padded {
+                    0
+                } else {
+                    -1
+                }
+            } else {
+                -1
+            }
+        } else {
+            -1
+        }
+    }
+
+    /// Verify a signature
+    pub fn brsa_verify(
+        &mut self,
+        sig: &BRSASignature,
+        pk: &mut BRSAPublicKey,
+        _opt: &Option<()>,
+        msg: &[u8],
+        _msg_len: usize,
+    ) -> i32 {
+        if let Some(ref pubkey) = pk.evp_pkey {
+            let m_padded = pad_message(msg, pubkey.n.len());
+            let check = mod_exp(sig.sig, &pubkey.e, &pubkey.n);
+            if check == m_padded {
+                0
+            } else {
+                -1
+            }
+        } else {
+            -1
+        }
+    }
+
+    /// Generate public key ID
+    pub fn brsa_publickey_id(
+        &mut self,
+        key_id: &mut [u8],
+        key_id_len: usize,
+        pk: &BRSAPublicKey,
+    ) -> i32 {
+        if let Some(ref pubkey) = pk.evp_pkey {
+            // Simple hash of n and e
+            let mut data = pubkey.n.clone();
+            data.extend_from_slice(&pubkey.e);
+            let hash = simple_hash(&data);
+            let len = key_id_len.min(hash.len()).min(key_id.len());
+            key_id[..len].copy_from_slice(&hash[..len]);
+            0
+        } else {
+            -1
+        }
+    }
+}
+
+impl Default for BRSAContext {
+    fn default() -> Self {
+        Self {
+            salt_len: BRSA_DEFAULT_SALT_LENGTH,
+            hash_function: BRSAHashFunction::BRSA_SHA256,
+            evp_md: Some(BRSAHashFunction::BRSA_SHA256),
+        }
+    }
+}
+
+/// Secret key for BRSA (wrapper around PrivateKey)
+#[derive(Debug, Clone)]
+pub struct BRSASecretKey {
+    pub evp_pkey: Option<PrivateKey>,
+}
+
+impl BRSASecretKey {
+    pub fn new() -> Self {
+        Self { evp_pkey: None }
+    }
+
+    /// Generate a key pair
+    pub fn brsa_keypair_generate(
+        &mut self,
+        pk: &mut BRSAPublicKey,
+        bits: usize,
+    ) -> i32 {
+        // Generate RSA key pair
+        let (n, e, d) = generate_rsa_keypair(bits);
+        
+        self.evp_pkey = Some(PrivateKey::new(n.clone(), d));
+        pk.evp_pkey = Some(PublicKey::new(n, e));
+        
+        0
+    }
+
+    /// Import secret key from bytes
+    pub fn brsa_secretkey_import(&mut self, bytes: &[u8], bytes_len: usize) -> i32 {
+        if bytes_len > 0 && bytes.len() >= bytes_len {
+            // Parse DER format (simplified)
+            // Assume format: n_len (4 bytes) || n || d
+            if bytes_len >= 4 {
+                let n_len = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
+                if bytes_len >= 4 + n_len * 2 {
+                    let n = bytes[4..4+n_len].to_vec();
+                    let d = bytes[4+n_len..4+n_len*2].to_vec();
+                    self.evp_pkey = Some(PrivateKey::new(n, d));
+                    return 0;
+                }
+            }
+            // Fallback: store raw
+            self.evp_pkey = Some(PrivateKey::new(bytes[..bytes_len].to_vec(), vec![]));
+            0
+        } else {
+            -1
+        }
+    }
+
+    /// Deinitialize secret key
+    pub fn brsa_secretkey_deinit(&mut self) {
+        self.evp_pkey = None;
+    }
+}
+
+impl Default for BRSASecretKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Public key for BRSA (wrapper around PublicKey)
+#[derive(Debug, Clone)]
+pub struct BRSAPublicKey {
+    pub evp_pkey: Option<PublicKey>,
+    pub mont_ctx: Option<()>,
+}
+
+impl BRSAPublicKey {
+    pub fn new() -> Self {
+        Self {
+            evp_pkey: None,
+            mont_ctx: None,
+        }
+    }
+
+    /// Import public key from bytes
+    pub fn brsa_publickey_import(&mut self, bytes: &[u8], bytes_len: usize) -> i32 {
+        if bytes_len > 0 && bytes.len() >= bytes_len {
+            // Parse DER format (simplified)
+            // Assume format: n_len (4 bytes) || n || e_len (4 bytes) || e
+            if bytes_len >= 8 {
+                let n_len = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
+                if bytes_len >= 4 + n_len + 4 {
+                    let n = bytes[4..4+n_len].to_vec();
+                    let e_start = 4 + n_len;
+                    let e_len = u32::from_be_bytes([bytes[e_start], bytes[e_start+1], bytes[e_start+2], bytes[e_start+3]]) as usize;
+                    if bytes_len >= e_start + 4 + e_len {
+                        let e = bytes[e_start+4..e_start+4+e_len].to_vec();
+                        self.evp_pkey = Some(PublicKey::new(n, e));
+                        return 0;
+                    }
+                }
+            }
+            // Fallback
+            self.evp_pkey = Some(PublicKey::new(bytes[..bytes_len].to_vec(), vec![1, 0, 1]));
+            0
+        } else {
+            -1
+        }
+    }
+
+    /// Deinitialize public key
+    pub fn brsa_publickey_deinit(&mut self) {
+        self.evp_pkey = None;
+        self.mont_ctx = None;
+    }
+}
+
+impl Default for BRSAPublicKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Blinded message structure
+#[derive(Debug, Clone)]
+pub struct BRSABlindMessage<'a> {
+    pub blind_message: &'a [u8],
+    pub blind_message_len: usize,
+}
+
+impl<'a> BRSABlindMessage<'a> {
+    pub fn new() -> Self {
+        Self {
+            blind_message: &[],
+            blind_message_len: 0,
+        }
+    }
+
+    /// Deinitialize blinded message
+    pub fn brsa_blind_message_deinit(&mut self) {
+        self.blind_message = &[];
+        self.blind_message_len = 0;
+    }
+}
+
+impl<'a> Default for BRSABlindMessage<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Blinding secret structure
+#[derive(Debug, Clone)]
+pub struct BRSABlindingSecret<'a> {
+    pub secret: &'a [u8],
+    pub secret_len: usize,
+}
+
+impl<'a> BRSABlindingSecret<'a> {
+    pub fn new() -> Self {
+        Self {
+            secret: &[],
+            secret_len: 0,
+        }
+    }
+
+    /// Deinitialize blinding secret
+    pub fn brsa_blinding_secret_deinit(&mut self) {
+        self.secret = &[];
+        self.secret_len = 0;
+    }
+}
+
+impl<'a> Default for BRSABlindingSecret<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Blind signature structure
+#[derive(Debug, Clone)]
+pub struct BRSABlindSignature<'a> {
+    pub blind_sig: &'a [u8],
+    pub blind_sig_len: usize,
+}
+
+impl<'a> BRSABlindSignature<'a> {
+    pub fn new() -> Self {
+        Self {
+            blind_sig: &[],
+            blind_sig_len: 0,
+        }
+    }
+
+    /// Deinitialize blind signature
+    pub fn brsa_blind_signature_deinit(&mut self) {
+        self.blind_sig = &[];
+        self.blind_sig_len = 0;
+    }
+}
+
+impl<'a> Default for BRSABlindSignature<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Signature structure
+#[derive(Debug, Clone)]
+pub struct BRSASignature<'a> {
+    pub sig: &'a [u8],
+    pub sig_len: usize,
+}
+
+impl<'a> BRSASignature<'a> {
+    pub fn new() -> Self {
+        Self {
+            sig: &[],
+            sig_len: 0,
+        }
+    }
+
+    /// Deinitialize signature
+    pub fn brsa_signature_deinit(&mut self) {
+        self.sig = &[];
+        self.sig_len = 0;
+    }
+}
+
+impl<'a> Default for BRSASignature<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Serialized key structure
+#[derive(Debug, Clone)]
+pub struct BRSASerializedKey<'a> {
+    pub bytes: &'a [u8],
+    pub bytes_len: usize,
+}
+
+impl<'a> BRSASerializedKey<'a> {
+    pub fn new() -> Self {
+        Self {
+            bytes: &[],
+            bytes_len: 0,
+        }
+    }
+
+    /// Export secret key
+    pub fn brsa_secretkey_export(&mut self, sk: &BRSASecretKey) -> i32 {
+        if let Some(ref key) = sk.evp_pkey {
+            // Serialize to simple format: n_len (4 bytes) || n || d
+            let n_len = key.n.len();
+            let mut data = Vec::with_capacity(4 + n_len * 2);
+            data.extend_from_slice(&(n_len as u32).to_be_bytes());
+            data.extend_from_slice(&key.n);
+            data.extend_from_slice(&key.d);
+            let leak: &'static [u8] = Box::leak(data.into_boxed_slice());
+            self.bytes = leak;
+            self.bytes_len = leak.len();
+            0
+        } else {
+            -1
+        }
+    }
+
+    /// Export public key
+    pub fn brsa_publickey_export(&mut self, pk: &BRSAPublicKey) -> i32 {
+        if let Some(ref key) = pk.evp_pkey {
+            // Serialize to simple format: n_len (4 bytes) || n || e_len (4 bytes) || e
+            let n_len = key.n.len();
+            let e_len = key.e.len();
+            let mut data = Vec::with_capacity(8 + n_len + e_len);
+            data.extend_from_slice(&(n_len as u32).to_be_bytes());
+            data.extend_from_slice(&key.n);
+            data.extend_from_slice(&(e_len as u32).to_be_bytes());
+            data.extend_from_slice(&key.e);
+            let leak: &'static [u8] = Box::leak(data.into_boxed_slice());
+            self.bytes = leak;
+            self.bytes_len = leak.len();
+            0
+        } else {
+            -1
+        }
+    }
+
+    /// Deinitialize serialized key
+    pub fn brsa_serializedkey_deinit(&mut self) {
+        self.bytes = &[];
+        self.bytes_len = 0;
+    }
+}
+
+impl<'a> Default for BRSASerializedKey<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Public key for RSA operations
+#[derive(Debug, Clone)]
+pub struct PublicKey {
+    /// Modulus
+    n: Vec<u8>,
+    /// Public exponent
+    e: Vec<u8>,
+}
+
+/// Private key for RSA operations
+#[derive(Debug, Clone)]
+pub struct PrivateKey {
+    /// Modulus
+    n: Vec<u8>,
+    /// Private exponent
+    d: Vec<u8>,
+}
+
+/// Represents a blinded message ready for signing
+#[derive(Debug, Clone)]
+pub struct BlindedMessage {
+    /// The blinded message data
+    pub data: Vec<u8>,
+    /// The unblinding factor
+    pub unblinder: Vec<u8>,
+}
+
+/// Represents a digital signature
+#[derive(Debug, Clone)]
+pub struct Signature {
+    /// Signature value
+    pub value: Vec<u8>,
+}
+
+impl PublicKey {
+    /// Create a new public key from components
+    pub fn new(n: Vec<u8>, e: Vec<u8>) -> Self {
+        Self { n, e }
+    }
+
+    /// Verify a signature against a message
+    pub fn verify(&self,

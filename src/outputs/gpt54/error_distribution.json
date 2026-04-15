@@ -1,0 +1,10 @@
+{
+    "No errors": 95,
+    "unresolved import": 2,
+    "args": 1,
+    "trait": 1,
+    "type": 1,
+    "Unresolved name used.": 1,
+    "expected one of `;` or `{`, found `/`": 1,
+    "unsafe": 0
+}

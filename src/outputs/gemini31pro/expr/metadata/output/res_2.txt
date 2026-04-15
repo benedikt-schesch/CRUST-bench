@@ -1,0 +1,7 @@
+```rust
+// Generated Rust Code
+{{lib.rs}}
+```rust
+pub mod mapper_expr;
+pub use crate::mapper_expr::*;
+```

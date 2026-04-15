@@ -1,0 +1,457 @@
+ {{rset.rs}}
+```rust
+const DEFAULT_SIZE: usize = 8;
+const GROWTH_FACTOR: usize = 2;
+const MAX_CARDINALITY: usize = 1 << 16;
+const LOW_CUTOFF: usize = 1 << 12;
+const HIGH_CUTOFF: usize = MAX_CARDINALITY - LOW_CUTOFF;
+const MAX_ITEM: u16 = 0xFFFF;
+const MAX_SIZE: usize = LOW_CUTOFF;
+
+pub struct RSet {
+    pub buffer: Vec<u16>,
+    pub size: usize,
+}
+
+impl RSet {
+    pub fn new() -> Self {
+        let mut set = Self {
+            buffer: Vec::with_capacity(1 + DEFAULT_SIZE),
+            size: DEFAULT_SIZE,
+        };
+        set.truncate();
+        set
+    }
+
+    pub fn free(&mut self) {
+        self.buffer.clear();
+        self.size = 0;
+    }
+
+    fn is_empty(&self) -> bool {
+        self.buffer.len() >= 2 && self.buffer[0] == 2 && self.buffer[1] == MAX_ITEM
+    }
+
+    fn is_full(&self) -> bool {
+        !self.buffer.is_empty() && self.buffer[0] == 0
+    }
+
+    fn is_bitset(&self) -> bool {
+        if self.buffer.is_empty() {
+            return false;
+        }
+        let card = self.buffer[0] as usize;
+        card > LOW_CUTOFF && card <= HIGH_CUTOFF
+    }
+
+    fn is_array(&self) -> bool {
+        if self.buffer.is_empty() {
+            return false;
+        }
+        let card = self.buffer[0] as usize;
+        card <= LOW_CUTOFF
+    }
+
+    fn is_inverted_array(&self) -> bool {
+        if self.buffer.is_empty() {
+            return false;
+        }
+        let card = self.buffer[0] as usize;
+        card > HIGH_CUTOFF
+    }
+
+    pub fn cardinality(&self) -> usize {
+        if self.is_full() {
+            MAX_CARDINALITY
+        } else if self.is_empty() {
+            0
+        } else {
+            self.buffer[0] as usize
+        }
+    }
+
+    pub fn truncate(&mut self) -> bool {
+        self.buffer.clear();
+        self.buffer.push(2);
+        self.buffer.push(MAX_ITEM);
+        true
+    }
+
+    pub fn fill(&mut self) -> bool {
+        self.buffer.clear();
+        self.buffer.push(0);
+        true
+    }
+
+    pub fn import(buffer: &[u8], length: usize) -> Self {
+        let size = if length == 0 { 1 } else { length };
+        let size = if size > MAX_SIZE { MAX_SIZE } else { size };
+        
+        let mut new_set = Self {
+            buffer: Vec::with_capacity(1 + size),
+            size,
+        };
+
+        if buffer.is_empty() || length == 0 {
+            new_set.truncate();
+        } else {
+            let num_u16s = buffer.len() / 2;
+            for i in 0..num_u16s {
+                let bytes = [buffer[2*i], buffer[2*i + 1]];
+                new_set.buffer.push(u16::from_ne_bytes(bytes));
+            }
+        }
+        new_set
+    }
+
+    pub fn export(&self) -> Vec<u8> {
+        let mut result = Vec::with_capacity(self.buffer.len() * 2);
+        for &val in &self.buffer {
+            result.extend_from_slice(&val.to_ne_bytes());
+        }
+        result
+    }
+
+    fn length_for_cardinality(cardinality: usize) -> usize {
+        let card = if cardinality == 0 {
+            1
+        } else if cardinality >= HIGH_CUTOFF {
+            MAX_CARDINALITY - cardinality
+        } else if cardinality > LOW_CUTOFF {
+            LOW_CUTOFF
+        } else {
+            cardinality
+        };
+        std::mem::size_of::<u16>() * card
+    }
+
+    pub fn length(&self) -> usize {
+        std::mem::size_of::<u16>() + Self::length_for_cardinality(self.cardinality())
+    }
+
+    pub fn copy(&self) -> Self {
+        Self::import(&self.export(), self.length())
+    }
+
+    fn grow_to(&mut self, size: usize) -> bool {
+        if self.size >= size {
+            return true;
+        }
+        self.buffer.reserve(1 + size - self.buffer.capacity() + self.buffer.len());
+        self.size = size;
+        true
+    }
+
+    fn grow(&mut self) -> bool {
+        let mut size = self.size * GROWTH_FACTOR;
+        if size > MAX_SIZE {
+            size = MAX_SIZE;
+        }
+        self.grow_to(size)
+    }
+
+    fn convert_array_to_bitset(&mut self) -> bool {
+        let mut bitset = vec![0u16; MAX_SIZE];
+        let cardinality = self.buffer[0] as usize;
+        
+        for i in 0..cardinality {
+            let item = self.buffer[1 + i];
+            let offset = (item >> 4) as usize;
+            let bit = 1u16 << (item & 0xF);
+            if offset < MAX_SIZE {
+                bitset[offset] |= bit;
+            }
+        }
+        
+        self.buffer.resize(1 + MAX_SIZE, 0);
+        self.buffer[1..1+MAX_SIZE].copy_from_slice(&bitset);
+        true
+    }
+
+    fn convert_bitset_to_inverted_array(&mut self) -> bool {
+        let mut array = Vec::with_capacity(MAX_SIZE);
+        
+        for bit in 0..MAX_CARDINALITY {
+            let i = bit >> 4;
+            let j = bit & 0xF;
+            if i >= MAX_SIZE {
+                break;
+            }
+            if (self.buffer[1 + i] & (1 << j)) == 0 {
+                array.push(bit as u16);
+            }
+        }
+        
+        let new_cardinality = array.len();
+        self.buffer.resize(1 + new_cardinality, 0);
+        self.buffer[0] = (MAX_CARDINALITY - new_cardinality) as u16;
+        self.buffer[1..].copy_from_slice(&array);
+        true
+    }
+
+    fn add_array(&mut self, item: u16) -> bool {
+        let cardinality = self.buffer[0] as usize;
+        let mut i = 1;
+        
+        if cardinality > 0 && self.buffer[cardinality] < item {
+            i = cardinality + 1;
+        } else {
+            for idx in 1..=cardinality {
+                if self.buffer[idx] < item {
+                    continue;
+                }
+                if self.buffer[idx] == item {
+                    return true;
+                }
+                i = idx;
+                break;
+            }
+        }
+        
+        if cardinality == self.size && !self.grow() {
+            return false;
+        }
+        
+        if self.buffer.len() < cardinality + 2 {
+            self.buffer.resize(cardinality + 2, 0);
+        }
+        
+        if cardinality + 1 > i {
+            for j in (i..=cardinality).rev() {
+                self.buffer[j + 1] = self.buffer[j];
+            }
+        }
+        
+        self.buffer[i] = item;
+        self.buffer[0] = (cardinality + 1) as u16;
+        true
+    }
+
+    fn add_bitset(&mut self, item: u16) -> bool {
+        let offset = ((item >> 4) + 1) as usize;
+        let bit = 1u16 << (item & 0xF);
+        
+        if offset >= self.buffer.len() {
+            return false;
+        }
+        
+        if (self.buffer[offset] & bit) == 0 {
+            self.buffer[offset] |= bit;
+            self.buffer[0] += 1;
+        }
+        true
+    }
+
+    fn add_inverted_array(&mut self, item: u16) -> bool {
+        let stored = self.buffer[0] as usize;
+        let cardinality = MAX_CARDINALITY - stored;
+        
+        if cardinality > 0 && self.buffer[cardinality] == item {
+            self.buffer[0] = (stored + 1) as u16;
+            return true;
+        }
+        
+        for i in 0..cardinality {
+            let idx = 1 + i;
+            if self.buffer[idx] < item {
+                continue;
+            }
+            if self.buffer[idx] > item {
+                break;
+            }
+            for j in i..cardinality-1 {
+                self.buffer[1 + j] = self.buffer[1 + j + 1];
+            }
+            self.buffer[0] = (stored + 1) as u16;
+            return true;
+        }
+        true
+    }
+
+    fn contains_array(&self, item: u16) -> bool {
+        let stored = self.buffer[0] as usize;
+        let cardinality = if stored > HIGH_CUTOFF {
+            MAX_CARDINALITY - stored
+        } else {
+            stored
+        };
+        
+        if cardinality == 0 {
+            return false;
+        }
+        
+        let mut first = 0i32;
+        let mut last = cardinality as i32 - 1;
+        
+        while first <= last {
+            let middle = ((first + last) / 2) as usize;
+            let val = self.buffer[1 + middle];
+            if val == item {
+                return true;
+            }
+            if val < item {
+                first = middle as i32 + 1;
+            } else {
+                last = middle as i32 - 1;
+            }
+        }
+        false
+    }
+
+    fn contains_bitset(&self, item: u16) -> bool {
+        let offset = ((item >> 4) + 1) as usize;
+        let bit = 1u16 << (item & 0xF);
+        if offset < self.buffer.len() {
+            (self.buffer[offset] & bit) != 0
+        } else {
+            false
+        }
+    }
+
+    pub fn add(&mut self, item: u16) -> bool {
+        if self.is_full() {
+            return true;
+        }
+        
+        if self.is_empty() {
+            self.buffer[0] = 0;
+        }
+        
+        let cardinality = self.buffer[0] as usize;
+        
+        if cardinality == LOW_CUTOFF {
+            if self.contains_array(item) {
+                return true;
+            }
+            if !self.convert_array_to_bitset() {
+                return false;
+            }
+        } else if cardinality == HIGH_CUTOFF {
+            if self.contains_bitset(item) {
+                return true;
+            }
+            if !self.convert_bitset_to_inverted_array() {
+                return false;
+            }
+        }
+        
+        let card = self.buffer[0] as usize;
+        if card < LOW_CUTOFF {
+            self.add_array(item)
+        } else if card >= HIGH_CUTOFF {
+            self.add_inverted_array(item)
+        } else {
+            self.add_bitset(item)
+        }
+    }
+
+    pub fn contains(&self, item: u16) -> bool {
+        if self.is_full() {
+            return true;
+        }
+        if self.is_empty() {
+            return false;
+        }
+        if self.is_array() {
+            self.contains_array(item)
+        } else if self.is_inverted_array() {
+            !self.contains_array(item)
+        } else {
+            self.contains_bitset(item)
+        }
+    }
+
+    pub fn equals(&self, comparison: &RSet) -> bool {
+        let card1 = self.cardinality();
+        let card2 = comparison.cardinality();
+        if card1 != card2 {
+            return false;
+        }
+        
+        let len = Self::length_for_cardinality(card1);
+        if len == 0 {
+            return true;
+        }
+        
+        let words = len / 2;
+        let end = 1 + words;
+        
+        if self.buffer.len() < end || comparison.buffer.len() < end {
+            return false;
+        }
+        self.buffer[1..end] == comparison.buffer[1..end]
+    }
+
+    fn copy_to(&self, dest: &mut RSet) -> bool {
+        if !dest.grow_to(self.size) {
+            return false;
+        }
+        dest.buffer.clear();
+        dest.buffer.extend_from_slice(&self.buffer);
+        true
+    }
+
+    fn invert_bitset(&mut self) {
+        for i in 0..MAX_SIZE {
+            if 1 + i < self.buffer.len() {
+                self.buffer[1 + i] = !self.buffer[1 + i];
+            }
+        }
+    }
+
+    pub fn invert(&self, result: &mut RSet) -> bool {
+        if self.is_empty() {
+            return result.truncate();
+        }
+        if self.is_full() {
+            return result.fill();
+        }
+        if !self.copy_to(result) {
+            return false;
+        }
+        
+        let card = result.cardinality();
+        result.buffer[0] = (MAX_CARDINALITY - card) as u16;
+        
+        if result.is_bitset() {
+            result.invert_bitset();
+        }
+        true
+    }
+
+    fn naive_intersection(a: &[u16], b: &[u16], result: &mut [u16]) -> usize {
+        let mut i = 0;
+        let mut j = 0;
+        let mut k = 0;
+        
+        while i < a.len() && j < b.len() {
+            if a[i] < b[j] {
+                i += 1;
+            } else if b[j] < a[i] {
+                j += 1;
+            } else {
+                result[k] = a[i];
+                k += 1;
+                i += 1;
+                j += 1;
+            }
+        }
+        k
+    }
+
+    fn intersection_array(&self, other: &RSet, result: &mut RSet) -> bool {
+        let card1 = self.buffer[0] as usize;
+        let card2 = other.buffer[0] as usize;
+        let result_size = if card1 > card2 { card1 } else { card2 };
+        
+        if !result.grow_to(result_size) {
+            return false;
+        }
+        
+        let a = &self.buffer[1..1+card1];
+        let b = &other.buffer[1..1+card2];
+        
+        if result.buffer.len() < 1 + result_size {
+            result.buffer.resize(1 + result_size, 0);
+        }
+        let res_slice = &mut result.buffer[1

@@ -1,0 +1,172 @@
+ {{lib.rs}}
+```rust
+pub mod annotation;
+pub mod check;
+pub mod comments;
+pub mod coordinate;
+pub mod metadata;
+pub mod moves;
+pub mod piece;
+pub mod pgn;
+pub mod score;
+pub mod utils;
+```
+
+{{annotation.rs}}
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum PgnAnnotation {
+    None,
+    Good,
+    Bad,
+    Interesting,
+    Dubious,
+    Brilliant,
+    Blunder,
+}
+```
+
+{{check.rs}}
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum PgnCheck {
+    None,
+    Check,
+    Checkmate,
+}
+```
+
+{{comments.rs}}
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum PgnCommentPosition {
+    Before,
+    After,
+}
+```
+
+{{coordinate.rs}}
+```rust
+pub const UNKNOWN: i32 = -1;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PgnCoordinate {
+    pub file: i32,
+    pub rank: i32,
+}
+
+pub fn pgn_coordinate_file_as_index(file: char) -> i32 {
+    if file >= 'a' && file <= 'h' {
+        (file as u8 - b'a') as i32
+    } else {
+        UNKNOWN
+    }
+}
+```
+
+{{metadata.rs}}
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub struct PgnMetadata {
+    pub event: Option<String>,
+    pub site: Option<String>,
+    pub date: Option<String>,
+    pub round: Option<String>,
+    pub white: Option<String>,
+    pub black: Option<String>,
+    pub result: Option<String>,
+}
+
+impl PgnMetadata {
+    pub fn new() -> Self {
+        Self {
+            event: None,
+            site: None,
+            date: None,
+            round: None,
+            white: None,
+            black: None,
+            result: None,
+        }
+    }
+}
+```
+
+{{moves.rs}}
+```rust
+pub const PGN_CASTLING_KINGSIDE: &str = "O-O";
+pub const PGN_CASTLING_QUEENSIDE: &str = "O-O-O";
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PgnMove {
+    pub from: crate::coordinate::PgnCoordinate,
+    pub to: crate::coordinate::PgnCoordinate,
+    pub piece: crate::piece::PgnPiece,
+    pub promotion: Option<crate::piece::PgnPiece>,
+    pub check: crate::check::PgnCheck,
+    pub annotation: crate::annotation::PgnAnnotation,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PgnMoves {
+    pub moves: Vec<PgnMove>,
+}
+
+impl PgnMoves {
+    pub fn new() -> Self {
+        Self { moves: Vec::new() }
+    }
+}
+```
+
+{{piece.rs}}
+```rust
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum PgnPiece {
+    Pawn,
+    Knight,
+    Bishop,
+    Rook,
+    Queen,
+    King,
+    None,
+}
+```
+
+{{pgn.rs}}
+```rust
+use crate::metadata::PgnMetadata;
+use crate::moves::PgnMoves;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Pgn {
+    pub metadata: PgnMetadata,
+    pub moves: PgnMoves,
+}
+
+impl Pgn {
+    pub fn new() -> Self {
+        Self {
+            metadata: PgnMetadata::new(),
+            moves: PgnMoves::new(),
+        }
+    }
+}
+```
+
+{{score.rs}}
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub enum PgnScore {
+    WhiteWin,
+    BlackWin,
+    Draw,
+    Unknown,
+}
+```
+
+{{utils.rs}}
+```rust
+// Utility functions for PGN parsing
+pub fn placeholder() {}
+```

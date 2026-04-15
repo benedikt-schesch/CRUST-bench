@@ -1,0 +1,637 @@
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod buffer;
+pub mod gap;
+pub mod defs;
+pub mod visual;
+```
+
+{{gap.rs}}
+```rust
+// Generated Rust Code
+pub const MEM_ERROR: i32 = 128;
+
+#[derive(Clone)]
+pub struct GapBuffer {
+    pub buffer: Vec<char>,
+    pub str_len: usize,
+    pub gap_len: usize,
+    pub gap_loc: usize,
+}
+
+impl GapBuffer {
+    fn resize_buffer(&mut self, new_capacity: usize) -> i32 {
+        let buffer_size = self.str_len + self.gap_len;
+        let final_capacity = if new_capacity < buffer_size {
+            buffer_size
+        } else {
+            new_capacity
+        };
+
+        let gap_size = self.gap_len + (final_capacity - buffer_size);
+        let mut new_buffer = vec!['\0'; final_capacity];
+
+        for i in 0..self.gap_loc {
+            new_buffer[i] = self.buffer[i];
+        }
+
+        let tail_len = self.str_len.saturating_sub(self.gap_loc);
+        let old_tail_start = self.gap_loc + self.gap_len;
+        let new_tail_start = self.gap_loc + gap_size;
+        for i in 0..tail_len {
+            new_buffer[new_tail_start + i] = self.buffer[old_tail_start + i];
+        }
+
+        self.buffer = new_buffer;
+        self.gap_len = gap_size;
+        0
+    }
+
+    pub fn create(capacity: usize) -> Self {
+        Self {
+            buffer: vec!['\0'; capacity],
+            str_len: 0,
+            gap_len: capacity,
+            gap_loc: 0,
+        }
+    }
+
+    pub fn destroy(self) {}
+
+    pub fn insert_char(&mut self, ch: char) -> i32 {
+        if self.gap_len <= 1 {
+            let current_cap = self.gap_len + self.str_len;
+            let new_cap = if current_cap == 0 { 1 } else { current_cap * 2 };
+            let err = self.resize_buffer(new_cap);
+            if err != 0 {
+                return err;
+            }
+        }
+
+        self.buffer[self.gap_loc] = ch;
+        self.str_len += 1;
+        self.gap_loc += 1;
+        self.gap_len -= 1;
+        0
+    }
+
+    pub fn backspace(&mut self) {
+        if self.gap_loc > 0 {
+            self.gap_loc -= 1;
+            self.gap_len += 1;
+            self.str_len -= 1;
+        }
+    }
+
+    pub fn move_gap(&mut self, location: usize) -> i32 {
+        let location = location.min(self.str_len);
+        let capacity = self.gap_len + self.str_len;
+        let mut new_buffer = vec!['\0'; capacity];
+
+        if location < self.gap_loc {
+            for i in 0..location {
+                new_buffer[i] = self.buffer[i];
+            }
+
+            let moved = self.gap_loc - location;
+            for i in 0..moved {
+                new_buffer[location + self.gap_len + i] = self.buffer[location + i];
+            }
+
+            let tail_len = self.str_len.saturating_sub(self.gap_loc);
+            for i in 0..tail_len {
+                new_buffer[location + self.gap_len + moved + i] =
+                    self.buffer[self.gap_loc + self.gap_len + i];
+            }
+        } else {
+            for i in 0..self.gap_loc {
+                new_buffer[i] = self.buffer[i];
+            }
+
+            let moved = location - self.gap_loc;
+            for i in 0..moved {
+                new_buffer[self.gap_loc + i] = self.buffer[self.gap_loc + self.gap_len + i];
+            }
+
+            let tail_len = self.str_len.saturating_sub(location);
+            for i in 0..tail_len {
+                new_buffer[location + self.gap_len + i] =
+                    self.buffer[self.gap_loc + self.gap_len + moved + i];
+            }
+        }
+
+        self.buffer = new_buffer;
+        self.gap_loc = location;
+        0
+    }
+
+    pub fn get_string(&self) -> String {
+        let mut s = String::with_capacity(self.str_len);
+        for i in 0..self.gap_loc {
+            s.push(self.buffer[i]);
+        }
+        for i in 0..(self.str_len.saturating_sub(self.gap_loc)) {
+            s.push(self.buffer[self.gap_loc + self.gap_len + i]);
+        }
+        s
+    }
+
+    pub fn split(&mut self) -> Self {
+        let capacity = self.gap_len + self.str_len;
+        let second_half_of_str_len = self.str_len.saturating_sub(self.gap_loc);
+        let mut new_gap_buffer = Self::create(capacity);
+
+        let start = capacity - second_half_of_str_len;
+        for i in 0..second_half_of_str_len {
+            new_gap_buffer.buffer[start + i] = self.buffer[self.gap_loc + self.gap_len + i];
+        }
+
+        new_gap_buffer.str_len = second_half_of_str_len;
+        new_gap_buffer.gap_loc = 0;
+        new_gap_buffer.gap_len = capacity - second_half_of_str_len;
+
+        self.str_len = self.gap_loc;
+        self.gap_len = capacity - self.str_len;
+
+        new_gap_buffer
+    }
+
+    pub fn create_from_string(s: &str, gap_len: usize) -> Self {
+        if s.is_empty() {
+            Self::create(gap_len)
+        } else {
+            let chars: Vec<char> = s.chars().collect();
+            let s_len = chars.len();
+            let capacity = s_len + gap_len;
+            let mut new_buffer = Self::create(capacity);
+            for (i, ch) in chars.iter().enumerate() {
+                new_buffer.buffer[i] = *ch;
+            }
+            new_buffer.str_len = s_len;
+            new_buffer.gap_loc = s_len;
+            new_buffer.gap_len = gap_len;
+            new_buffer
+        }
+    }
+
+    pub fn char_at(&self, i: usize) -> char {
+        if self.str_len == 0 || i >= self.str_len {
+            '\0'
+        } else if i < self.gap_loc {
+            self.buffer[i]
+        } else {
+            self.buffer[i + self.gap_len]
+        }
+    }
+}
+```
+
+{{buffer.rs}}
+```rust
+// Generated Rust Code
+use crate::gap::GapBuffer;
+use crate::gap::MEM_ERROR;
+use std::io::BufRead;
+use std::io::BufReader;
+
+pub const DEFAULT_GAP_BUF_CAP: usize = 100;
+pub const DEFAULT_CAPACITY: usize = 100;
+
+pub struct TextBuffer {
+    pub lines: Vec<Option<GapBuffer>>,
+    pub lines_capacity: usize,
+    pub cursor_row: usize,
+    pub cursor_col: usize,
+    pub cursor_col_moved: bool,
+    pub last_line_loc: usize,
+}
+
+impl TextBuffer {
+    pub fn create(lines: usize, line_size: usize) -> Option<Self> {
+        if lines == 0 {
+            return None;
+        }
+
+        let mut text_buffer = Self {
+            lines: vec![None; lines],
+            lines_capacity: lines,
+            cursor_row: 0,
+            cursor_col: 0,
+            cursor_col_moved: false,
+            last_line_loc: 0,
+        };
+        text_buffer.lines[0] = Some(GapBuffer::create(line_size));
+        Some(text_buffer)
+    }
+
+    pub fn destroy(self) {}
+
+    pub fn move_cursor(&mut self, row: usize, col: usize) {
+        let row = row.min(self.last_line_loc);
+        self.cursor_row = row;
+
+        let line_len = self.lines[row].as_ref().map(|l| l.str_len).unwrap_or(0);
+        let col = col.min(line_len);
+
+        if self.cursor_col != col {
+            self.cursor_col_moved = true;
+        }
+        self.cursor_col = col;
+    }
+
+    pub fn insert(&mut self, ch: char) -> i32 {
+        if self.cursor_col_moved {
+            if let Some(line) = self.lines[self.cursor_row].as_mut() {
+                let err = line.move_gap(self.cursor_col);
+                if err != 0 {
+                    return err;
+                }
+            }
+            self.cursor_col_moved = false;
+        }
+
+        if let Some(line) = self.lines[self.cursor_row].as_mut() {
+            let err = line.insert_char(ch);
+            if err != 0 {
+                return err;
+            }
+            self.cursor_col = line.gap_loc;
+            0
+        } else {
+            MEM_ERROR
+        }
+    }
+
+    pub fn backspace(&mut self) -> i32 {
+        if self.cursor_col_moved {
+            if let Some(line) = self.lines[self.cursor_row].as_mut() {
+                let err = line.move_gap(self.cursor_col);
+                if err != 0 {
+                    return err;
+                }
+            }
+            self.cursor_col_moved = false;
+        }
+
+        if let Some(line) = self.lines[self.cursor_row].as_mut() {
+            line.backspace();
+            self.cursor_col = line.gap_loc;
+            0
+        } else {
+            MEM_ERROR
+        }
+    }
+
+    pub fn new_line(&mut self) -> i32 {
+        if self.cursor_col_moved {
+            if let Some(line) = self.lines[self.cursor_row].as_mut() {
+                let err = line.move_gap(self.cursor_col);
+                if err != 0 {
+                    return err;
+                }
+            }
+            self.cursor_col_moved = false;
+        }
+
+        let newline = if let Some(line) = self.lines[self.cursor_row].as_mut() {
+            line.split()
+        } else {
+            return MEM_ERROR;
+        };
+
+        if self.last_line_loc == self.lines_capacity.saturating_sub(1) {
+            let new_capacity = if self.lines_capacity == 0 {
+                1
+            } else {
+                self.lines_capacity * 2
+            };
+            self.lines.resize(new_capacity, None);
+            self.lines_capacity = new_capacity;
+        }
+
+        let insert_index = self.cursor_row + 1;
+        let end_exclusive = self.last_line_loc + 1;
+        for i in (insert_index..end_exclusive).rev() {
+            self.lines[i + 1] = self.lines[i].take();
+        }
+
+        self.lines[insert_index] = Some(newline);
+        self.last_line_loc += 1;
+        self.cursor_row += 1;
+        self.cursor_col = self.lines[self.cursor_row]
+            .as_ref()
+            .map(|g| g.gap_loc)
+            .unwrap_or(0);
+        0
+    }
+
+    pub fn get_line(&self, row: usize) -> Option<String> {
+        if row > self.last_line_loc {
+            return None;
+        }
+        self.lines.get(row)?.as_ref().map(|g| g.get_string())
+    }
+
+    pub fn create_from_file(fp: &std::fs::File) -> Option<Self> {
+        let mut new_tbuffer = Self::create(DEFAULT_CAPACITY, DEFAULT_GAP_BUF_CAP)?;
+
+        new_tbuffer.lines[new_tbuffer.last_line_loc] = None;
+
+        let reader = BufReader::new(fp);
+        let mut any_line = false;
+
+        for line_result in reader.lines() {
+            let line = match line_result {
+                Ok(v) => v,
+                Err(_) => return None,
+            };
+            any_line = true;
+
+            if new_tbuffer.last_line_loc == new_tbuffer.lines_capacity.saturating_sub(1) {
+                let new_capacity = new_tbuffer.lines_capacity * 2;
+                new_tbuffer.lines.resize(new_capacity, None);
+                new_tbuffer.lines_capacity = new_capacity;
+            }
+
+            let read = line.chars().count() + 1;
+            let line_gap_size = if read * 2 < DEFAULT_GAP_BUF_CAP {
+                DEFAULT_GAP_BUF_CAP
+            } else {
+                read * 2
+            };
+
+            let idx = new_tbuffer.last_line_loc + 1;
+            new_tbuffer.lines[idx] = Some(GapBuffer::create_from_string(&line, line_gap_size));
+            new_tbuffer.last_line_loc += 1;
+        }
+
+        if !any_line {
+            new_tbuffer.last_line_loc = 0;
+            new_tbuffer.lines[0] = Some(GapBuffer::create(DEFAULT_GAP_BUF_CAP));
+        }
+
+        Some(new_tbuffer)
+    }
+}
+```
+
+{{defs.rs}}
+```rust
+// Generated Rust Code
+pub const ESC: char = '\x1b';
+pub const INVERT_COLOUR: &str = "\x1b[7m";
+pub const INVERT_COLOUR_SIZE: usize = 4;
+pub const RESET_STYLE_COLOUR: &str = "\x1b[0m";
+
+pub fn panic(message: &str) -> ! {
+    eprintln!("{}", message);
+    std::process::exit(1);
+}
+```
+
+{{visual.rs}}
+```rust
+// Generated Rust Code
+use crate::buffer::TextBuffer;
+use crate::defs::panic;
+
+#[derive(Clone, Default)]
+pub struct Cursor {
+    x: usize,
+    y: usize,
+}
+
+#[derive(Clone, Default)]
+pub struct VirtualScreen {
+    buffer: Vec<char>,
+    buf_pos: usize,
+    len: usize,
+    cursor: Cursor,
+    width: usize,
+    height: usize,
+    render_start_line: usize,
+}
+
+impl VirtualScreen {
+    pub fn screen_append(&mut self, str: &str, size: usize) {
+        let chars: Vec<char> = str.chars().collect();
+        let write_size = size.min(chars.len());
+
+        if self.buffer.is_empty() {
+            self.buffer.extend(chars.iter().take(write_size).copied());
+            self.buf_pos = write_size;
+            self.len = self.buffer.len();
+            return;
+        }
+
+        if (self.len.saturating_sub(self.buf_pos)) > write_size {
+            for i in 0..write_size {
+                if self.buf_pos + i < self.buffer.len() {
+                    self.buffer[self.buf_pos + i] = chars[i];
+                } else {
+                    self.buffer.push(chars[i]);
+                }
+            }
+            self.buf_pos += write_size;
+            self.len = self.buffer.len();
+        } else {
+            for ch in chars.iter().take(write_size) {
+                self.buffer.push(*ch);
+            }
+            self.buf_pos = self.buffer.len();
+            self.len = self.buffer.len();
+        }
+    }
+
+    pub fn required_screen_rows(line_length: usize, screen_width: usize) -> i32 {
+        if line_length == 0 {
+            1
+        } else if screen_width == 0 {
+            0
+        } else {
+            ((line_length / screen_width) + usize::from((line_length % screen_width) > 0)) as i32
+        }
+    }
+
+    pub fn move_cursor_in_view(buffer: &TextBuffer, screen: &mut VirtualScreen) {
+        let buffer_cursor_x = buffer.cursor_row;
+        let mut cumul_req_rows: usize = 0;
+        let mut cur_line = screen.render_start_line;
+
+        if buffer_cursor_x < screen.render_start_line {
+            screen.render_start_line = buffer_cursor_x;
+        } else {
+            while cur_line <= buffer.last_line_loc {
+                let cur_line_required_rows = Self::required_screen_rows(
+                    buffer.lines[cur_line].as_ref().map(|g| g.str_len).unwrap_or(0),
+                    screen.width,
+                ) as usize;
+
+                if (cur_line_required_rows + cumul_req_rows) > screen.height.saturating_sub(1) {
+                    cur_line = cur_line.saturating_sub(1);
+                    break;
+                }
+                cumul_req_rows += cur_line_required_rows;
+                cur_line += 1;
+            }
+
+            if buffer_cursor_x > cur_line {
+                let mut rows_required = 0usize;
+                while cur_line <= buffer_cursor_x {
+                    rows_required += Self::required_screen_rows(
+                        buffer.lines[cur_line].as_ref().map(|g| g.str_len).unwrap_or(0),
+                        screen.width,
+                    ) as usize;
+                    cur_line += 1;
+                }
+
+                while rows_required > 0 {
+                    rows_required = rows_required.saturating_sub(
+                        Self::required_screen_rows(
+                            buffer.lines[screen.render_start_line]
+                                .as_ref()
+                                .map(|g| g.str_len)
+                                .unwrap_or(0),
+                            screen.width,
+                        ) as usize,
+                    );
+                    screen.render_start_line += 1;
+                }
+            }
+        }
+    }
+
+    pub fn draw_editor_window(buffer: &TextBuffer, screen: &mut VirtualScreen) {
+        let mut cur_line = screen.render_start_line;
+        let mut lines_written = 0usize;
+
+        while cur_line <= buffer.last_line_loc && lines_written < screen.height.saturating_sub(1) {
+            let screen_cols = screen.width;
+            let line = match buffer.get_line(cur_line) {
+                Some(v) => v,
+                None => panic("draw editor cant get text of current line in buffer"),
+            };
+
+            if line.chars().count() > screen_cols {
+                let chars: Vec<char> = line.chars().collect();
+                let mut i = 0usize;
+                loop {
+                    let remaining = chars.len().saturating_sub(i);
+                    let len_to_write = screen_cols.min(remaining);
+                    let segment: String = chars[i..i + len_to_write].iter().collect();
+                    screen.screen_append(&segment, len_to_write);
+                    screen.screen_append("\r\n", 2);
+                    screen.screen_append("\x1b[K", 3);
+                    i += len_to_write;
+                    lines_written += 1;
+
+                    if lines_written == screen.height.saturating_sub(2) {
+                        break;
+                    }
+                    if i >= chars.len().saturating_sub(1) {
+                        break;
+                    }
+                }
+            } else {
+                screen.screen_append(&line, line.chars().count());
+                screen.screen_append("\r\n", 2);
+                lines_written += 1;
+            }
+            cur_line += 1;
+        }
+
+        while lines_written < screen.height.saturating_sub(2) {
+            screen.screen_append("\r\n", 2);
+            lines_written += 1;
+        }
+    }
+
+    pub fn set_virtual_cursor_position(buffer: &TextBuffer, screen: &mut VirtualScreen) {
+        let mut current_line = screen.render_start_line;
+        let mut virtual_cursor_row = 1usize;
+
+        while current_line != buffer.cursor_row {
+            let required_rows = Self::required_screen_rows(
+                buffer.lines[current_line].as_ref().map(|g| g.str_len).unwrap_or(0),
+                screen.width,
+            ) as usize;
+            virtual_cursor_row += required_rows;
+            current_line += 1;
+        }
+
+        if screen.width != 0 {
+            virtual_cursor_row += buffer.cursor_col / screen.width;
+            screen.cursor.x = virtual_cursor_row;
+            screen.cursor.y = (buffer.cursor_col % screen.width) + 1;
+        } else {
+            screen.cursor.x = virtual_cursor_row;
+            screen.cursor.y = 1;
+        }
+    }
+}
+```
+
+{{main.rs}}
+```rust
+// Generated Rust Code
+use crate::buffer::TextBuffer;
+use crate::defs::panic;
+use crate::visual::Cursor;
+use crate::visual::VirtualScreen;
+
+pub struct EditorState {
+    orig_termios: (),
+    file_name: Option<String>,
+    file_path: Option<String>,
+    flushed: bool,
+    current_buffer: TextBuffer,
+    screen: VirtualScreen,
+}
+
+impl EditorState {
+    pub fn initialize(_argc: i32, _argv: Vec<String>) {
+        panic("initialize not implemented for safe Rust terminal version")
+    }
+
+    pub fn cleanup() {}
+
+    pub fn set_window_size() {}
+
+    pub fn disable_raw_mode() {}
+
+    pub fn enable_raw_mode() {}
+
+    pub fn render_screen() {}
+
+    pub fn draw_screen() {}
+
+    pub fn draw_status_line(_line_size: usize) {}
+
+    pub fn up_arrow() {}
+
+    pub fn down_arrow() {}
+
+    pub fn right_arrow() {}
+
+    pub fn left_arrow() {}
+
+    pub fn read_char() -> i32 {
+        0
+    }
+
+    pub fn process_keypress() {}
+
+    pub fn flush_buffer_to_file() -> i32 {
+        0
+    }
+
+    pub fn load_file_and_initialize_buffer() -> i32 {
+        0
+    }
+}
+
+pub fn main() {
+    let _ = std::mem::size_of::<Cursor>();
+}
+```

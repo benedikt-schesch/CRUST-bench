@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `coroutine::coroutine`", "file_path": "coroutine/src/bin/test.rs", "row": "3", "col": "16", "error_snippet": "|\n3 | use coroutine::coroutine::{\n  |                ^^^^^^^^^ could not find `coroutine` in `coroutine`\n\nFor more information about this error, try `rustc --explain E0432`."}]

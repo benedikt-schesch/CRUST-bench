@@ -1,0 +1,1 @@
+[{"error_code": null, "error_message": "expected one of `;` or `{`, found `/`", "file_path": "skp/src/lib.rs", "row": "2", "col": "12", "error_snippet": "|\n2 | pub mod src/bin/ut_test3;\n  |            ^ expected one of `;` or `{`"}]

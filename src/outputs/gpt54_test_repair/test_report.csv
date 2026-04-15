@@ -1,0 +1,137 @@
+project,error_code,error_message,file_path,row,col
+proj_2DPartInt,No errors,No errors,No errors,No errors,No errors
+proj_42_Kocaeli_Printf,No errors,No errors,No errors,No errors,No errors
+aes128_SIMD,No errors,No errors,No errors,No errors,No errors
+amp,No errors,No errors,No errors,No errors,No errors
+approxidate,No errors,No errors,No errors,No errors,No errors
+avalanche,No errors,No errors,No errors,No errors,No errors
+bhshell,No errors,No errors,No errors,No errors,No errors
+bigint,No errors,No errors,No errors,No errors,No errors
+bitset,No errors,No errors,No errors,No errors,No errors
+blt,No errors,No errors,No errors,No errors,No errors
+bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug.rs,7,5
+bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug_2.rs,7,5
+bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/timing.rs,7,5
+btree_map,No errors,No errors,No errors,No errors,No errors
+c_aces,No errors,No errors,No errors,No errors,No errors
+carrays,No errors,No errors,No errors,No errors,No errors
+c_blind_rsa_signatures,No errors,No errors,No errors,No errors,No errors
+cfsm,No errors,No errors,No errors,No errors,No errors
+chtrie,No errors,No errors,No errors,No errors,No errors
+CircularBuffer,No errors,No errors,No errors,No errors,No errors
+cissy,No errors,No errors,No errors,No errors,No errors
+cJSON,No errors,No errors,No errors,No errors,No errors
+clhash,No errors,No errors,No errors,No errors,No errors
+clog,No errors,No errors,No errors,No errors,No errors
+coroutine,No errors,No errors,No errors,No errors,No errors
+cset,No errors,No errors,No errors,No errors,No errors
+c_string,No errors,No errors,No errors,No errors,No errors
+csyncmers,No errors,No errors,No errors,No errors,No errors
+dict,No errors,No errors,No errors,No errors,No errors
+emlang,No errors,No errors,No errors,No errors,No errors
+expr,No errors,No errors,No errors,No errors,No errors
+FastHamming,No errors,No errors,No errors,No errors,No errors
+fft,No errors,No errors,No errors,No errors,No errors
+file2str,No errors,No errors,No errors,No errors,No errors
+fleur,No errors,No errors,No errors,No errors,No errors
+fs_c,No errors,No errors,No errors,No errors,No errors
+fslib,No errors,No errors,No errors,No errors,No errors
+Genetic_neural_network_for_simple_control,No errors,No errors,No errors,No errors,No errors
+geofence,No errors,No errors,No errors,No errors,No errors
+gfc,No errors,No errors,No errors,No errors,No errors
+gorilla_paper_encode,,lifetime may not live long enough,gorilla_paper_encode/src/gorilla.rs,177,1
+gorilla_paper_encode,,lifetime may not live long enough,gorilla_paper_encode/src/gorilla.rs,341,1
+Graph_recogniser,No errors,No errors,No errors,No errors,No errors
+hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,20,22
+hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,41,26
+hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,72,7
+hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,94,11
+hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,128,11
+hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,11,17
+hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,20,22
+hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,32,17
+hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,41,26
+hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,63,17
+hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,72,7
+hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,84,17
+hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,94,11
+hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,117,17
+hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,128,11
+hamta,E0308,mismatched types,hamta/src/bin/test.rs,21,8
+hamta,E0308,mismatched types,hamta/src/bin/test.rs,42,12
+hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,24,19
+hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,28,7
+hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,45,23
+hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,54,21
+hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,59,7
+hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,73,7
+hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,74,7
+hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,75,7
+hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,76,21
+hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,80,7
+hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,97,18
+hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,99,23
+hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,103,18
+hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,109,25
+hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,112,22
+hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,132,18
+Holdem_Odds,No errors,No errors,No errors,No errors,No errors
+hydra,No errors,No errors,No errors,No errors,No errors
+impcheck,No errors,No errors,No errors,No errors,No errors
+inversion_list,No errors,No errors,No errors,No errors,No errors
+jccc,No errors,No errors,No errors,No errors,No errors
+kairoCompiler,No errors,No errors,No errors,No errors,No errors
+kd3,No errors,No errors,No errors,No errors,No errors
+lambda_calculus_eval,No errors,No errors,No errors,No errors,No errors
+leftpad,No errors,No errors,No errors,No errors,No errors
+lib2bit,No errors,No errors,No errors,No errors,No errors
+libbase122,No errors,No errors,No errors,No errors,No errors
+libbeaufort,E0425,cannot find value `BEAUFORT_ALPHA` in this scope,libbeaufort/src/bin/test_all.rs,47,52
+libfor,E0432,unresolved import `libfor::forLib`,libfor/src/bin/test.rs,1,5
+libfor,E0432,unresolved import `libfor::for_gen`,libfor/src/bin/test.rs,2,5
+libm17,No errors,No errors,No errors,No errors,No errors
+libpgn,No errors,No errors,No errors,No errors,No errors
+libpsbt,No errors,No errors,No errors,No errors,No errors
+libqueue,No errors,No errors,No errors,No errors,No errors
+libtinyfseq,No errors,No errors,No errors,No errors,No errors
+libutf,E0432,unresolved import `libutf`,libutf/src/test.rs,2,5
+libvcd,No errors,No errors,No errors,No errors,No errors
+libwecan,No errors,No errors,No errors,No errors,No errors
+Linear_Algebra_C,No errors,No errors,No errors,No errors,No errors
+ljmm,No errors,No errors,No errors,No errors,No errors
+LTRE,No errors,No errors,No errors,No errors,No errors
+Math_Library_in_C,No errors,No errors,No errors,No errors,No errors
+matrix_multiplication,No errors,No errors,No errors,No errors,No errors
+mdb,No errors,No errors,No errors,No errors,No errors
+Megalania,No errors,No errors,No errors,No errors,No errors
+merkle_tree_c,No errors,No errors,No errors,No errors,No errors
+morton,No errors,No errors,No errors,No errors,No errors
+murmurhash_c,No errors,No errors,No errors,No errors,No errors
+mvptree,No errors,No errors,No errors,No errors,No errors
+NandC,No errors,No errors,No errors,No errors,No errors
+Phills_DHT,No errors,No errors,No errors,No errors,No errors
+quadtree,No errors,No errors,No errors,No errors,No errors
+razz_simulation,No errors,No errors,No errors,No errors,No errors
+rbtree_lab,No errors,No errors,No errors,No errors,No errors
+recordManager,No errors,No errors,No errors,No errors,No errors
+rect_pack_h,No errors,No errors,No errors,No errors,No errors
+Remimu,No errors,No errors,No errors,No errors,No errors
+rhbloom,No errors,No errors,No errors,No errors,No errors
+roaring_bitmap,No errors,No errors,No errors,No errors,No errors
+rubiksolver,No errors,No errors,No errors,No errors,No errors
+satc,No errors,No errors,No errors,No errors,No errors
+Simple_Config,E0277,`?` couldn't convert the error to `CfgError`,Simple_Config/src/simple_config.rs,622,48
+simple_lang,No errors,No errors,No errors,No errors,No errors
+Simple_Sparsehash,No errors,No errors,No errors,No errors,No errors
+SimpleXML,No errors,No errors,No errors,No errors,No errors
+skp,No errors,No errors,No errors,No errors,No errors
+SlothLang,E0308,`match` arms have incompatible types,SlothLang/src/slothvm.rs,111,1
+ted,No errors,No errors,No errors,No errors,No errors
+tisp,No errors,No errors,No errors,No errors,No errors
+totp,No errors,No errors,No errors,No errors,No errors
+ulidgen,No errors,No errors,No errors,No errors,No errors
+utf8,No errors,No errors,No errors,No errors,No errors
+VaultSync,No errors,No errors,No errors,No errors,No errors
+vec,No errors,No errors,No errors,No errors,No errors
+worsp,No errors,No errors,No errors,No errors,No errors
+XOpt,No errors,No errors,No errors,No errors,No errors

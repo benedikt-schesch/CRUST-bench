@@ -1,0 +1,80 @@
+ {{lib.rs}}
+```rust
+pub mod logger;
+pub mod vm;
+```
+
+{{vm.rs}}
+```rust
+//! VM module for VaultSync
+
+/// Represents an author of a commit
+#[derive(Debug, Clone)]
+pub struct Author {
+    pub name: String,
+    pub email: String,
+}
+
+/// Represents a commit in the repository
+#[derive(Debug, Clone)]
+pub struct Commit {
+    pub id: String,
+    pub author: Author,
+    pub message: String,
+    pub timestamp: u64,
+}
+
+/// Repository structure for managing version control operations
+pub struct Repository {
+    pub path: String,
+    pub staged_changes: Vec<String>,
+}
+
+/// Initializes a new repository at the given path
+pub fn init_repo(path: &str) -> Result<Repository, String> {
+    Ok(Repository {
+        path: path.to_string(),
+        staged_changes: Vec::new(),
+    })
+}
+
+/// Adds changes to the repository staging area
+pub fn add_changes(repo: &mut Repository, changes: &[String]) -> Result<(), String> {
+    repo.staged_changes.extend(changes.iter().cloned());
+    Ok(())
+}
+
+/// Creates a new commit with the given message and author
+pub fn make_commit(repo: &mut Repository, message: &str, author: &Author) -> Result<Commit, String> {
+    let commit = Commit {
+        id: format!("commit_{}", repo.staged_changes.len()),
+        author: author.clone(),
+        message: message.to_string(),
+        timestamp: 0,
+    };
+    repo.staged_changes.clear();
+    Ok(commit)
+}
+```
+
+{{logger.rs}}
+```rust
+//! Logger module for VaultSync
+
+use std::fmt;
+
+/// Initialize the logging system
+pub fn init() -> Result<(), String> {
+    Ok(())
+}
+
+/// Log a message at the info level
+pub fn info(message: &str) {
+    println!("[INFO] {}", message);
+}
+
+/// Log a message at the error level
+pub fn error(message: &str) {
+    eprintln!("[ERROR] {}", message);
+}
+```

@@ -1,0 +1,445 @@
+{{tisp.rs}}
+```rust
+use std::io::Write;
+use crate::core;
+use crate::math;
+use crate::string;
+
+#[derive(Clone, Debug)]
+pub enum Value {
+    Int(i64),
+    Float(f64),
+    Fraction(i64, i64),
+    String(String),
+    Symbol(String),
+    Nil,
+}
+
+pub struct Tsp {
+    memory_size: usize,
+    pub file: String,
+    pub filec: usize,
+}
+
+impl Tsp {
+    pub fn new(size: usize) -> Self {
+        Tsp {
+            memory_size: size,
+            file: String::new(),
+            filec: 0,
+        }
+    }
+}
+
+pub fn tisp_env_init(size: usize) -> Tsp {
+    Tsp::new(size)
+}
+
+fn skip_whitespace(st: &mut Tsp) {
+    let bytes = st.file.as_bytes();
+    while st.filec < bytes.len() {
+        let c = bytes[st.filec] as char;
+        if c.is_whitespace() {
+            st.filec += 1;
+        } else {
+            break;
+        }
+    }
+}
+
+fn peek_char(st: &Tsp) -> Option<char> {
+    st.file.as_bytes().get(st.filec).map(|&b| b as char)
+}
+
+fn consume_char(st: &mut Tsp) -> Option<char> {
+    let c = peek_char(st)?;
+    st.filec += 1;
+    Some(c)
+}
+
+fn gcd(a: i64, b: i64) -> i64 {
+    if b == 0 {
+        a.abs()
+    } else {
+        gcd(b, a % b)
+    }
+}
+
+fn parse_number(st: &mut Tsp) -> Option<Value> {
+    let start = st.filec;
+    
+    // Check for sign
+    let has_sign = matches!(peek_char(st), Some('+') | Some('-'));
+    if has_sign {
+        st.filec += 1;
+    }
+    
+    let after_sign = st.filec;
+    
+    // Parse digits before dot or slash or e
+    let mut has_digits = false;
+    while let Some(c) = peek_char(st) {
+        if c.is_ascii_digit() {
+            has_digits = true;
+            st.filec += 1;
+        } else {
+            break;
+        }
+    }
+    
+    // Check for fraction
+    if peek_char(st) == Some('/') {
+        if !has_digits {
+            st.filec = start;
+            return None;
+        }
+        
+        st.filec += 1; // consume '/'
+        
+        // Parse denominator sign
+        if let Some(c) = peek_char(st) {
+            if c == '+' || c == '-' {
+                st.filec += 1;
+            }
+        }
+        
+        let mut denom_digits = false;
+        while let Some(c) = peek_char(st) {
+            if c.is_ascii_digit() {
+                denom_digits = true;
+                st.filec += 1;
+            } else {
+                break;
+            }
+        }
+        
+        if !denom_digits {
+            st.filec = start;
+            return None;
+        }
+        
+        // Extract the number strings
+        let slash_pos = st.file[start..st.filec].find('/').unwrap() + start;
+        let numer_str = &st.file[start..slash_pos];
+        let denom_str = &st.file[slash_pos+1..st.filec];
+        
+        let numer: i64 = numer_str.parse().ok()?;
+        let denom: i64 = denom_str.parse().ok()?;
+        
+        if denom == 0 {
+            return None;
+        }
+        
+        // Normalize
+        let g = gcd(numer, denom);
+        let mut n = numer / g;
+        let mut d = denom / g;
+        
+        if d < 0 {
+            n = -n;
+            d = -d;
+        }
+        
+        if d == 1 {
+            return Some(Value::Int(n));
+        } else {
+            return Some(Value::Fraction(n, d));
+        }
+    }
+    
+    // Check for dot
+    let has_dot = peek_char(st) == Some('.');
+    if has_dot {
+        st.filec += 1;
+        // Parse digits after dot
+        while let Some(c) = peek_char(st) {
+            if c.is_ascii_digit() {
+                st.filec += 1;
+            } else {
+                break;
+            }
+        }
+    }
+    
+    // Check for exponent
+    let has_exp = matches!(peek_char(st), Some('e') | Some('E'));
+    if has_exp {
+        st.filec += 1;
+        if let Some(c) = peek_char(st) {
+            if c == '+' || c == '-' {
+                st.filec += 1;
+            }
+        }
+        let mut exp_digits = false;
+        while let Some(c) = peek_char(st) {
+            if c.is_ascii_digit() {
+                exp_digits = true;
+                st.filec += 1;
+            } else {
+                break;
+            }
+        }
+        if !exp_digits {
+            st.filec = start;
+            return None;
+        }
+    }
+    
+    // If we have no digits and no dot (e.g., just "+" or "-"), rollback
+    if !has_digits && !has_dot {
+        st.filec = start;
+        return None;
+    }
+    
+    // If we have dot but no digits before and no digits after (e.g., "."), rollback
+    if has_dot && !has_digits {
+        // Check if there are any digits after the dot
+        let after_dot = after_sign + 1;
+        if after_dot >= st.filec {
+            st.filec = start;
+            return None;
+        }
+    }
+    
+    let num_str = &st.file[start..st.filec];
+    
+    // Try to parse as float first to check if it's a valid number
+    match num_str.parse::<f64>() {
+        Ok(f) => {
+            if has_dot {
+                // Explicit decimal point means float
+                Some(Value::Float(f))
+            } else if has_exp {
+                // Scientific notation: check if result is integer
+                if f.fract() == 0.0 {
+                    Some(Value::Int(f as i64))
+                } else {
+                    Some(Value::Float(f))
+                }
+            } else {
+                // Integer
+                Some(Value::Int(f as i64))
+            }
+        }
+        Err(_) => {
+            st.filec = start;
+            None
+        }
+    }
+}
+
+fn parse_string(st: &mut Tsp) -> Option<Value> {
+    if consume_char(st) != Some('"') {
+        return None;
+    }
+    
+    let mut result = String::new();
+    while let Some(c) = consume_char(st) {
+        if c == '"' {
+            return Some(Value::String(result));
+        } else if c == '\\' {
+            if let Some(next) = consume_char(st) {
+                match next {
+                    'n' => result.push('\n'),
+                    't' => result.push('\t'),
+                    '"' => result.push('"'),
+                    '\\' => result.push('\\'),
+                    _ => result.push(next),
+                }
+            } else {
+                return None;
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    None
+}
+
+fn parse_symbol(st: &mut Tsp) -> Option<Value> {
+    let start = st.filec;
+    
+    while let Some(c) = peek_char(st) {
+        if c.is_alphanumeric() || c == '_' || c == '-' || c == '+' || c == '*' || c == '/' || c == '?' || c == '!' || c == '<' || c == '>' || c == '=' {
+            st.filec += 1;
+        } else {
+            break;
+        }
+    }
+    
+    if start == st.filec {
+        return None;
+    }
+    
+    let sym = &st.file[start..st.filec];
+    
+    match sym {
+        "True" => Some(Value::Symbol("True".to_string())),
+        "Nil" => Some(Value::Nil),
+        "Void" => Some(Value::Symbol("Void".to_string())),
+        _ => Some(Value::Symbol(sym.to_string())),
+    }
+}
+
+pub fn tisp_read(st: &mut Tsp) -> Option<Value> {
+    skip_whitespace(st);
+    
+    if let Some(c) = peek_char(st) {
+        if c == '(' {
+            consume_char(st);
+            skip_whitespace(st);
+            if let Some(c2) = peek_char(st) {
+                if c2 == ')' {
+                    consume_char(st);
+                    return Some(Value::Nil);
+                }
+            }
+            return None;
+        } else if c == '"' {
+            return parse_string(st);
+        } else if c.is_ascii_digit() || c == '+' || c == '-' || c == '.' {
+            let saved_pos = st.filec;
+            if let Some(val) = parse_number(st) {
+                return Some(val);
+            }
+            st.filec = saved_pos;
+            return parse_symbol(st);
+        } else if c.is_alphabetic() {
+            return parse_symbol(st);
+        }
+    }
+    
+    None
+}
+
+pub fn tisp_eval(_st: &mut Tsp, val: Value) -> Option<Value> {
+    Some(val)
+}
+
+fn format_scientific(s: String) -> String {
+    // Convert "1e-5" to "1e-05", "-5e16" to "-5e+16"
+    if let Some(pos) = s.find('e') {
+        let (coeff, exp_part) = s.split_at(pos);
+        let exp_val = &exp_part[1..]; // skip 'e'
+        
+        let exp_num: i32 = exp_val.parse().unwrap();
+        let new_exp = format!("{:+03}", exp_num);
+        
+        format!("{}e{}", coeff, new_exp)
+    } else {
+        s
+    }
+}
+
+pub fn tisp_print<W: Write>(writer: &mut W, val: &Value) {
+    let s = match val {
+        Value::Int(i) => format!("{}", i),
+        Value::Float(f) => {
+            if f.is_nan() {
+                "nan".to_string()
+            } else if f.is_infinite() {
+                if f.is_sign_positive() {
+                    "inf".to_string()
+                } else {
+                    "-inf".to_string()
+                }
+            } else {
+                let abs_f = f.abs();
+                let is_integer = f.fract() == 0.0;
+                let use_scientific = abs_f >= 1e16 || (abs_f < 1e-4 && abs_f > 0.0);
+                
+                if is_integer {
+                    if use_scientific {
+                        let s = format!("{:e}", f);
+                        format_scientific(s)
+                    } else {
+                        if *f == 0.0 && f.is_sign_negative() {
+                            "-0.0".to_string()
+                        } else {
+                            format!("{:.1}", f)
+                        }
+                    }
+                } else {
+                    if use_scientific {
+                        let s = format!("{:e}", f);
+                        format_scientific(s)
+                    } else {
+                        format!("{}", f)
+                    }
+                }
+            }
+        }
+        Value::Fraction(n, d) => format!("{}/{}", n, d),
+        Value::String(s) => s.clone(),
+        Value::Symbol(s) => s.clone(),
+        Value::Nil => "Nil".to_string(),
+    };
+    
+    let _ = writer.write_all(s.as_bytes());
+}
+
+pub fn tib_env_core(st: &mut Tsp) {
+    core::init(st);
+}
+
+pub fn tib_env_math(st: &mut Tsp) {
+    math::init(st);
+}
+
+pub fn tib_env_string(st: &mut Tsp) {
+    string::init(st);
+}
+
+pub fn tisp_env_lib(_st: &mut Tsp, _path: &str) {
+}
+```
+
+{{math.rs}}
+```rust
+use crate::tisp::Tsp;
+pub fn init(_st: &mut Tsp) {
+}
+```
+
+{{string.rs}}
+```rust
+use crate::tisp::Tsp;
+pub fn init(_st: &mut Tsp) {
+}
+```
+
+{{core.rs}}
+```rust
+use crate::tisp::Tsp;
+pub fn init(_st: &mut Tsp) {
+}
+```
+
+{{os.rs}}
+```rust
+
+```
+
+{{io.rs}}
+```rust
+use std::io::{self, Read, Write};
+pub fn read_line() -> io::Result<String> {
+let mut buffer = String::new();
+io::stdin().read_line(&mut buffer)?;
+Ok(buffer)
+}
+pub fn write_output<W: Write>(writer: &mut W, output: &str) -> io::Result<()> {
+writer.write_all(output.as_bytes())?;
+Ok(())
+}
+```
+
+{{lib.rs}}
+```rust
+pub mod core;
+pub mod io;
+pub mod tisp;
+pub mod math;
+pub mod string;
+pub mod os;
+```

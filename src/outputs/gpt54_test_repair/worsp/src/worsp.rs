@@ -1,0 +1,1407 @@
+#[derive(Debug, Clone)]
+pub struct Token {
+pub kind: TokenKind,
+pub next: Option<Box<Token>>,
+pub val: i32,
+pub str: String,
+}
+pub const OBJECT_NUMBER: usize = 50;
+pub const BLOCK_SIZE: usize = std::mem::size_of::<Object>();
+pub const MEMORY_SIZE: usize = BLOCK_SIZE * OBJECT_NUMBER;
+pub const FREE_BITMAP_SIZE: usize = MEMORY_SIZE / BLOCK_SIZE;
+pub const MAX_BINDINGS: usize = 10;
+pub const MAX_SYMBOL_NAME_LENGTH: usize = 20;
+#[derive(Debug, Clone, Copy)]
+pub enum ConsCellType {
+Cell,
+Nil,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenKind {
+Digit,
+LParen,
+RParen,
+Symbol,
+String,
+True,
+False,
+Eof,
+Quote,
+}
+#[derive(Debug, Clone)]
+pub struct ParseState {
+pub token: Option<Box<Token>>,
+pub pos: i32,
+}
+#[derive(Debug, Clone)]
+pub struct ProgramNode {
+pub expressions: Option<Box<ExpressionList>>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExpressionType {
+Literal,
+Symbol,
+List,
+SymbolicExp,
+}
+#[derive(Debug, Clone)]
+pub struct ExpressionList {
+pub expression: Option<Box<ExpressionNode>>,
+pub next: Option<Box<ExpressionList>>,
+}
+#[derive(Debug, Clone)]
+pub struct ExpressionNode {
+pub type_: ExpressionType,
+pub data: ExpressionData,
+}
+#[derive(Debug, Clone)]
+pub enum ExpressionData {
+SymbolicExp(Option<Box<SymbolicExpNode>>),
+List(Option<Box<ListNode>>),
+Literal(Option<Box<LiteralNode>>),
+Symbol(Option<Box<SymbolNode>>),
+}
+#[derive(Debug, Clone)]
+pub struct SymbolicExpNode {
+pub expressions: Option<Box<ExpressionList>>,
+}
+#[derive(Debug, Clone)]
+pub struct ListNode {
+pub expressions: Option<Box<ExpressionList>>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LiteralType {
+Integer,
+String,
+Boolean,
+}
+#[derive(Debug, Clone)]
+pub struct LiteralNode {
+pub type_: LiteralType,
+pub value: LiteralValue,
+}
+#[derive(Debug, Clone)]
+pub enum LiteralValue {
+IntValue(i32),
+BooleanValue(bool),
+StringValue(String),
+}
+#[derive(Debug, Clone)]
+pub struct SymbolNode {
+pub symbol_name: String,
+}
+#[derive(Debug, Clone)]
+pub struct ParseResult {
+pub program: Option<Box<ProgramNode>>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObjectType {
+Integer,
+String,
+Bool,
+List,
+Nil,
+Function,
+}
+#[derive(Debug, Clone)]
+pub struct ConsCell {
+pub type_: ConsCellType,
+pub car: Option<Box<Object>>,
+pub cdr: Option<Box<Object>>,
+}
+#[derive(Debug, Clone)]
+pub struct Function {
+pub param_symbol_names: Vec<String>,
+pub body: Option<Box<ExpressionNode>>,
+}
+#[derive(Debug, Clone)]
+pub struct Object {
+pub marked: bool,
+pub type_: ObjectType,
+pub value: ObjectValue,
+}
+#[derive(Debug, Clone)]
+pub enum ObjectValue {
+IntValue(i32),
+StringValue(String),
+BoolValue(i32),
+ListValue(Option<Box<ConsCell>>),
+FunctionValue(Option<Box<Function>>),
+}
+#[derive(Debug, Clone)]
+pub struct Binding {
+pub symbol_name: String,
+pub value: Option<Box<Object>>,
+}
+#[derive(Debug, Clone)]
+pub struct Env {
+pub bindings: [Binding; MAX_BINDINGS],
+pub parent: Option<Box<Env>>,
+}
+#[derive(Debug, Clone)]
+pub struct ObjectStack {
+pub objects: [Option<Box<Object>>; OBJECT_NUMBER],
+pub top: i32,
+}
+#[derive(Debug, Clone)]
+pub struct AllocatorContext {
+pub gc_less_mode: i32,
+pub stack: Option<Box<ObjectStack>>,
+pub memory_pool: Option<Box<Object>>,
+pub free_bitmap: [u8; FREE_BITMAP_SIZE],
+}
+fn default_binding() -> Binding {
+Binding {
+symbol_name: String::new(),
+value: None,
+}
+}
+fn default_object() -> Object {
+Object {
+marked: false,
+type_: ObjectType::Nil,
+value: ObjectValue::IntValue(0),
+}
+}
+fn blank_token() -> Token {
+Token {
+kind: TokenKind::Eof,
+next: None,
+val: 0,
+str: String::new(),
+}
+}
+fn current_token_ref(state: &ParseState) -> &Token {
+state
+.token
+.as_ref()
+.map(|b| b.as_ref())
+.unwrap_or_else(|| panic!("parser token is not initialized"))
+}
+fn current_token_mut(state: &mut ParseState) -> &mut Token {
+state
+.token
+.as_mut()
+.map(|b| b.as_mut())
+.unwrap_or_else(|| panic!("parser token is not initialized"))
+}
+fn append_token(state: &mut ParseState, new_tok: Token) {
+match state.token.as_mut() {
+None => {
+state.token = Some(Box::new(new_tok));
+}
+Some(head) => {
+let mut cur = head.as_mut();
+while cur.next.is_some() {
+cur = cur.next.as_mut().expect("token next exists");
+}
+cur.next = Some(Box::new(new_tok));
+state.token = cur.next.clone();
+}
+}
+}
+fn isop(ch: char) -> bool {
+matches!(ch, '+' | '-' | '*' | '/' | '%' | '|' | '&' | '=' | '<' | '>')
+}
+fn match_kind(state: &ParseState, kind: TokenKind) -> bool {
+state
+.token
+.as_ref()
+.map(|t| t.kind == kind)
+.unwrap_or(false)
+}
+pub fn match_token(state: &mut ParseState, kind: TokenKind) -> i32 {
+if match_kind(state, kind) { 1 } else { 0 }
+}
+pub fn next(source: &str, state: &mut ParseState) {
+let chars: Vec<char> = source.chars().collect();
+while (state.pos as usize) < chars.len()
+&& (chars[state.pos as usize].is_whitespace() || chars[state.pos as usize] == '\n')
+{
+state.pos += 1;
+}
+let pos = state.pos as usize;
+let ch = if pos < chars.len() { chars[pos] } else { '\0' };
+let mut new_tok = blank_token();
+if ch == '(' {
+new_tok.kind = TokenKind::LParen;
+new_tok.str = "(".to_string();
+state.pos += 1;
+} else if ch == ')' {
+new_tok.kind = TokenKind::RParen;
+new_tok.str = ")".to_string();
+state.pos += 1;
+} else if ch == '\'' {
+new_tok.kind = TokenKind::Quote;
+new_tok.str = "'".to_string();
+state.pos += 1;
+} else if ch == '\0' {
+new_tok.kind = TokenKind::Eof;
+new_tok.str = "\0".to_string();
+} else if ch.is_ascii_alphabetic() || isop(ch) {
+let start = state.pos as usize;
+while (state.pos as usize) < chars.len() {
+let c = chars[state.pos as usize];
+if c.is_ascii_alphanumeric() || isop(c) {
+state.pos += 1;
+} else {
+break;
+}
+}
+let s: String = chars[start..state.pos as usize].iter().collect();
+match s.as_str() {
+"true" => {
+new_tok.kind = TokenKind::True;
+new_tok.str = s;
+}
+"false" => {
+new_tok.kind = TokenKind::False;
+new_tok.str = s;
+}
+_ => {
+new_tok.kind = TokenKind::Symbol;
+new_tok.str = s;
+}
+}
+} else if ch.is_ascii_digit() {
+let start = state.pos as usize;
+while (state.pos as usize) < chars.len() && chars[state.pos as usize].is_ascii_digit() {
+state.pos += 1;
+}
+let s: String = chars[start..state.pos as usize].iter().collect();
+let val = s.parse::<i32>().unwrap_or(0);
+new_tok.kind = TokenKind::Digit;
+new_tok.val = val;
+new_tok.str = s;
+} else if ch == '"' {
+state.pos += 1;
+let start = state.pos as usize;
+while (state.pos as usize) < chars.len() {
+let c = chars[state.pos as usize];
+if c != '"' && c != '\0' {
+state.pos += 1;
+} else {
+break;
+}
+}
+let s: String = chars[start..state.pos as usize].iter().collect();
+new_tok.kind = TokenKind::String;
+new_tok.str = s;
+if (state.pos as usize) < chars.len() && chars[state.pos as usize] == '"' {
+state.pos += 1;
+}
+} else if ch == ';' {
+while (state.pos as usize) < chars.len() {
+let c = chars[state.pos as usize];
+if c != '\n' && c != '\0' {
+state.pos += 1;
+} else {
+break;
+}
+}
+next(source, state);
+return;
+} else {
+panic!("Unexpected token: {}", ch);
+}
+append_token(state, new_tok);
+}
+fn parse_expression(source: &str, state: &mut ParseState) -> ExpressionNode {
+if match_kind(state, TokenKind::LParen) {
+parse_symbolic_expression(source, state)
+} else if match_kind(state, TokenKind::Quote) {
+parse_list_expression(source, state)
+} else if match_kind(state, TokenKind::Symbol) {
+parse_symbol_expression(source, state)
+} else if match_kind(state, TokenKind::Digit)
+|| match_kind(state, TokenKind::String)
+|| match_kind(state, TokenKind::True)
+|| match_kind(state, TokenKind::False)
+{
+parse_literal_expression(source, state)
+} else {
+panic!("Unexpected token: {}", current_token_ref(state).str);
+}
+}
+fn append_expression_to_list(list: &mut Option<Box<ExpressionList>>, expr: ExpressionNode) {
+let new_node = Box::new(ExpressionList {
+expression: Some(Box::new(expr)),
+next: None,
+});
+match list {
+None => *list = Some(new_node),
+Some(head) => {
+let mut cur = head.as_mut();
+while cur.next.is_some() {
+cur = cur.next.as_mut().expect("list next exists");
+}
+cur.next = Some(new_node);
+}
+}
+}
+fn parse_symbolic_expression(source: &str, state: &mut ParseState) -> ExpressionNode {
+next(source, state);
+let mut expressions: Option<Box<ExpressionList>> = None;
+while !match_kind(state, TokenKind::RParen) {
+let expr = parse_expression(source, state);
+append_expression_to_list(&mut expressions, expr);
+}
+next(source, state);
+ExpressionNode {
+type_: ExpressionType::SymbolicExp,
+data: ExpressionData::SymbolicExp(Some(Box::new(SymbolicExpNode { expressions }))),
+}
+}
+fn parse_list_expression(source: &str, state: &mut ParseState) -> ExpressionNode {
+next(source, state);
+next(source, state);
+let mut expressions: Option<Box<ExpressionList>> = None;
+while !match_kind(state, TokenKind::RParen) {
+let expr = parse_expression(source, state);
+append_expression_to_list(&mut expressions, expr);
+}
+next(source, state);
+ExpressionNode {
+type_: ExpressionType::List,
+data: ExpressionData::List(Some(Box::new(ListNode { expressions }))),
+}
+}
+fn parse_symbol_expression(source: &str, state: &mut ParseState) -> ExpressionNode {
+let name = current_token_ref(state).str.clone();
+next(source, state);
+ExpressionNode {
+type_: ExpressionType::Symbol,
+data: ExpressionData::Symbol(Some(Box::new(SymbolNode { symbol_name: name }))),
+}
+}
+fn parse_literal_expression(source: &str, state: &mut ParseState) -> ExpressionNode {
+if match_kind(state, TokenKind::Digit) {
+let v = current_token_ref(state).val;
+next(source, state);
+ExpressionNode {
+type_: ExpressionType::Literal,
+data: ExpressionData::Literal(Some(Box::new(LiteralNode {
+type_: LiteralType::Integer,
+value: LiteralValue::IntValue(v),
+}))),
+}
+} else if match_kind(state, TokenKind::String) {
+let s = current_token_ref(state).str.clone();
+next(source, state);
+ExpressionNode {
+type_: ExpressionType::Literal,
+data: ExpressionData::Literal(Some(Box::new(LiteralNode {
+type_: LiteralType::String,
+value: LiteralValue::StringValue(s),
+}))),
+}
+} else if match_kind(state, TokenKind::True) {
+next(source, state);
+ExpressionNode {
+type_: ExpressionType::Literal,
+data: ExpressionData::Literal(Some(Box::new(LiteralNode {
+type_: LiteralType::Boolean,
+value: LiteralValue::BooleanValue(true),
+}))),
+}
+} else if match_kind(state, TokenKind::False) {
+next(source, state);
+ExpressionNode {
+type_: ExpressionType::Literal,
+data: ExpressionData::Literal(Some(Box::new(LiteralNode {
+type_: LiteralType::Boolean,
+value: LiteralValue::BooleanValue(false),
+}))),
+}
+} else {
+panic!("Unexpected token: {}", current_token_ref(state).str);
+}
+}
+fn parse_program(source: &str, state: &mut ParseState, result: &mut ParseResult) {
+next(source, state);
+let mut expressions: Option<Box<ExpressionList>> = None;
+while !match_kind(state, TokenKind::Eof) {
+let expr = parse_expression(source, state);
+append_expression_to_list(&mut expressions, expr);
+}
+result.program = Some(Box::new(ProgramNode { expressions }));
+}
+pub fn parse(source: &str, state: &mut ParseState, result: &mut ParseResult) {
+parse_program(source, state, result);
+}
+fn initialize_object_stack(stack: &mut ObjectStack) {
+stack.top = -1;
+}
+fn push_object_stack(stack: &mut ObjectStack, obj: &Object) {
+if stack.top as usize >= OBJECT_NUMBER - 1 {
+panic!("Object stack is full.");
+}
+stack.top += 1;
+stack.objects[stack.top as usize] = Some(Box::new(obj.clone()));
+}
+fn pop_object_stack(stack: &mut ObjectStack) -> Option<Box<Object>> {
+if stack.top == -1 {
+panic!("Object stack is empty.");
+}
+let obj = stack.objects[stack.top as usize].take();
+stack.top -= 1;
+obj
+}
+pub fn init_allocator() -> AllocatorContext {
+let mut stack = ObjectStack {
+objects: std::array::from_fn(|_| None),
+top: -1,
+};
+initialize_object_stack(&mut stack);
+AllocatorContext {
+gc_less_mode: 0,
+stack: Some(Box::new(stack)),
+memory_pool: None,
+free_bitmap: [0; FREE_BITMAP_SIZE],
+}
+}
+pub fn allocate(_context: &mut AllocatorContext, _env: &mut Env) -> Option<Box<Object>> {
+Some(Box::new(default_object()))
+}
+fn bool_val(obj: &Object) -> bool {
+match (&obj.type_, &obj.value) {
+(ObjectType::Bool, ObjectValue::BoolValue(v)) => *v != 0,
+(ObjectType::Nil, _) => false,
+_ => true,
+}
+}
+fn eq_obj(op1: &Object, op2: &Object) -> bool {
+if op1.type_ != op2.type_ {
+return false;
+}
+match (&op1.type_, &op1.value, &op2.value) {
+(ObjectType::Integer, ObjectValue::IntValue(a), ObjectValue::IntValue(b)) => a == b,
+(ObjectType::String, ObjectValue::StringValue(a), ObjectValue::StringValue(b)) => a == b,
+(ObjectType::Bool, ObjectValue::BoolValue(a), ObjectValue::BoolValue(b)) => a == b,
+(ObjectType::List, _, _) => false,
+(ObjectType::Nil, _, _) => true,
+_ => false,
+}
+}
+pub fn stringify_object(obj: &Object) -> String {
+match (&obj.type_, &obj.value) {
+(ObjectType::Integer, ObjectValue::IntValue(v)) => v.to_string(),
+(ObjectType::String, ObjectValue::StringValue(s)) => s.clone(),
+(ObjectType::Bool, ObjectValue::BoolValue(v)) => {
+if *v != 0 { "T".to_string() } else { "F".to_string() }
+}
+(ObjectType::Nil, _) => "nil".to_string(),
+(ObjectType::Function, _) => "<function>".to_string(),
+(ObjectType::List, ObjectValue::ListValue(list)) => {
+let mut parts = Vec::new();
+let mut current = list.as_ref().map(|b| b.as_ref());
+while let Some(cell) = current {
+if let Some(car) = &cell.car {
+parts.push(stringify_object(car));
+}
+match &cell.cdr {
+Some(cdr) if cdr.type_ == ObjectType::List => {
+if let ObjectValue::ListValue(next_cell) = &cdr.value {
+current = next_cell.as_ref().map(|b| b.as_ref());
+} else {
+break;
+}
+}
+_ => break,
+}
+}
+format!("({})", parts.join(" "))
+}
+_ => String::new(),
+}
+}
+fn object_from_literal(expression: &ExpressionNode, evaluated: &mut Object) {
+if let ExpressionData::Literal(Some(lit)) = &expression.data {
+match (&lit.type_, &lit.value) {
+(LiteralType::Integer, LiteralValue::IntValue(v)) => {
+evaluated.type_ = ObjectType::Integer;
+evaluated.value = ObjectValue::IntValue(*v);
+}
+(LiteralType::String, LiteralValue::StringValue(s)) => {
+evaluated.type_ = ObjectType::String;
+evaluated.value = ObjectValue::StringValue(s.clone());
+}
+(LiteralType::Boolean, LiteralValue::BooleanValue(b)) => {
+evaluated.type_ = ObjectType::Bool;
+evaluated.value = ObjectValue::BoolValue(if *b { 1 } else { 0 });
+}
+_ => {}
+}
+}
+}
+fn set_object_to_env(env: &mut Env, symbol_name: &str, obj: Object) {
+for i in 0..MAX_BINDINGS {
+if env.bindings[i].symbol_name.is_empty() {
+env.bindings[i].symbol_name = symbol_name.to_string();
+env.bindings[i].value = Some(Box::new(obj));
+return;
+}
+if env.bindings[i].symbol_name == symbol_name {
+env.bindings[i].value = Some(Box::new(obj));
+return;
+}
+}
+panic!("Environment is full");
+}
+fn lookup_env(env: &Env, symbol_name: &str) -> Option<Object> {
+for i in 0..MAX_BINDINGS {
+if env.bindings[i].symbol_name.is_empty() {
+break;
+}
+if env.bindings[i].symbol_name == symbol_name {
+return env.bindings[i].value.as_ref().map(|v| (**v).clone());
+}
+}
+match &env.parent {
+Some(parent) => lookup_env(parent, symbol_name),
+None => None,
+}
+}
+fn list_from_expressions(
+exprs: &Option<Box<ExpressionList>>,
+env: &mut Env,
+context: &mut AllocatorContext,
+) -> Object {
+let mut values: Vec<Object> = Vec::new();
+let mut cur = exprs.as_ref().map(|b| b.as_ref());
+while let Some(node) = cur {
+if let Some(expr) = &node.expression {
+let mut obj = default_object();
+evaluate_expression(expr, &mut obj, env, context);
+values.push(obj);
+}
+cur = node.next.as_ref().map(|b| b.as_ref());
+}
+if values.is_empty() {
+return Object {
+marked: false,
+type_: ObjectType::Nil,
+value: ObjectValue::IntValue(0),
+};
+}
+fn build(values: &[Object]) -> Box<ConsCell> {
+let car = Box::new(values[0].clone());
+if values.len() == 1 {
+Box::new(ConsCell {
+type_: ConsCellType::Nil,
+car: Some(car),
+cdr: Some(Box::new(Object {
+marked: false,
+type_: ObjectType::Nil,
+value: ObjectValue::IntValue(0),
+})),
+})
+} else {
+Box::new(ConsCell {
+type_: ConsCellType::Cell,
+car: Some(car),
+cdr: Some(Box::new(Object {
+marked: false,
+type_: ObjectType::List,
+value: ObjectValue::ListValue(Some(build(&values[1..]))),
+})),
+})
+}
+}
+Object {
+marked: false,
+type_: ObjectType::List,
+value: ObjectValue::ListValue(Some(build(&values))),
+}
+}
+fn expression_list_to_vec(list: &Option<Box<ExpressionList>>) -> Vec<ExpressionNode> {
+let mut out = Vec::new();
+let mut cur = list.as_ref().map(|b| b.as_ref());
+while let Some(node) = cur {
+if let Some(expr) = &node.expression {
+out.push((**expr).clone());
+}
+cur = node.next.as_ref().map(|b| b.as_ref());
+}
+out
+}
+fn defined_add(op1: &Object, op2: &Object, evaluated: &mut Object) {
+match (&op1.type_, &op1.value, &op2.type_, &op2.value) {
+(
+ObjectType::Integer,
+ObjectValue::IntValue(a),
+ObjectType::Integer,
+ObjectValue::IntValue(b),
+) => {
+evaluated.type_ = ObjectType::Integer;
+evaluated.value = ObjectValue::IntValue(a + b);
+}
+(
+ObjectType::String,
+ObjectValue::StringValue(a),
+ObjectType::String,
+ObjectValue::StringValue(b),
+) => {
+evaluated.type_ = ObjectType::String;
+evaluated.value = ObjectValue::StringValue(format!("{a}{b}"));
+}
+_ => panic!("Type error: operands for + must be integers or strings."),
+}
+}
+fn defined_sub(op1: &Object, op2: &Object, evaluated: &mut Object) {
+if let (
+ObjectType::Integer,
+ObjectValue::IntValue(a),
+ObjectType::Integer,
+ObjectValue::IntValue(b),
+) = (&op1.type_, &op1.value, &op2.type_, &op2.value)
+{
+evaluated.type_ = ObjectType::Integer;
+evaluated.value = ObjectValue::IntValue(a - b);
+} else {
+panic!("Type error: operands for - must be integers.");
+}
+}
+fn defined_mul(op1: &Object, op2: &Object, evaluated: &mut Object) {
+if let (
+ObjectType::Integer,
+ObjectValue::IntValue(a),
+ObjectType::Integer,
+ObjectValue::IntValue(b),
+) = (&op1.type_, &op1.value, &op2.type_, &op2.value)
+{
+evaluated.type_ = ObjectType::Integer;
+evaluated.value = ObjectValue::IntValue(a * b);
+} else {
+panic!("Type error: operands for * must be integers.");
+}
+}
+fn defined_div(op1: &Object, op2: &Object, evaluated: &mut Object) {
+if let (
+ObjectType::Integer,
+ObjectValue::IntValue(a),
+ObjectType::Integer,
+ObjectValue::IntValue(b),
+) = (&op1.type_, &op1.value, &op2.type_, &op2.value)
+{
+evaluated.type_ = ObjectType::Integer;
+evaluated.value = ObjectValue::IntValue(a / b);
+} else {
+panic!("Type error: operands for / must be integers.");
+}
+}
+fn defined_mod(op1: &Object, op2: &Object, evaluated: &mut Object) {
+if let (
+ObjectType::Integer,
+ObjectValue::IntValue(a),
+ObjectType::Integer,
+ObjectValue::IntValue(b),
+) = (&op1.type_, &op1.value, &op2.type_, &op2.value)
+{
+evaluated.type_ = ObjectType::Integer;
+evaluated.value = ObjectValue::IntValue(a % b);
+} else {
+panic!("Type error: operands for % must be integers.");
+}
+}
+fn defined_lt(op1: &Object, op2: &Object, evaluated: &mut Object) {
+if let (
+ObjectType::Integer,
+ObjectValue::IntValue(a),
+ObjectType::Integer,
+ObjectValue::IntValue(b),
+) = (&op1.type_, &op1.value, &op2.type_, &op2.value)
+{
+evaluated.type_ = ObjectType::Bool;
+evaluated.value = ObjectValue::BoolValue(if a < b { 1 } else { 0 });
+} else {
+panic!("Type error: operands for < must be integers.");
+}
+}
+fn defined_gt(op1: &Object, op2: &Object, evaluated: &mut Object) {
+if let (
+ObjectType::Integer,
+ObjectValue::IntValue(a),
+ObjectType::Integer,
+ObjectValue::IntValue(b),
+) = (&op1.type_, &op1.value, &op2.type_, &op2.value)
+{
+evaluated.type_ = ObjectType::Bool;
+evaluated.value = ObjectValue::BoolValue(if a > b { 1 } else { 0 });
+} else {
+panic!("Type error: operands for < must be integers.");
+}
+}
+fn defined_eq(op1: &Object, op2: &Object, evaluated: &mut Object) {
+evaluated.type_ = ObjectType::Bool;
+evaluated.value = ObjectValue::BoolValue(if eq_obj(op1, op2) { 1 } else { 0 });
+}
+fn defined_not(op: &Object, evaluated: &mut Object) {
+if let (ObjectType::Bool, ObjectValue::BoolValue(v)) = (&op.type_, &op.value) {
+evaluated.type_ = ObjectType::Bool;
+evaluated.value = ObjectValue::BoolValue(if *v != 0 { 0 } else { 1 });
+} else {
+panic!("Type error: not operand must be boolean.");
+}
+}
+fn defined_car(op: &Object, evaluated: &mut Object) {
+if op.type_ != ObjectType::List {
+panic!("Type error: car operand must be list.");
+}
+if let ObjectValue::ListValue(Some(cell)) = &op.value {
+if let Some(car) = &cell.car {
+*evaluated = (**car).clone();
+return;
+}
+}
+panic!("Type error: invalid list.");
+}
+fn defined_cdr(op: &Object, evaluated: &mut Object) {
+if op.type_ != ObjectType::List {
+panic!("Type error: cdr operand must be list.");
+}
+if let ObjectValue::ListValue(Some(cell)) = &op.value {
+if let Some(cdr) = &cell.cdr {
+*evaluated = (**cdr).clone();
+return;
+}
+}
+panic!("Type error: invalid list.");
+}
+fn defined_cons(op1: &Object, op2: &Object, evaluated: &mut Object) {
+let cdr_obj = if op2.type_ == ObjectType::List || op2.type_ == ObjectType::Nil {
+Box::new(op2.clone())
+} else {
+Box::new(Object {
+marked: false,
+type_: ObjectType::List,
+value: ObjectValue::ListValue(Some(Box::new(ConsCell {
+type_: ConsCellType::Cell,
+car: Some(Box::new(op2.clone())),
+cdr: Some(Box::new(Object {
+marked: false,
+type_: ObjectType::Nil,
+value: ObjectValue::IntValue(0),
+})),
+}))),
+})
+};
+evaluated.type_ = ObjectType::List;
+evaluated.value = ObjectValue::ListValue(Some(Box::new(ConsCell {
+type_: ConsCellType::Cell,
+car: Some(Box::new(op1.clone())),
+cdr: Some(cdr_obj),
+})));
+}
+fn defined_split(op1: &Object, op2: &Object, evaluated: &mut Object) {
+let s1 = match (&op1.type_, &op1.value) {
+(ObjectType::String, ObjectValue::StringValue(s)) => s.clone(),
+_ => panic!("Type error: split first operand must be string."),
+};
+let s2 = match (&op2.type_, &op2.value) {
+(ObjectType::String, ObjectValue::StringValue(s)) => s.clone(),
+_ => panic!("Type error: split second operand must be string."),
+};
+let parts: Vec<String> = if s2.is_empty() {
+s1.chars().map(|c| c.to_string()).collect()
+} else {
+s1.split(&s2).map(|s| s.to_string()).collect()
+};
+if parts.is_empty() {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+return;
+}
+fn build(parts: &[String]) -> Box<ConsCell> {
+let car = Box::new(Object {
+marked: false,
+type_: ObjectType::String,
+value: ObjectValue::StringValue(parts[0].clone()),
+});
+if parts.len() == 1 {
+Box::new(ConsCell {
+type_: ConsCellType::Cell,
+car: Some(car),
+cdr: Some(Box::new(Object {
+marked: false,
+type_: ObjectType::Nil,
+value: ObjectValue::IntValue(0),
+})),
+})
+} else {
+Box::new(ConsCell {
+type_: ConsCellType::Cell,
+car: Some(car),
+cdr: Some(Box::new(Object {
+marked: false,
+type_: ObjectType::List,
+value: ObjectValue::ListValue(Some(build(&parts[1..]))),
+})),
+})
+}
+}
+evaluated.type_ = ObjectType::List;
+evaluated.value = ObjectValue::ListValue(Some(build(&parts)));
+}
+fn defined_list_ref(op1: &Object, op2: &Object, evaluated: &mut Object) {
+if op1.type_ != ObjectType::List {
+panic!("Type error: list-ref first operand must be list.");
+}
+let index = match (&op2.type_, &op2.value) {
+(ObjectType::Integer, ObjectValue::IntValue(i)) => *i,
+_ => panic!("Type error: list-ref second operand must be integer."),
+};
+let mut current = match &op1.value {
+ObjectValue::ListValue(Some(cell)) => cell.as_ref(),
+_ => panic!("Type error: invalid list."),
+};
+for _ in 0..index {
+match &current.cdr {
+Some(cdr) if cdr.type_ == ObjectType::List => {
+if let ObjectValue::ListValue(Some(next)) = &cdr.value {
+current = next.as_ref();
+} else {
+panic!("Index out of range.");
+}
+}
+_ => panic!("Index out of range."),
+}
+}
+if let Some(car) = &current.car {
+*evaluated = (**car).clone();
+}
+}
+fn defined_remove_whitespaces(op1: &Object, evaluated: &mut Object) {
+let s = match (&op1.type_, &op1.value) {
+(ObjectType::String, ObjectValue::StringValue(s)) => s,
+_ => panic!("Type error: remove-whitespaces operand must be string."),
+};
+let new_s: String = s.chars().filter(|c| !c.is_whitespace()).collect();
+evaluated.type_ = ObjectType::String;
+evaluated.value = ObjectValue::StringValue(new_s);
+}
+fn last_cell(cell: &ConsCell) -> bool {
+matches!(&cell.cdr, Some(cdr) if cdr.type_ == ObjectType::Nil)
+}
+fn defined_pop(op: &Object, evaluated: &mut Object) {
+if op.type_ == ObjectType::Nil {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+return;
+}
+if op.type_ != ObjectType::List {
+panic!("Type error: pop operand must be list.");
+}
+let mut current = match &op.value {
+ObjectValue::ListValue(Some(cell)) => cell.as_ref(),
+_ => panic!("Type error: invalid list."),
+};
+loop {
+if last_cell(current) {
+if let Some(car) = &current.car {
+*evaluated = (**car).clone();
+return;
+}
+}
+match &current.cdr {
+Some(cdr) if cdr.type_ == ObjectType::List => {
+if let ObjectValue::ListValue(Some(next)) = &cdr.value {
+current = next.as_ref();
+} else {
+break;
+}
+}
+_ => break,
+}
+}
+}
+fn defined_push(op1: &Object, op2: &Object, evaluated: &mut Object) {
+if op1.type_ == ObjectType::Nil {
+*evaluated = op2.clone();
+return;
+}
+if op1.type_ != ObjectType::List {
+panic!("Type error: push second operand must be list.");
+}
+*evaluated = op2.clone();
+}
+fn defined_length(op: &Object, evaluated: &mut Object) {
+match (&op.type_, &op.value) {
+(ObjectType::Nil, _) => {
+evaluated.type_ = ObjectType::Integer;
+evaluated.value = ObjectValue::IntValue(0);
+}
+(ObjectType::String, ObjectValue::StringValue(s)) => {
+evaluated.type_ = ObjectType::Integer;
+evaluated.value = ObjectValue::IntValue(s.chars().count() as i32);
+}
+(ObjectType::List, ObjectValue::ListValue(Some(cell))) => {
+let mut len = 1;
+let mut current = cell.as_ref();
+loop {
+if last_cell(current) {
+break;
+}
+len += 1;
+match &current.cdr {
+Some(cdr) if cdr.type_ == ObjectType::List => {
+if let ObjectValue::ListValue(Some(next)) = &cdr.value {
+current = next.as_ref();
+} else {
+break;
+}
+}
+_ => break,
+}
+}
+evaluated.type_ = ObjectType::Integer;
+evaluated.value = ObjectValue::IntValue(len);
+}
+_ => panic!("Type error: length operand must be list or string."),
+}
+}
+fn defined_is_int_string(op: &Object, evaluated: &mut Object) {
+let res = match (&op.type_, &op.value) {
+(ObjectType::String, ObjectValue::StringValue(s)) => s.chars().all(|c| c.is_ascii_digit()),
+_ => false,
+};
+evaluated.type_ = ObjectType::Bool;
+evaluated.value = ObjectValue::BoolValue(if res { 1 } else { 0 });
+}
+fn defined_parse_int(op: &Object, evaluated: &mut Object) {
+let s = match (&op.type_, &op.value) {
+(ObjectType::String, ObjectValue::StringValue(s)) => s,
+_ => panic!("Type error: parse-int operand must be string."),
+};
+if !s.chars().all(|c| c.is_ascii_digit()) {
+panic!("Type error: parse-int operand must be string of digits.");
+}
+evaluated.type_ = ObjectType::Integer;
+evaluated.value = ObjectValue::IntValue(s.parse::<i32>().unwrap_or(0));
+}
+fn defined_string_ref(op1: &Object, op2: &Object, evaluated: &mut Object) {
+let s = match (&op1.type_, &op1.value) {
+(ObjectType::String, ObjectValue::StringValue(s)) => s,
+_ => panic!("Type error: string-ref first operand must be string."),
+};
+let index = match (&op2.type_, &op2.value) {
+(ObjectType::Integer, ObjectValue::IntValue(i)) => *i,
+_ => panic!("Type error: string-ref second operand must be integer."),
+};
+let chars: Vec<char> = s.chars().collect();
+if index < 0 || index as usize >= chars.len() {
+panic!("Index out of range.");
+}
+evaluated.type_ = ObjectType::String;
+evaluated.value = ObjectValue::StringValue(chars[index as usize].to_string());
+}
+fn evaluate_list_expression(
+expression: &ExpressionNode,
+evaluated: &mut Object,
+env: &mut Env,
+context: &mut AllocatorContext,
+) {
+if let ExpressionData::List(Some(list)) = &expression.data {
+if list.expressions.is_none() {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+return;
+}
+*evaluated = list_from_expressions(&list.expressions, env, context);
+} else {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+}
+}
+fn evaluate_symbol_expression(expression: &ExpressionNode, evaluated: &mut Object, env: &mut Env) {
+if let ExpressionData::Symbol(Some(sym)) = &expression.data {
+if sym.symbol_name == "nil" {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+return;
+}
+if let Some(obj) = lookup_env(env, &sym.symbol_name) {
+*evaluated = obj;
+return;
+}
+panic!("Undefined symbol: {}", sym.symbol_name);
+}
+}
+fn evaluate_symbolic_expression(
+expression: &ExpressionNode,
+evaluated: &mut Object,
+env: &mut Env,
+context: &mut AllocatorContext,
+) {
+let exprs = if let ExpressionData::SymbolicExp(Some(sym)) = &expression.data {
+expression_list_to_vec(&sym.expressions)
+} else {
+Vec::new()
+};
+if exprs.is_empty() {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+return;
+}
+let head = &exprs[0];
+let symbol_name = if let ExpressionData::Symbol(Some(sym)) = &head.data {
+sym.symbol_name.clone()
+} else {
+panic!("S-exp must be started with symbol.");
+};
+match symbol_name.as_str() {
+"if" => {
+if exprs.len() < 3 {
+panic!("if must have condition and then clause.");
+}
+let mut cond_obj = default_object();
+evaluate_expression(&exprs[1], &mut cond_obj, env, context);
+if bool_val(&cond_obj) {
+evaluate_expression(&exprs[2], evaluated, env, context);
+} else if exprs.len() >= 4 {
+evaluate_expression(&exprs[3], evaluated, env, context);
+} else {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+}
+}
+"while" => {
+if exprs.len() < 3 {
+panic!("if must have condition and then clause.");
+}
+loop {
+let mut cond_obj = default_object();
+evaluate_expression(&exprs[1], &mut cond_obj, env, context);
+if bool_val(&cond_obj) {
+evaluate_expression(&exprs[2], evaluated, env, context);
+} else {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+break;
+}
+}
+}
+"=" => {
+if exprs.len() < 3 {
+panic!("assignment must have expression.");
+}
+let sym = if let ExpressionData::Symbol(Some(sym)) = &exprs[1].data {
+sym.symbol_name.clone()
+} else {
+panic!("Variable name must be symbol.");
+};
+let mut obj = default_object();
+evaluate_expression(&exprs[2], &mut obj, env, context);
+*evaluated = obj.clone();
+set_object_to_env(env, &sym, obj);
+}
+"defun" => {
+if exprs.len() < 4 {
+panic!("Function must have body.");
+}
+let name = if let ExpressionData::Symbol(Some(sym)) = &exprs[1].data {
+sym.symbol_name.clone()
+} else {
+panic!("Function name must be symbol.");
+};
+let params = if let ExpressionData::SymbolicExp(Some(se)) = &exprs[2].data {
+expression_list_to_vec(&se.expressions)
+.into_iter()
+.map(|e| match e.data {
+ExpressionData::Symbol(Some(s)) => s.symbol_name,
+_ => panic!("Function parameter must be symbol."),
+})
+.collect::<Vec<_>>()
+} else {
+panic!("Function parameter must be list.");
+};
+let fun = Function {
+param_symbol_names: params,
+body: Some(Box::new(exprs[3].clone())),
+};
+evaluated.type_ = ObjectType::Function;
+evaluated.value = ObjectValue::FunctionValue(Some(Box::new(fun)));
+set_object_to_env(env, &name, evaluated.clone());
+}
+"+" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_add(&a, &b, evaluated);
+}
+"-" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_sub(&a, &b, evaluated);
+}
+"*" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_mul(&a, &b, evaluated);
+}
+"/" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_div(&a, &b, evaluated);
+}
+"%" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_mod(&a, &b, evaluated);
+}
+"||" => {
+for expr in exprs.iter().skip(1) {
+let mut operand = default_object();
+evaluate_expression(expr, &mut operand, env, context);
+if bool_val(&operand) {
+evaluated.type_ = ObjectType::Bool;
+evaluated.value = ObjectValue::BoolValue(1);
+return;
+}
+}
+evaluated.type_ = ObjectType::Bool;
+evaluated.value = ObjectValue::BoolValue(0);
+}
+"&&" => {
+for expr in exprs.iter().skip(1) {
+let mut operand = default_object();
+evaluate_expression(expr, &mut operand, env, context);
+if !bool_val(&operand) {
+evaluated.type_ = ObjectType::Bool;
+evaluated.value = ObjectValue::BoolValue(0);
+return;
+}
+}
+evaluated.type_ = ObjectType::Bool;
+evaluated.value = ObjectValue::BoolValue(1);
+}
+"<" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_lt(&a, &b, evaluated);
+}
+">" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_gt(&a, &b, evaluated);
+}
+"eq" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_eq(&a, &b, evaluated);
+}
+"not" => {
+let mut a = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+defined_not(&a, evaluated);
+}
+"print" => {
+let mut a = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+println!("{}", stringify_object(&a));
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+}
+"car" => {
+let mut a = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+defined_car(&a, evaluated);
+}
+"cdr" => {
+let mut a = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+defined_cdr(&a, evaluated);
+}
+"cons" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_cons(&a, &b, evaluated);
+}
+"readline" => {
+let mut buf = String::new();
+let read = std::io::stdin().read_line(&mut buf);
+match read {
+Ok(0) => {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+}
+Ok(_) => {
+if buf.ends_with('\n') {
+buf.pop();
+if buf.ends_with('\r') {
+buf.pop();
+}
+}
+evaluated.type_ = ObjectType::String;
+evaluated.value = ObjectValue::StringValue(buf);
+}
+Err(_) => {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+}
+}
+}
+"split" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_split(&a, &b, evaluated);
+}
+"list-ref" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_list_ref(&a, &b, evaluated);
+}
+"progn" => {
+let mut last: Option<Object> = None;
+for expr in exprs.iter().skip(1) {
+let mut a = default_object();
+evaluate_expression(expr, &mut a, env, context);
+last = Some(a);
+}
+if let Some(v) = last {
+*evaluated = v;
+} else {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+}
+}
+"remove-whitespaces" => {
+let mut a = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+defined_remove_whitespaces(&a, evaluated);
+}
+"pop" => {
+let mut a = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+defined_pop(&a, evaluated);
+}
+"push" => {
+let mut op1 = default_object();
+let mut op2 = default_object();
+evaluate_expression(&exprs[2], &mut op1, env, context);
+evaluate_expression(&exprs[1], &mut op2, env, context);
+defined_push(&op2, &op1, evaluated);
+}
+"length" => {
+let mut a = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+defined_length(&a, evaluated);
+}
+"is-int-string" => {
+let mut a = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+defined_is_int_string(&a, evaluated);
+}
+"parse-int" => {
+let mut a = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+defined_parse_int(&a, evaluated);
+}
+"string-ref" => {
+let mut a = default_object();
+let mut b = default_object();
+evaluate_expression(&exprs[1], &mut a, env, context);
+evaluate_expression(&exprs[2], &mut b, env, context);
+defined_string_ref(&a, &b, evaluated);
+}
+_ => {
+let func_obj = lookup_env(env, &symbol_name)
+.unwrap_or_else(|| panic!("Undefined function: {}", symbol_name));
+let function = match func_obj.value {
+ObjectValue::FunctionValue(Some(f)) => f,
+_ => panic!("Undefined function: {}", symbol_name),
+};
+let mut new_env = Env {
+bindings: std::array::from_fn(|_| default_binding()),
+parent: Some(Box::new(env.clone())),
+};
+for (i, param_name) in function.param_symbol_names.iter().enumerate() {
+if i + 1 >= exprs.len() {
+break;
+}
+let mut param = default_object();
+evaluate_expression(&exprs[i + 1], &mut param, env, context);
+set_object_to_env(&mut new_env, param_name, param);
+}
+if let Some(body) = &function.body {
+evaluate_expression(body, evaluated, &mut new_env, context);
+} else {
+evaluated.type_ = ObjectType::Nil;
+evaluated.value = ObjectValue::IntValue(0);
+}
+}
+}
+}
+pub fn evaluate_expression(
+expression: &ExpressionNode,
+result: &mut Object,
+env: &mut Env,
+context: &mut AllocatorContext,
+) {
+if let Some(stack) = context.stack.as_mut() {
+push_object_stack(stack, result);
+}
+match expression.type_ {
+ExpressionType::List => evaluate_list_expression(expression, result, env, context),
+ExpressionType::SymbolicExp => evaluate_symbolic_expression(expression, result, env, context),
+ExpressionType::Literal => object_from_literal(expression, result),
+ExpressionType::Symbol => evaluate_symbol_expression(expression, result, env),
+}
+if let Some(stack) = context.stack.as_mut() {
+let _ = pop_object_stack(stack);
+}
+}
+pub fn evaluate_expression_with_context(
+expression: &ExpressionNode,
+result: &mut Object,
+env: &mut Env,
+) {
+let mut context = init_allocator();
+evaluate_expression(expression, result, env, &mut context);
+}
+pub fn init_env(env: &mut Env) {
+env.parent = None;
+env.bindings = std::array::from_fn(|_| default_binding());
+}
+fn evaluate_program(program: &ProgramNode) {
+let mut env = Env {
+bindings: std::array::from_fn(|_| default_binding()),
+parent: None,
+};
+init_env(&mut env);
+let mut context = init_allocator();
+let mut current = program.expressions.as_ref().map(|b| b.as_ref());
+while let Some(node) = current {
+if let Some(expr) = &node.expression {
+let mut evaluated = default_object();
+evaluate_expression(expr, &mut evaluated, &mut env, &mut context);
+}
+current = node.next.as_ref().map(|b| b.as_ref());
+}
+}
+pub fn evaluate(result: &mut ParseResult) {
+if let Some(program) = &result.program {
+evaluate_program(program);
+}
+}

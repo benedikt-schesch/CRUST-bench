@@ -1,0 +1,4 @@
+```rust
+pub mod simple_config;
+pub use crate::simple_config::*;
+```

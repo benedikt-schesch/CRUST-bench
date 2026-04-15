@@ -1,0 +1,352 @@
+{{snprintf.rs}} 
+```rust
+// Generated Rust Code
+use std::cmp;
+
+pub fn rpl_vsnprintf(
+    s: &mut String,
+    n: usize,
+    format: &str,
+    args: &[&str],
+) -> i32 {
+    let mut result = String::new();
+    let mut arg_idx = 0;
+    let mut chars = format.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            if let Some(&'%') = chars.peek() {
+                result.push('%');
+                chars.next();
+            } else {
+                while let Some(&next_c) = chars.peek() {
+                    if next_c.is_alphabetic() {
+                        chars.next();
+                        break;
+                    }
+                    chars.next();
+                }
+                if arg_idx < args.len() {
+                    result.push_str(args[arg_idx]);
+                    arg_idx += 1;
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    let len = result.len();
+    if n > 0 {
+        let copy_len = cmp::min(len, n - 1);
+        s.push_str(&result[..copy_len]);
+    }
+    len as i32
+}
+
+pub fn fmtstr(
+    s: &mut String,
+    _size: usize,
+    value: &str,
+    _width: usize,
+    _precision: usize,
+    _flags: i32,
+) {
+    s.push_str(value);
+}
+
+pub fn fmtint(
+    s: &mut String,
+    _size: usize,
+    value: i32,
+    _width: usize,
+    _precision: usize,
+    _flags: i32,
+) {
+    s.push_str(&value.to_string());
+}
+
+pub fn fmtflt(
+    s: &mut String,
+    _size: usize,
+    value: f64,
+    _width: usize,
+    _precision: usize,
+    _flags: i32,
+) {
+    s.push_str(&value.to_string());
+}
+
+pub fn printsep(
+    s: &mut String,
+    _size: usize,
+) {
+    s.push(',');
+}
+
+pub fn getnumsep(digits: i32) -> i32 {
+    (digits - if digits % 3 == 0 { 1 } else { 0 }) / 3
+}
+
+pub fn getexponent(value: f64) -> i32 {
+    if value == 0.0 {
+        return 0;
+    }
+    value.abs().log10().floor() as i32
+}
+
+pub fn convert(
+    mut value: usize, 
+    buf: &mut String,
+    base: usize,
+    caps: usize,
+) {
+    let digits = if caps != 0 { "0123456789ABCDEF" } else { "0123456789abcdef" };
+    let mut temp = String::new();
+    loop {
+        temp.push(digits.chars().nth(value % base).unwrap());
+        value /= base;
+        if value == 0 {
+            break;
+        }
+    }
+    buf.push_str(&temp.chars().rev().collect::<String>());
+}
+
+pub fn cast(value: f64) -> i32 {
+    value as i32
+}
+
+pub fn mypow10(mut exponent: i32) -> f64 {
+    let mut result = 1.0;
+    while exponent > 0 {
+        result *= 10.0;
+        exponent -= 1;
+    }
+    while exponent < 0 {
+        result /= 10.0;
+        exponent += 1;
+    }
+    result
+}
+
+pub fn rpl_vasprintf(
+    _s: Vec<String>,
+    _format: &str,
+    _args: &[&str],
+) -> i32 {
+    0
+}
+
+pub fn rpl_asprintf(
+    s: &mut String,
+    format: &str,
+    args: &[&str],
+) -> i32 {
+    rpl_vsnprintf(s, usize::MAX, format, args)
+}
+
+pub fn main() {
+}
+```
+
+{{xopt.rs}} 
+```rust
+// Generated Rust Code
+use crate::snprintf;
+
+pub const XOPT_TYPE_STRING: i64 = 0x1;
+pub const XOPT_TYPE_INT: i64    = 0x2;
+pub const XOPT_TYPE_LONG: i64   = 0x4;
+pub const XOPT_TYPE_FLOAT: i64  = 0x8;
+pub const XOPT_TYPE_DOUBLE: i64 = 0x10;
+pub const XOPT_TYPE_BOOL: i64   = 0x20;
+pub const XOPT_OPTIONAL: i64    = 0x40;
+
+pub const XOPT_CTX_KEEPFIRST: i64     = 0x1;
+pub const XOPT_CTX_POSIXMEHARDER: i64 = 0x2;
+pub const XOPT_CTX_NOCONDENSE: i64    = 0x4;
+pub const XOPT_CTX_SLOPPYSHORTS: i64  = 0x8 | XOPT_CTX_NOCONDENSE;
+pub const XOPT_CTX_STRICT: i64        = 0x10;
+
+pub type XoptCallback = fn(
+    value: Option<&str>,
+    data: *mut u8,
+    option: &XoptOption,
+    long_arg: bool,
+    err: &mut Option<String>,
+);
+
+#[derive(Debug, Clone)]
+pub struct XoptOption {
+    pub long_arg: Option<String>,
+    pub short_arg: char,
+    pub offset: usize,
+    pub callback: Option<XoptCallback>,
+    pub options: i64,
+    pub arg_descrip: Option<String>,
+    pub descrip: Option<String>,
+}
+
+pub const fn XOPT_NULLOPTION() -> XoptOption {
+    XoptOption {
+        long_arg: None,
+        short_arg: '\0',
+        offset: 0,
+        callback: None,
+        options: 0,
+        arg_descrip: None,
+        descrip: None,
+    }
+}
+
+#[derive(Debug)]
+pub struct XoptContext {
+    pub options: Vec<XoptOption>,
+    pub flags: i64,
+    pub name: Option<String>,
+    pub doubledash: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct XoptAutohelpOptions {
+    pub usage: Option<String>,
+    pub prefix: Option<String>,
+    pub suffix: Option<String>,
+    pub spacer: usize,
+}
+
+pub fn xopt_context(
+    name: Option<&str>,
+    options: &[XoptOption],
+    flags: i64,
+    err: &mut Option<String>,
+) -> Option<Box<XoptContext>> {
+    *err = None;
+    Some(Box::new(XoptContext {
+        options: options.to_vec(),
+        flags,
+        name: name.map(|s| s.to_string()),
+        doubledash: false,
+    }))
+}
+
+pub fn xopt_parse(
+    ctx: &mut XoptContext,
+    argc: i32,
+    argv: &[&str],
+    data: *mut u8,
+    extras: &mut Option<Vec<String>>,
+    err: &mut Option<String>,
+) -> i32 {
+    *err = None;
+    let mut argi = 0;
+    let mut extras_vec = Vec::new();
+
+    if (ctx.flags & XOPT_CTX_KEEPFIRST) == 0 {
+        argi += 1;
+    }
+
+    while argi < argc as usize {
+        let parse_result = _xopt_parse_arg(ctx, argc, argv, &mut argi, data, err);
+        if err.is_some() {
+            break;
+        }
+
+        if parse_result {
+            extras_vec.push(argv[argi].to_string());
+        } else {
+            if (ctx.flags & XOPT_CTX_POSIXMEHARDER) != 0 && !extras_vec.is_empty() {
+                *err = Some(format!("options cannot be specified after arguments: {}", argv[argi]));
+                break;
+            }
+        }
+        argi += 1;
+    }
+
+    if err.is_some() {
+        *extras = None;
+        return 0;
+    }
+
+    let count = extras_vec.len() as i32;
+    *extras = Some(extras_vec);
+    count
+}
+
+pub fn xopt_autohelp(
+    ctx: &mut XoptContext,
+    stream: &mut dyn std::io::Write,
+    options: Option<&XoptAutohelpOptions>,
+    err: &mut Option<String>,
+) {
+    *err = None;
+    let mut nl = "";
+    let spacer = options.map(|o| o.spacer).unwrap_or(2);
+
+    if let Some(opts) = options {
+        if let Some(ref usage) = opts.usage {
+            let _ = writeln!(stream, "{}{}", nl, usage);
+            nl = "\n";
+        }
+        if let Some(ref prefix) = opts.prefix {
+            let _ = writeln!(stream, "{}{}\n", nl, prefix);
+            nl = "\n";
+        }
+    }
+
+    let mut width = 0;
+    for o in &ctx.options {
+        if o.long_arg.is_none() && o.short_arg == '\0' {
+            break;
+        }
+        let mut twidth = 0;
+        if let Some(ref long_arg) = o.long_arg {
+            twidth += 2 + long_arg.len();
+            if let Some(ref arg_descrip) = o.arg_descrip {
+                twidth += 1 + arg_descrip.len();
+            }
+        }
+        if o.short_arg != '\0' {
+            twidth += 2;
+        }
+        if o.short_arg != '\0' && o.long_arg.is_some() {
+            twidth += 2;
+        }
+        if twidth > width {
+            width = twidth;
+        }
+    }
+
+    for o in &ctx.options {
+        if o.long_arg.is_none() && o.short_arg == '\0' {
+            break;
+        }
+        let mut twidth = 0;
+        if o.short_arg != '\0' {
+            let _ = write!(stream, "-{}", o.short_arg);
+            twidth += 2;
+        }
+        if o.short_arg != '\0' && o.long_arg.is_some() {
+            let _ = write!(stream, ", ");
+            twidth += 2;
+        }
+        if let Some(ref long_arg) = o.long_arg {
+            let _ = write!(stream, "--{}", long_arg);
+            twidth += 2 + long_arg.len();
+            if let Some(ref arg_descrip) = o.arg_descrip {
+                let _ = write!(stream, "={}", arg_descrip);
+                twidth += 1 + arg_descrip.len();
+            }
+        }
+        if let Some(ref descrip) = o.descrip {
+            for _ in twidth..(width + spacer) {
+                let _ = write!(stream, " ");
+            }
+            let _ = writeln!(stream, "{}", descrip);
+        } else {
+            let _ = writeln!(stream);
+        }
+    }
+
+    if let Some(opts) = options {
+        if let Some(ref suffix) = opts.suffix {
+            let _ = writeln!(stream

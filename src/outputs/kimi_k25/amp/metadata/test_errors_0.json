@@ -1,0 +1,1 @@
+[{"error_code": ": cannot construct `amp::amp:", "error_message": "Amp` with struct literal syntax due to private fields", "file_path": "amp/src/bin/test.rs", "row": "9", "col": "19", "error_snippet": "|\n9 |     let mut msg = Amp {\n  |                   ^^^\n  |\n  = note: ...and other private field `pos` that was not provided"}]

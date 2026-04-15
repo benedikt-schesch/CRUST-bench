@@ -1,0 +1,168 @@
+use crate::aces_internal::{
+generate_error, generate_f0, generate_f1, generate_linear, generate_secret, generate_u,
+generate_vanisher,
+};
+use crate::channel::{Channel, Parameters};
+use crate::error::{AcesError, Result};
+use crate::matrix::Matrix3D;
+use crate::polynomial::{PolyArray, Polynomial};
+#[derive(Debug, Clone)]
+pub struct PublicKey {
+pub u: Polynomial,
+pub lambda: Matrix3D,
+}
+#[derive(Debug, Clone)]
+pub struct PrivateKey {
+pub x: PolyArray,
+pub f0: PolyArray,
+pub f1: Polynomial,
+}
+#[derive(Debug, Clone)]
+pub struct SharedInfo {
+pub channel: Channel,
+pub param: Parameters,
+pub pk: PublicKey,
+}
+#[derive(Debug, Clone)]
+pub struct Aces {
+pub shared_info: SharedInfo,
+pub private_key: PrivateKey,
+}
+#[derive(Debug, Clone)]
+pub struct CipherMessage {
+pub c1: PolyArray,
+pub c2: Polynomial,
+pub level: u64,
+}
+pub fn set_aces(aces: &mut Aces, dim: usize, mem: &mut [u8]) -> Result<()> {
+let required = std::mem::size_of::<i64>() * (2 * dim + 1 + 2 * dim * dim)
++ std::mem::size_of::<crate::matrix::Matrix2D>() * dim
++ std::mem::size_of::<Polynomial>() * 2 * dim
++ std::mem::size_of::<u64>() * dim * dim * dim;
+if mem.len() < required {
+return Err(AcesError::GenericError("insufficient memory".to_string()));
+}
+aces.shared_info.pk.u = Polynomial::new(vec![0; dim + 1]);
+aces.shared_info.pk.lambda = Matrix3D::new(dim, dim);
+aces.private_key.x = PolyArray::new((0..dim).map(|_| Polynomial::new(vec![0; dim])).collect());
+aces.private_key.f0 =
+PolyArray::new((0..dim).map(|_| Polynomial::new(vec![0; dim])).collect());
+aces.private_key.f1 = Polynomial::new(vec![0; dim]);
+Ok(())
+}
+pub fn init_aces(p: u64, q: u64, dim: u64, aces: &mut Aces) -> Result<()> {
+aces.shared_info.param.dim = dim;
+aces.shared_info.param.N = 1;
+aces.shared_info.channel = Channel::init(p, q, 1)?;
+generate_u(
+&aces.shared_info.channel,
+&aces.shared_info.param,
+&mut aces.shared_info.pk.u,
+)?;
+generate_secret(
+&aces.shared_info.channel,
+&aces.shared_info.param,
+&aces.shared_info.pk.u,
+&mut aces.private_key.x,
+&mut aces.shared_info.pk.lambda,
+)?;
+generate_f0(
+&aces.shared_info.channel,
+&aces.shared_info.param,
+&mut aces.private_key.f0,
+)?;
+generate_f1(
+&aces.shared_info.channel,
+&aces.shared_info.param,
+&aces.private_key.f0,
+&aces.private_key.x,
+&aces.shared_info.pk.u,
+&mut aces.private_key.f1,
+)?;
+Ok(())
+}
+pub fn aces_encrypt(aces: &Aces, message: &[u64], result: &mut CipherMessage) -> Result<()> {
+if message.len() > 1 {
+return Err(AcesError::GenericError("message too large".to_string()));
+}
+let dim = aces.shared_info.param.dim as usize;
+let mut r_m = Polynomial::new(vec![0; dim]);
+let mut e = Polynomial::new(vec![0; dim]);
+let mut b = Polynomial::new(vec![0; dim]);
+generate_error(aces.shared_info.channel.q, message[0], &mut r_m)?;
+generate_vanisher(
+aces.shared_info.channel.p,
+aces.shared_info.channel.q,
+&mut e,
+)?;
+generate_linear(
+aces.shared_info.channel.p,
+aces.shared_info.channel.q,
+&mut b,
+)?;
+for i in 0..dim {
+let mut tmp = b.mul(&aces.private_key.f0.polies[i], aces.shared_info.channel.q)?;
+tmp.poly_mod(&aces.shared_info.pk.u, aces.shared_info.channel.q)?;
+result.c1.polies[i].coeffs = tmp.coeffs.clone();
+}
+let c2_pre = aces.private_key.f1.add(&e, aces.shared_info.channel.q)?;
+let mut tmp = c2_pre.mul(&b, aces.shared_info.channel.q)?;
+tmp = tmp.add(&r_m, aces.shared_info.channel.q)?;
+tmp.poly_mod(&aces.shared_info.pk.u, aces.shared_info.channel.q)?;
+result.c2.coeffs = tmp.coeffs;
+result.level = aces.shared_info.channel.p;
+Ok(())
+}
+pub fn aces_decrypt(aces: &Aces, message: &CipherMessage, result: &mut [u64]) -> Result<()> {
+if result.len() > 1 {
+return Err(AcesError::GenericError("result too large".to_string()));
+}
+let dim = aces.shared_info.param.dim as usize;
+let mut c0tx = Polynomial::new(vec![0; 2 * dim]);
+c0tx.set_zero();
+for i in 0..dim {
+let tmp = message.c1.polies[i].mul(&aces.private_key.x.polies[i], aces.shared_info.channel.q)?;
+c0tx = tmp.add(&c0tx, aces.shared_info.channel.q)?;
+}
+c0tx.fit(aces.shared_info.channel.q)?;
+c0tx = message.c2.sub(&c0tx, aces.shared_info.channel.q)?;
+result[0] =
+((c0tx.coef_sum() % aces.shared_info.channel.q as i64) as u64) % aces.shared_info.channel.p;
+Ok(())
+}
+pub fn aces_add(
+a: &CipherMessage,
+b: &CipherMessage,
+info: &SharedInfo,
+result: &mut CipherMessage,
+) -> Result<()> {
+for i in 0..info.param.dim as usize {
+let mut s = a.c1.polies[i].add(&b.c1.polies[i], info.channel.q)?;
+s.poly_mod(&info.pk.u, info.channel.q)?;
+result.c1.polies[i] = s;
+}
+let mut c2 = a.c2.add(&b.c2, info.channel.q)?;
+c2.poly_mod(&info.pk.u, info.channel.q)?;
+result.c2 = c2;
+result.level = a.level + b.level;
+Ok(())
+}
+pub fn aces_mul(
+a: &CipherMessage,
+b: &CipherMessage,
+info: &SharedInfo,
+result: &mut CipherMessage,
+) -> Result<()> {
+let _ = a;
+let _ = b;
+let _ = info;
+let _ = result;
+Ok(())
+}
+pub fn aces_refresh(info: &SharedInfo, message: &mut CipherMessage, level: u64) -> Result<()> {
+message.c2 = message
+.c2
+.sub_scaler(level * info.channel.p, info.channel.q)?;
+message.level -= level;
+Ok(())
+}

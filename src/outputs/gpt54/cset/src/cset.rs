@@ -1,0 +1,452 @@
+// Generated Rust Code
+
+pub type XXH64HashT = u64;
+pub type XXHU8 = u8;
+pub type XXHU64 = XXH64HashT;
+pub type XXHU32 = u32;
+pub type XXH32HashT = u32;
+
+pub const XXH_PRIME64_1: u64 = 0x9E3779B185EBCA87;
+pub const XXH_PRIME64_2: u64 = 0xC2B2AE3D27D4EB4F;
+pub const XXH_PRIME64_3: u64 = 0x165667B19E3779F9;
+pub const XXH_PRIME64_4: u64 = 0x85EBCA77C2B2AE63;
+pub const XXH_PRIME64_5: u64 = 0x27D4EB2F165667C5;
+
+pub const CSET_FORCE_INITIALIZE: bool = true;
+pub const CSET_INITIAL_CAP: usize = 2;
+pub const CSET_DEFAULT_SEED: u64 = 2718182;
+pub const CSET_MAX_LOAD_FACTOR: f64 = 0.7;
+pub const CSET_MIN_LOAD_FACTOR: f64 = 0.2;
+
+pub fn xxh_get64bits(mem_ptr: &mut XXHU8) -> XXHU64 {
+xxh_read_le64_align(mem_ptr)
+}
+
+pub fn xxh_read_le64(mem_ptr: &mut XXHU8) -> XXHU64 {
+u64::from(*mem_ptr)
+}
+
+pub fn xxh_is_little_endian() -> bool {
+cfg!(target_endian = "little")
+}
+
+pub fn xxh_read_le64_align(mem_ptr: &mut XXHU8) -> XXHU64 {
+xxh_read_le64(mem_ptr)
+}
+
+pub fn xxh_swap32(x: &mut XXHU32) -> XXHU32 {
+x.swap_bytes()
+}
+
+pub fn xxh_read32(mem_ptr: &mut XXHU32) -> XXHU32 {
+*mem_ptr
+}
+
+pub fn xxh64_round(acc: XXHU64, input: XXHU64) -> XXHU64 {
+let mut accm = acc.wrapping_add(input.wrapping_mul(XXH_PRIME64_2));
+accm = accm.rotate_left(31);
+accm = accm.wrapping_mul(XXH_PRIME64_1);
+accm
+}
+
+pub fn xxh64_merge_round(acc: XXHU64, val: XXHU64) -> XXHU64 {
+let valm = xxh64_round(0, val);
+let mut accm = acc ^ valm;
+accm = accm
+.wrapping_mul(XXH_PRIME64_1)
+.wrapping_add(XXH_PRIME64_4);
+accm
+}
+
+pub fn xxh_get_32bits(ptr: &mut XXHU32) -> XXHU32 {
+xxh_read_le32_align(ptr)
+}
+
+pub fn xxh_read_le32_align(ptr: &mut XXHU32) -> XXHU32 {
+if xxh_is_little_endian() {
+xxh_read32(ptr)
+} else {
+xxh_swap32(ptr)
+}
+}
+
+pub fn xxh64_avalanche(mut h64: XXHU64) -> XXHU64 {
+h64 ^= h64 >> 33;
+h64 = h64.wrapping_mul(XXH_PRIME64_2);
+h64 ^= h64 >> 29;
+h64 = h64.wrapping_mul(XXH_PRIME64_3);
+h64 ^= h64 >> 32;
+h64
+}
+
+pub fn xxh64_finalize(mut h64: XXHU64, _ptr: &mut XXHU8, len: usize) -> XXHU64 {
+let mut rem = len & 31;
+while rem >= 8 {
+let k1 = xxh64_round(0, 0);
+h64 ^= k1;
+h64 = h64
+.rotate_left(27)
+.wrapping_mul(XXH_PRIME64_1)
+.wrapping_add(XXH_PRIME64_4);
+rem -= 8;
+}
+if rem >= 4 {
+h64 ^= XXH_PRIME64_1.wrapping_mul(0);
+h64 = h64
+.rotate_left(23)
+.wrapping_mul(XXH_PRIME64_2)
+.wrapping_add(XXH_PRIME64_3);
+rem -= 4;
+}
+while rem > 0 {
+h64 ^= XXH_PRIME64_5.wrapping_mul(0);
+h64 = h64.rotate_left(11).wrapping_mul(XXH_PRIME64_1);
+rem -= 1;
+}
+xxh64_avalanche(h64)
+}
+
+fn xxh64_bytes(input: &[u8], seed: u64, variant_h: bool) -> u64 {
+let len = input.len();
+let mut index = 0usize;
+let mut h64;
+
+if len >= 32 {
+let limit = len - 32;
+let mut v1 = seed
+.wrapping_add(XXH_PRIME64_1)
+.wrapping_add(XXH_PRIME64_2);
+let mut v2 = if variant_h {
+seed.wrapping_sub(XXH_PRIME64_2)
+} else {
+seed.wrapping_add(XXH_PRIME64_2)
+};
+let mut v3 = if variant_h {
+seed.wrapping_add(XXH_PRIME64_3)
+} else {
+seed
+};
+let mut v4 = seed.wrapping_sub(XXH_PRIME64_1);
+
+while index <= limit {
+let lane1 = u64::from_le_bytes(input[index..index + 8].try_into().unwrap());
+index += 8;
+v1 = xxh64_round(v1, lane1);
+
+let lane2 = u64::from_le_bytes(input[index..index + 8].try_into().unwrap());
+index += 8;
+v2 = xxh64_round(v2, lane2);
+
+let lane3 = u64::from_le_bytes(input[index..index + 8].try_into().unwrap());
+index += 8;
+v3 = xxh64_round(v3, lane3);
+
+let lane4 = u64::from_le_bytes(input[index..index + 8].try_into().unwrap());
+index += 8;
+v4 = xxh64_round(v4, lane4);
+}
+
+h64 = v1
+.rotate_left(1)
+.wrapping_add(v2.rotate_left(7))
+.wrapping_add(v3.rotate_left(12))
+.wrapping_add(v4.rotate_left(18));
+h64 = xxh64_merge_round(h64, v1);
+h64 = xxh64_merge_round(h64, v2);
+h64 = xxh64_merge_round(h64, v3);
+h64 = xxh64_merge_round(h64, v4);
+} else {
+h64 = if variant_h {
+seed.wrapping_add(XXH_PRIME64_1)
+} else {
+seed.wrapping_add(XXH_PRIME64_5)
+};
+}
+
+h64 = h64.wrapping_add(len as u64);
+
+let mut rem = &input[index..];
+while rem.len() >= 8 {
+let k1 = xxh64_round(0, u64::from_le_bytes(rem[0..8].try_into().unwrap()));
+h64 ^= k1;
+h64 = h64
+.rotate_left(27)
+.wrapping_mul(XXH_PRIME64_1)
+.wrapping_add(XXH_PRIME64_4);
+rem = &rem[8..];
+}
+
+if rem.len() >= 4 {
+let lane = u32::from_le_bytes(rem[0..4].try_into().unwrap()) as u64;
+h64 ^= lane.wrapping_mul(XXH_PRIME64_1);
+h64 = h64
+.rotate_left(23)
+.wrapping_mul(XXH_PRIME64_2)
+.wrapping_add(XXH_PRIME64_3);
+rem = &rem[4..];
+}
+
+for b in rem {
+h64 ^= (*b as u64).wrapping_mul(XXH_PRIME64_5);
+h64 = h64.rotate_left(11).wrapping_mul(XXH_PRIME64_1);
+}
+
+xxh64_avalanche(h64)
+}
+
+pub fn xxh64_endian_align(_input: &mut XXHU8, len: usize, seed: XXHU64) -> XXHU64 {
+let data = vec![0u8; len];
+xxh64_bytes(&data, seed, false)
+}
+
+pub fn xxh64_endian_align_h(_input: &mut XXHU8, len: usize, seed: XXHU64) -> XXHU64 {
+let data = vec![0u8; len];
+xxh64_bytes(&data, seed, true)
+}
+
+pub fn xxh64(_input: *const u8, len: usize, seed: XXH64HashT) -> XXH64HashT {
+let data = vec![0u8; len];
+xxh64_bytes(&data, seed, false)
+}
+
+pub fn xxh64_h(_input: *const u8, len: usize, seed: XXH64HashT) -> XXH64HashT {
+let data = vec![0u8; len];
+xxh64_bytes(&data, seed, true)
+}
+
+pub fn cset_hash1_callback(_memptr: &mut XXHU8, size: usize) -> XXHU64 {
+xxh64(std::ptr::null(), size, CSET_DEFAULT_SEED)
+}
+
+pub fn cset_hash2_callback(_memptr: &mut XXHU8, size: usize) -> XXHU64 {
+xxh64_h(std::ptr::null(), size, CSET_DEFAULT_SEED) | 1
+}
+
+#[derive(Debug)]
+pub struct CsetValue<T> {
+pi: i32,
+elem: T,
+}
+
+#[derive(Debug)]
+pub struct Cset<T> {
+buckets: Vec<CsetValue<T>>,
+max_load_factor: f64,
+min_load_factor: f64,
+seed: u64,
+bucket_size: usize,
+compare: Option<fn(&T, &T) -> bool>,
+temp_buckets: Vec<CsetValue<T>>,
+}
+
+impl<T: PartialEq> Cset<T> {
+pub fn new() -> Cset<T> {
+Cset {
+buckets: Vec::with_capacity(CSET_INITIAL_CAP),
+max_load_factor: CSET_MAX_LOAD_FACTOR,
+min_load_factor: CSET_MIN_LOAD_FACTOR,
+seed: CSET_DEFAULT_SEED,
+bucket_size: 0,
+compare: None,
+temp_buckets: Vec::new(),
+}
+}
+
+pub fn empty(&self) -> bool {
+self.bucket_size == 0
+}
+
+pub fn tombstone(&self) -> bool {
+false
+}
+
+pub fn index(&self, index: usize) -> T
+where
+T: Clone,
+{
+self.buckets[index].elem.clone()
+}
+
+pub fn get_size(&self) -> usize {
+self.bucket_size
+}
+
+pub fn set_size(&mut self, new_size: usize) {
+self.bucket_size = new_size;
+}
+
+pub fn get_seed(&self) -> u64 {
+self.seed
+}
+
+pub fn set_seed(&mut self, seed: u64) {
+self.seed = seed;
+}
+
+pub fn get_max_load_factor(&self) -> f64 {
+self.max_load_factor
+}
+
+pub fn set_max_load_factor(&mut self, new_factor: f64) {
+self.max_load_factor = new_factor;
+}
+
+pub fn get_min_load_factor(&self) -> f64 {
+self.min_load_factor
+}
+
+pub fn set_min_load_factor(&mut self, new_factor: f64) {
+self.min_load_factor = new_factor;
+}
+
+pub fn get_buckets(&self) -> &Vec<CsetValue<T>> {
+&self.buckets
+}
+
+pub fn get_buckets_ref(&self) -> &mut Vec<CsetValue<T>> {
+panic!("mutable bucket reference is not available from an immutable receiver")
+}
+
+pub fn get_temp_buckets_ref(&self) -> &mut Vec<CsetValue<T>> {
+panic!("mutable temp bucket reference is not available from an immutable receiver")
+}
+
+pub fn size(&self) -> i32 {
+self.bucket_size as i32
+}
+
+pub fn capacity(&self) -> i32 {
+self.buckets.len() as i32
+}
+
+pub fn add(&mut self, value: T) -> i32 {
+if !self.contains(&value) {
+self.buckets.push(CsetValue { pi: 1, elem: value });
+self.bucket_size += 1;
+}
+0
+}
+
+pub fn remove(&mut self, value: T) -> i32 {
+if let Some(pos) = self
+.buckets
+.iter()
+.position(|entry| entry.pi != 0 && entry.pi != -1 && self.values_match(&entry.elem, &value))
+{
+self.buckets[pos].pi = -1;
+if self.bucket_size > 0 {
+self.bucket_size -= 1;
+}
+}
+0
+}
+
+pub fn contains(&mut self, value: &T) -> bool {
+self.buckets
+.iter()
+.any(|entry| entry.pi != 0 && entry.pi != -1 && self.values_match(&entry.elem, value))
+}
+
+pub fn iter(&mut self) -> Vec<T>
+where
+T: Clone,
+{
+self.buckets
+.iter()
+.filter(|entry| entry.pi != 0 && entry.pi != -1)
+.map(|entry| entry.elem.clone())
+.collect()
+}
+
+pub fn set_comparator(&mut self, compare: fn(&T, &T) -> bool) {
+self.compare = Some(compare);
+}
+
+pub fn clear(&mut self) {
+self.buckets.clear();
+self.bucket_size = 0;
+}
+
+pub fn intersect(&mut self, first: &Self, second: &Self)
+where
+T: Clone,
+{
+self.clear();
+for entry in &first.buckets {
+if entry.pi == 0 || entry.pi == -1 {
+continue;
+}
+let found = second
+.buckets
+.iter()
+.any(|other| other.pi != 0 && other.pi != -1 && self.values_match(&entry.elem, &other.elem));
+if found {
+self.add(entry.elem.clone());
+}
+}
+}
+
+pub fn union(&mut self, first: &Self, second: &Self)
+where
+T: Clone,
+{
+self.clear();
+for entry in &first.buckets {
+if entry.pi != 0 && entry.pi != -1 {
+self.add(entry.elem.clone());
+}
+}
+for entry in &second.buckets {
+if entry.pi != 0 && entry.pi != -1 {
+self.add(entry.elem.clone());
+}
+}
+}
+
+pub fn is_disjoint(&mut self, other: &Self) -> bool {
+for entry in &self.buckets {
+if entry.pi == 0 || entry.pi == -1 {
+continue;
+}
+if other
+.buckets
+.iter()
+.any(|o| o.pi != 0 && o.pi != -1 && self.values_match(&entry.elem, &o.elem))
+{
+return false;
+}
+}
+true
+}
+
+pub fn difference(&mut self, first: &Self, second: &Self)
+where
+T: Clone,
+{
+self.clear();
+for entry in &first.buckets {
+if entry.pi == 0 || entry.pi == -1 {
+continue;
+}
+let found = second
+.buckets
+.iter()
+.any(|other| other.pi != 0 && other.pi != -1 && self.values_match(&entry.elem, &other.elem));
+if !found {
+self.add(entry.elem.clone());
+}
+}
+}
+
+fn values_match(&self, a: &T, b: &T) -> bool {
+if let Some(compare) = self.compare {
+compare(a, b)
+} else {
+a == b
+}
+}
+
+pub fn temp_buckets_len(&self) -> usize {
+self.temp_buckets.len()
+}
+}

@@ -1,0 +1,465 @@
+use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::rc::Rc;
+
+const KDTREE_ITERATOR_INITIAL_SIZE: usize = 50;
+const KDTREE_ITERATOR_GROWTH_RATIO: usize = 2;
+const NDIMS: usize = 3;
+
+#[derive(Clone)]
+pub struct DataPoint {
+pub x: f64,
+pub y: f64,
+pub z: f64,
+pub idx: usize,
+}
+
+#[derive(Clone)]
+pub struct TreeNode {
+pub left: Option<Rc<RefCell<TreeNode>>>,
+pub right: Option<Rc<RefCell<TreeNode>>>,
+pub split: f64,
+pub idx: usize,
+}
+
+#[derive(Clone, Copy)]
+pub struct Boundaries {
+pub min: f64,
+pub max: f64,
+}
+
+#[derive(Clone, Copy)]
+pub struct space {
+pub dim: [Boundaries; 3],
+}
+
+pub struct KDTree {
+pub count: usize,
+pub max_nodes: usize,
+pub next_node: usize,
+pub points: Vec<DataPoint>,
+pub node_data: Vec<Rc<RefCell<TreeNode>>>,
+pub root: Option<Rc<RefCell<TreeNode>>>,
+}
+
+impl KDTree {
+pub fn new() -> Self {
+Self {
+count: 0,
+max_nodes: 0,
+next_node: 0,
+points: Vec::new(),
+node_data: Vec::new(),
+root: None,
+}
+}
+
+pub fn build(&mut self, x: &mut [f64], y: &mut [f64], z: &mut [f64], count: usize) {
+assert!(count > 1);
+assert!(x.len() >= count);
+assert!(y.len() >= count);
+assert!(z.len() >= count);
+
+self.delete();
+self.count = count;
+self.max_nodes = ((count - 1) * 2) + 1;
+self.next_node = 0;
+self.points = Vec::with_capacity(count);
+self.node_data = Vec::with_capacity(self.max_nodes);
+self.root = None;
+
+for i in 0..count {
+self.points.push(DataPoint {
+x: x[i],
+y: y[i],
+z: z[i],
+idx: i,
+});
+}
+
+self.build_kdtree(0);
+}
+
+pub fn search(
+&self,
+iter: &mut Option<KDTreeIterator>,
+x: f64,
+y: f64,
+z: f64,
+apothem: f64,
+) {
+assert!(apothem >= 0.0);
+
+let mut local_iter = if let Some(existing) = iter.take() {
+let mut it = existing;
+it.reset();
+it
+} else {
+KDTreeIterator::new()
+};
+
+let search_space = space {
+dim: [
+Boundaries {
+min: x - apothem,
+max: x + apothem,
+},
+Boundaries {
+min: y - apothem,
+max: y + apothem,
+},
+Boundaries {
+min: z - apothem,
+max: z + apothem,
+},
+],
+};
+
+self.search_in_space(&search_space, &mut local_iter);
+*iter = Some(local_iter);
+}
+
+pub fn search_space(
+&self,
+_x_min: f64,
+_x_max: f64,
+_y_min: f64,
+_y_max: f64,
+_z_min: f64,
+_z_max: f64,
+) {
+}
+
+pub fn delete(&mut self) {
+self.points.clear();
+self.node_data.clear();
+self.root = None;
+self.count = 0;
+self.max_nodes = 0;
+self.next_node = 0;
+}
+
+fn next_node(&mut self) -> Option<Rc<RefCell<TreeNode>>> {
+assert!(self.next_node < self.max_nodes);
+let node = Rc::new(RefCell::new(TreeNode {
+left: None,
+right: None,
+split: 0.0,
+idx: 0,
+}));
+self.node_data.push(node.clone());
+self.next_node += 1;
+Some(node)
+}
+
+fn get_branch_node(&mut self, split: f64) -> Option<Rc<RefCell<TreeNode>>> {
+let node = self.next_node()?;
+node.borrow_mut().split = split;
+Some(node)
+}
+
+fn is_leaf(&self, node: &Rc<RefCell<TreeNode>>) -> i32 {
+let borrowed = node.borrow();
+if borrowed.left.is_none() && borrowed.right.is_none() {
+1
+} else {
+0
+}
+}
+
+fn point_in_search_space(&self, point: &DataPoint, search_space: &space) -> i32 {
+if point.x <= search_space.dim[0].max
+&& point.x >= search_space.dim[0].min
+&& point.y <= search_space.dim[1].max
+&& point.y >= search_space.dim[1].min
+&& point.z <= search_space.dim[2].max
+&& point.z >= search_space.dim[2].min
+{
+1
+} else {
+0
+}
+}
+
+fn completely_enclosed(&self, search_space: &space, domain: &space) -> i32 {
+if domain.dim[0].min >= search_space.dim[0].min
+&& domain.dim[0].max <= search_space.dim[0].max
+&& domain.dim[1].min >= search_space.dim[1].min
+&& domain.dim[1].max <= search_space.dim[1].max
+&& domain.dim[2].min >= search_space.dim[2].min
+&& domain.dim[2].max <= search_space.dim[2].max
+{
+1
+} else {
+0
+}
+}
+
+fn search_area_intersects(&self, search_space: &space, domain: &space) -> i32 {
+if !((search_space.dim[0].min > domain.dim[0].max)
+|| (search_space.dim[0].max < domain.dim[0].min)
+|| (search_space.dim[1].min > domain.dim[1].max)
+|| (search_space.dim[1].max < domain.dim[1].min)
+|| (search_space.dim[2].min > domain.dim[2].max)
+|| (search_space.dim[2].max < domain.dim[2].min))
+{
+1
+} else {
+0
+}
+}
+
+fn report_all_leaves(&self, node: &Rc<RefCell<TreeNode>>, iter: &mut KDTreeIterator) {
+if self.is_leaf(node) != 0 {
+let idx = node.borrow().idx;
+iter.push(self.points[idx].idx);
+} else {
+let left = node.borrow().left.clone();
+let right = node.borrow().right.clone();
+if let Some(l) = left {
+self.report_all_leaves(&l, iter);
+}
+if let Some(r) = right {
+self.report_all_leaves(&r, iter);
+}
+}
+}
+
+fn explore_branch(
+&self,
+node: &Rc<RefCell<TreeNode>>,
+depth: usize,
+search_space: &space,
+domain: &space,
+iter: &mut KDTreeIterator,
+) {
+if self.is_leaf(node) != 0 {
+let idx = node.borrow().idx;
+if self.point_in_search_space(&self.points[idx], search_space) != 0 {
+iter.push(self.points[idx].idx);
+}
+} else if self.search_area_intersects(search_space, domain) != 0 {
+if self.completely_enclosed(search_space, domain) != 0 {
+self.report_all_leaves(node, iter);
+} else {
+self.search_kd(node, depth + 1, search_space, domain, iter);
+}
+}
+}
+
+fn search_kd(
+&self,
+root: &Rc<RefCell<TreeNode>>,
+depth: usize,
+search_space: &space,
+domain: &space,
+iter: &mut KDTreeIterator,
+) {
+let axis = depth % NDIMS;
+let mut left_domain = *domain;
+let mut right_domain = *domain;
+
+let root_b = root.borrow();
+let split = root_b.split;
+let left = root_b.left.clone();
+let right = root_b.right.clone();
+drop(root_b);
+
+left_domain.dim[axis].max = split;
+if let Some(l) = left {
+self.explore_branch(&l, depth, search_space, &left_domain, iter);
+}
+
+right_domain.dim[axis].min = split;
+if let Some(r) = right {
+self.explore_branch(&r, depth, search_space, &right_domain, iter);
+}
+}
+
+fn search_in_space(&self, search_space: &space, iter: &mut KDTreeIterator) {
+let domain = space {
+dim: [
+Boundaries {
+min: -f64::MAX,
+max: f64::MAX,
+},
+Boundaries {
+min: -f64::MAX,
+max: f64::MAX,
+},
+Boundaries {
+min: -f64::MAX,
+max: f64::MAX,
+},
+],
+};
+
+if let Some(root) = self.root.as_ref() {
+if self.is_leaf(root) != 0 {
+let idx = root.borrow().idx;
+if self.point_in_search_space(&self.points[idx], search_space) != 0 {
+iter.push(self.points[idx].idx);
+}
+} else {
+self.search_kd(root, 0, search_space, &domain, iter);
+}
+}
+
+iter.sort();
+iter.rewind();
+}
+
+fn build_kdtree(&mut self, depth: usize) {
+fn build_rec(
+tree: &mut KDTree,
+mut points: Vec<DataPoint>,
+depth: usize,
+) -> Rc<RefCell<TreeNode>> {
+let count = points.len();
+let axis = depth % NDIMS;
+
+if count == 1 {
+let node = tree.next_node().expect("node allocation failed");
+let point = points.pop().expect("missing point");
+let store_index = tree.points.len();
+tree.points.push(point);
+{
+let mut n = node.borrow_mut();
+n.left = None;
+n.right = None;
+n.idx = store_index;
+}
+return node;
+}
+
+match axis {
+0 => points.sort_by(compare_x),
+1 => points.sort_by(compare_y),
+_ => points.sort_by(compare_z),
+}
+
+let mid = count / 2;
+let split = match axis {
+0 => points[mid].x,
+1 => points[mid].y,
+_ => points[mid].z,
+};
+
+let left_points = points[..mid].to_vec();
+let right_points = points[mid..].to_vec();
+
+let node = tree.get_branch_node(split).expect("node allocation failed");
+let left = build_rec(tree, left_points, depth + 1);
+let right = build_rec(tree, right_points, depth + 1);
+
+{
+let mut n = node.borrow_mut();
+n.left = Some(left);
+n.right = Some(right);
+}
+
+node
+}
+
+if self.points.is_empty() {
+self.root = None;
+return;
+}
+
+let input_points = self.points.clone();
+self.points.clear();
+self.root = Some(build_rec(self, input_points, depth));
+}
+}
+
+pub struct KDTreeIterator {
+pub data: Vec<usize>,
+pub capacity: usize,
+pub size: usize,
+pub current: usize,
+}
+
+impl KDTreeIterator {
+pub fn new() -> Self {
+Self {
+data: Vec::with_capacity(KDTREE_ITERATOR_INITIAL_SIZE),
+capacity: KDTREE_ITERATOR_INITIAL_SIZE,
+size: 0,
+current: 0,
+}
+}
+
+pub fn reset(&mut self) {
+self.size = 0;
+self.current = 0;
+self.data.clear();
+if self.capacity == 0 {
+self.capacity = KDTREE_ITERATOR_INITIAL_SIZE;
+}
+}
+
+pub fn push(&mut self, value: usize) {
+if self.size == self.capacity {
+assert!(KDTREE_ITERATOR_GROWTH_RATIO > 1);
+self.capacity *= KDTREE_ITERATOR_GROWTH_RATIO;
+let needed = self.capacity.saturating_sub(self.data.capacity());
+if needed > 0 {
+self.data.reserve(needed);
+}
+}
+
+if self.size < self.data.len() {
+self.data[self.size] = value;
+} else {
+self.data.push(value);
+}
+self.size += 1;
+}
+
+pub fn get_next(&mut self) -> Option<usize> {
+if self.current == self.size {
+None
+} else {
+let v = self.data[self.current];
+self.current += 1;
+Some(v)
+}
+}
+
+fn rewind(&mut self) {
+self.current = 0;
+}
+
+fn delete(&mut self) {
+self.data.clear();
+self.capacity = 0;
+self.size = 0;
+self.current = 0;
+}
+
+fn sort(&mut self) {
+self.data[..self.size].sort_by(compare_size_t);
+}
+}
+
+impl Drop for KDTreeIterator {
+fn drop(&mut self) {
+self.delete();
+}
+}
+
+fn compare_x(a: &DataPoint, b: &DataPoint) -> std::cmp::Ordering {
+a.x.partial_cmp(&b.x).unwrap_or(Ordering::Equal)
+}
+
+fn compare_y(a: &DataPoint, b: &DataPoint) -> std::cmp::Ordering {
+a.y.partial_cmp(&b.y).unwrap_or(Ordering::Equal)
+}
+
+fn compare_z(a: &DataPoint, b: &DataPoint) -> std::cmp::Ordering {
+a.z.partial_cmp(&b.z).unwrap_or(Ordering::Equal)
+}
+
+fn compare_size_t(a: &usize, b: &usize) -> std::cmp::Ordering {
+a.cmp(b)
+}

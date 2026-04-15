@@ -1,0 +1,362 @@
+{{inversion_list.rs}} 
+```rust
+use std::fmt;
+
+#[derive(Debug)]
+pub enum InversionListError {
+    ValueOutOfRange(u32, u32),
+    Generic(String),
+}
+
+#[derive(Clone, Debug)]
+pub struct InversionList {
+    capacity: u32,
+    support: u32,
+    pub intervals: Vec<(u32, u32)>,
+}
+
+impl InversionList {
+    pub fn new(capacity: u32, values: &[u32]) -> Result<Self, InversionListError> {
+        let mut sorted_values = values.to_vec();
+        sorted_values.sort_unstable();
+        
+        if let Some(&max_val) = sorted_values.last() {
+            if max_val >= capacity {
+                return Err(InversionListError::ValueOutOfRange(max_val, capacity));
+            }
+        }
+        
+        let mut intervals = Vec::new();
+        let mut support = 0;
+        
+        if !sorted_values.is_empty() {
+            let mut start = sorted_values[0];
+            let mut end = start + 1;
+            support += 1;
+            
+            for &val in &sorted_values[1..] {
+                if val == end - 1 {
+                    // duplicate, ignore
+                } else if val == end {
+                    end += 1;
+                    support += 1;
+                } else {
+                    intervals.push((start, end));
+                    start = val;
+                    end = val + 1;
+                    support += 1;
+                }
+            }
+            intervals.push((start, end));
+        }
+        
+        Ok(InversionList {
+            capacity,
+            support,
+            intervals,
+        })
+    }
+
+    pub fn capacity(&self) -> u32 {
+        self.capacity
+    }
+
+    pub fn support(&self) -> u32 {
+        self.support
+    }
+
+    pub fn contains(&self, value: u32) -> bool {
+        self.intervals.binary_search_by(|&(start, end)| {
+            if value < start {
+                std::cmp::Ordering::Greater
+            } else if value >= end {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        }).is_ok()
+    }
+
+    pub fn clone_list(&self) -> Self {
+        self.clone()
+    }
+
+    pub fn complement(&self) -> Self {
+        let mut comp_intervals = Vec::new();
+        let mut current = 0;
+        
+        for &(start, end) in &self.intervals {
+            if start > current {
+                comp_intervals.push((current, start));
+            }
+            current = end;
+        }
+        
+        if current < self.capacity {
+            comp_intervals.push((current, self.capacity));
+        }
+        
+        InversionList {
+            capacity: self.capacity,
+            support: self.capacity - self.support,
+            intervals: comp_intervals,
+        }
+    }
+
+    pub fn to_str(&self) -> String {
+        let mut s = String::from("[");
+        let mut first = true;
+        for &(start, end) in &self.intervals {
+            for val in start..end {
+                if !first {
+                    s.push_str(", ");
+                }
+                s.push_str(&val.to_string());
+                first = false;
+            }
+        }
+        s.push(']');
+        s
+    }
+
+    pub fn equal(&self, other: &Self) -> bool {
+        self.support == other.support && self.intervals == other.intervals
+    }
+
+    pub fn is_strict_subset_of(&self, other: &Self) -> bool {
+        self.support < other.support && self.is_subset_of(other)
+    }
+
+    pub fn is_subset_of(&self, other: &Self) -> bool {
+        if self.support > other.support {
+            return false;
+        }
+        let mut it1 = self.intervals.iter();
+        let mut it2 = other.intervals.iter();
+        
+        let mut curr1 = it1.next();
+        let mut curr2 = it2.next();
+        
+        while let (Some(&(s1, e1)), Some(&(s2, e2))) = (curr1, curr2) {
+            if s1 >= e2 {
+                curr2 = it2.next();
+            } else if s1 >= s2 && e1 <= e2 {
+                curr1 = it1.next();
+            } else {
+                return false;
+            }
+        }
+        curr1.is_none()
+    }
+
+    pub fn is_disjoint(&self, other: &Self) -> bool {
+        let mut it1 = self.intervals.iter();
+        let mut it2 = other.intervals.iter();
+        
+        let mut curr1 = it1.next();
+        let mut curr2 = it2.next();
+        
+        while let (Some(&(s1, e1)), Some(&(s2, e2))) = (curr1, curr2) {
+            if e1 <= s2 {
+                curr1 = it1.next();
+            } else if e2 <= s1 {
+                curr2 = it2.next();
+            } else {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn union(&self, other: &Self) -> Self {
+        let capacity = self.capacity.max(other.capacity);
+        let mut intervals = Vec::new();
+        let mut it1 = self.intervals.iter().copied().peekable();
+        let mut it2 = other.intervals.iter().copied().peekable();
+        
+        let mut current_interval: Option<(u32, u32)> = None;
+        
+        loop {
+            let next_interval = match (it1.peek(), it2.peek()) {
+                (Some(&i1), Some(&i2)) => {
+                    if i1.0 < i2.0 {
+                        it1.next().unwrap()
+                    } else {
+                        it2.next().unwrap()
+                    }
+                }
+                (Some(_), None) => it1.next().unwrap(),
+                (None, Some(_)) => it2.next().unwrap(),
+                (None, None) => break,
+            };
+            
+            match current_interval.as_mut() {
+                Some(curr) => {
+                    if next_interval.0 <= curr.1 {
+                        curr.1 = curr.1.max(next_interval.1);
+                    } else {
+                        intervals.push(*curr);
+                        *curr = next_interval;
+                    }
+                }
+                None => {
+                    current_interval = Some(next_interval);
+                }
+            }
+        }
+        
+        if let Some(curr) = current_interval {
+            intervals.push(curr);
+        }
+        
+        let support = intervals.iter().map(|(s, e)| e - s).sum();
+        
+        InversionList {
+            capacity,
+            support,
+            intervals,
+        }
+    }
+
+    pub fn intersection(&self, other: &Self) -> Self {
+        let capacity = self.capacity.max(other.capacity);
+        let mut intervals = Vec::new();
+        let mut it1 = self.intervals.iter().copied();
+        let mut it2 = other.intervals.iter().copied();
+        
+        let mut curr1 = it1.next();
+        let mut curr2 = it2.next();
+        
+        while let (Some(i1), Some(i2)) = (curr1, curr2) {
+            let start = i1.0.max(i2.0);
+            let end = i1.1.min(i2.1);
+            
+            if start < end {
+                intervals.push((start, end));
+            }
+            
+            if i1.1 < i2.1 {
+                curr1 = it1.next();
+            } else if i1.1 > i2.1 {
+                curr2 = it2.next();
+            } else {
+                curr1 = it1.next();
+                curr2 = it2.next();
+            }
+        }
+        
+        let support = intervals.iter().map(|(s, e)| e - s).sum();
+        
+        InversionList {
+            capacity,
+            support,
+            intervals,
+        }
+    }
+
+    pub fn difference(&self, other: &Self) -> Self {
+        let capacity = self.capacity.max(other.capacity);
+        let mut intervals = Vec::new();
+        
+        for &(s, e) in &self.intervals {
+            let mut current_start = s;
+            
+            for &(os, oe) in &other.intervals {
+                if oe <= current_start {
+                    continue;
+                }
+                if os >= e {
+                    break;
+                }
+                
+                if os > current_start {
+                    intervals.push((current_start, os));
+                }
+                current_start = current_start.max(oe);
+            }
+            
+            if current_start < e {
+                intervals.push((current_start, e));
+            }
+        }
+        
+        let support = intervals.iter().map(|(s, e)| e - s).sum();
+        
+        InversionList {
+            capacity,
+            support,
+            intervals,
+        }
+    }
+
+    pub fn symmetric_difference(&self, other: &Self) -> Self {
+        let u = self.union(other);
+        let i = self.intersection(other);
+        u.difference(&i)
+    }
+}
+
+impl PartialEq for InversionList {
+    fn eq(&self, other: &Self) -> bool {
+        self.equal(other)
+    }
+}
+
+impl Eq for InversionList {}
+
+impl fmt::Display for InversionList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_str())
+    }
+}
+
+pub struct InversionListIterator<'a> {
+    list: &'a InversionList,
+    interval_index: usize,
+    current_value: u32,
+}
+
+impl<'a> InversionListIterator<'a> {
+    pub fn new(list: &'a InversionList) -> Self {
+        let current_value = if list.intervals.is_empty() {
+            0
+        } else {
+            list.intervals[0].0
+        };
+        Self {
+            list,
+            interval_index: 0,
+            current_value,
+        }
+    }
+}
+
+impl<'a> Iterator for InversionListIterator<'a> {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.interval_index >= self.list.intervals.len() {
+            return None;
+        }
+        
+        let val = self.current_value;
+        self.current_value += 1;
+        
+        if self.current_value >= self.list.intervals[self.interval_index].1 {
+            self.interval_index += 1;
+            if self.interval_index < self.list.intervals.len() {
+                self.current_value = self.list.intervals[self.interval_index].0;
+            }
+        }
+        
+        Some(val)
+    }
+}
+
+pub struct InversionListCoupleIterator<'a> {
+    list: &'a InversionList,
+    couple_index: usize,
+}
+
+impl<'a> InversionListCoupleIterator<'a> {
+    pub fn new(

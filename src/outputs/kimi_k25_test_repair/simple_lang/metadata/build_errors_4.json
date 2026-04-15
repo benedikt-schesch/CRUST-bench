@@ -1,0 +1,1 @@
+[{"error_code": null, "error_message": "expected one of `;` or `{`, found `/`", "file_path": "simple_lang/src/lib.rs", "row": "3", "col": "20", "error_snippet": "|\n3 | pub mod simple_lang/src/bin/test_parser;\n  |                    ^ expected one of `;` or `{`"}]

@@ -1,0 +1,1 @@
+[{"error_code": "E0063", "error_message": "missing field `pos` in initializer of `amp::amp::Amp`", "file_path": "amp/src/bin/test.rs", "row": "9", "col": "19", "error_snippet": "|\n9 |     let mut msg = Amp {\n  |                   ^^^ missing `pos`\n\nFor more information about this error, try `rustc --explain E0063`."}]

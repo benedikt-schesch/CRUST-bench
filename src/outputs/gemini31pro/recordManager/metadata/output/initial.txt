@@ -1,0 +1,81 @@
+if let ValueUnion::IntV(v) = val.v {
+                format!("{}:{}", attr_name, v)
+            } else {
+                String::new()
+            }
+        }
+        DataType::DtString => {
+            if let ValueUnion::StringV(v) = val.v {
+                format!("{}:{}", attr_name, v)
+            } else {
+                String::new()
+            }
+        }
+        DataType::DtFloat => {
+            if let ValueUnion::FloatV(v) = val.v {
+                format!("{}:{}", attr_name, v)
+            } else {
+                String::new()
+            }
+        }
+        DataType::DtBool => {
+            if let ValueUnion::BoolV(v) = val.v {
+                format!("{}:{}", attr_name, if v { "TRUE" } else { "FALSE" })
+            } else {
+                String::new()
+            }
+        }
+    }
+}
+
+pub fn serialize_value(val: &Value) -> String {
+    match val.dt {
+        DataType::DtInt => {
+            if let ValueUnion::IntV(v) = val.v {
+                format!("{}", v)
+            } else {
+                String::new()
+            }
+        }
+        DataType::DtFloat => {
+            if let ValueUnion::FloatV(v) = val.v {
+                format!("{}", v)
+            } else {
+                String::new()
+            }
+        }
+        DataType::DtString => {
+            if let ValueUnion::StringV(ref v) = val.v {
+                format!("{}", v)
+            } else {
+                String::new()
+            }
+        }
+        DataType::DtBool => {
+            if let ValueUnion::BoolV(v) = val.v {
+                format!("{}", if v { "true" } else { "false" })
+            } else {
+                String::new()
+            }
+        }
+    }
+}
+
+pub fn string_to_value(val: &str) -> Value {
+    if val.is_empty() {
+        return Value { dt: DataType::DtInt, v: ValueUnion::IntV(-1) };
+    }
+    let first_char = val.chars().next().unwrap();
+    let rest = &val[1..];
+    match first_char {
+        'i' => Value {
+            dt: DataType::DtInt,
+            v: ValueUnion::IntV(rest.parse().unwrap_or(0)),
+        },
+        'f' => Value {
+            dt: DataType::DtFloat,
+            v: ValueUnion::FloatV(rest.parse().unwrap_or(0.0)),
+        },
+        's' => Value {
+            dt: DataType::DtString,
+            v: ValueUnion::StringV(rest.to_string

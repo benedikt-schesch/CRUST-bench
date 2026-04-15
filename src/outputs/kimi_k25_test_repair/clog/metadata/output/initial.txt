@@ -1,0 +1,105 @@
+ {{clog.rs}}
+```rust
+use std::fs::{File, OpenOptions};
+use std::io::{self, Write};
+use frunk_core::{hlist, HList, poly_fn};
+use std::fmt;
+use std::sync::{Mutex, OnceLock};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+pub const CLOG_MAX_LOGGERS: usize = 16;
+pub const CLOG_FORMAT_LENGTH: usize = 256;
+pub const CLOG_DATETIME_LENGTH: usize = 256;
+pub const CLOG_DEFAULT_FORMAT: &str = "%d %t %f(%n): %l: %m\n";
+pub const CLOG_DEFAULT_DATE_FORMAT: &str = "%Y-%m-%d";
+pub const CLOG_DEFAULT_TIME_FORMAT: &str = "%H:%M:%S";
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ClogLevel {
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+pub struct Clog {
+    level: ClogLevel,
+    file: Option<File>,
+    fmt: [char; CLOG_FORMAT_LENGTH],
+    date_fmt: [char; CLOG_FORMAT_LENGTH],
+    time_fmt: [char; CLOG_FORMAT_LENGTH],
+    opened: bool,
+}
+
+static CLOG_LOGGERS: OnceLock<Mutex<[Option<Clog>; CLOG_MAX_LOGGERS]>> = OnceLock::new();
+
+fn get_loggers() -> std::sync::MutexGuard<'static, [Option<Clog>; CLOG_MAX_LOGGERS]> {
+    CLOG_LOGGERS.get_or_init(|| {
+        let arr: [Option<Clog>; CLOG_MAX_LOGGERS] = std::array::from_fn(|_| None);
+        Mutex::new(arr)
+    }).lock().unwrap()
+}
+
+fn clog_err(msg: &str) {
+    eprint!("{}", msg);
+}
+
+fn copy_str_to_char_array(arr: &mut [char; CLOG_FORMAT_LENGTH], s: &str) {
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len().min(CLOG_FORMAT_LENGTH - 1);
+    for i in 0..len {
+        arr[i] = chars[i];
+    }
+    for i in len..CLOG_FORMAT_LENGTH {
+        arr[i] = '\0';
+    }
+}
+
+fn char_array_to_string(arr: &[char; CLOG_FORMAT_LENGTH]) -> String {
+    arr.iter().take_while(|&&c| c != '\0').collect()
+}
+
+pub fn clog_init_path(id: usize, path: &str) -> io::Result<()> {
+    if id >= CLOG_MAX_LOGGERS {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Invalid logger id"));
+    }
+    
+    let file = match OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(true)
+        .open(path) 
+    {
+        Ok(f) => f,
+        Err(e) => {
+            clog_err(&format!("Unable to open {}: {}\n", path, e));
+            return Err(e);
+        }
+    };
+    
+    clog_init_fd(id, file)?;
+    
+    let mut loggers = get_loggers();
+    if let Some(ref mut logger) = loggers[id] {
+        logger.opened = true;
+    }
+    
+    Ok(())
+}
+
+pub fn clog_init_fd(id: usize, file: File) -> io::Result<()> {
+    if id >= CLOG_MAX_LOGGERS {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Invalid logger id"));
+    }
+    
+    let mut loggers = get_loggers();
+    if loggers[id].is_some() {
+        clog_err(&format!("Logger {} already initialized.\n", id));
+        return Err(io::Error::new(io::ErrorKind::AlreadyExists, "Logger already initialized"));
+    }
+    
+    let mut clog = Clog {
+        level: ClogLevel::Debug,
+        file: Some(file),
+        fmt: ['\0'; CLOG_FORMAT_LENGTH],
+        date_fmt

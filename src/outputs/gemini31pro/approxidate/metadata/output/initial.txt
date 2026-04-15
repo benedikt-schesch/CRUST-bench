@@ -1,0 +1,52 @@
+// Generated Rust Code
+```rust
+use std::time::{SystemTime, UNIX_EPOCH};
+
+#[derive(Clone)]
+pub struct Atm {
+    pub tm_sec: i32,
+    pub tm_min: i32,
+    pub tm_hour: i32,
+    pub tm_mday: i32,
+    pub tm_mon: i32,
+    pub tm_year: i32,
+    pub tm_wday: i32,
+    pub tm_yday: i32,
+    pub tm_isdst: i32,
+    pub tm_usec: i64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TimeVal {
+    pub tv_sec: i64,
+    pub tv_usec: i64,
+}
+
+pub type TimeT = i64;
+
+const GIT_SPACE: u8 = 0x01;
+const GIT_DIGIT: u8 = 0x02;
+const GIT_ALPHA: u8 = 0x04;
+const GIT_GLOB_SPECIAL: u8 = 0x08;
+const GIT_REGEX_SPECIAL: u8 = 0x10;
+const GIT_PATHSPEC_MAGIC: u8 = 0x20;
+const GIT_CNTRL: u8 = 0x40;
+const GIT_PUNCT: u8 = 0x80;
+
+const S: u8 = GIT_SPACE;
+const A: u8 = GIT_ALPHA;
+const D: u8 = GIT_DIGIT;
+const G: u8 = GIT_GLOB_SPECIAL;
+const R: u8 = GIT_REGEX_SPECIAL;
+const P: u8 = GIT_PATHSPEC_MAGIC;
+const X: u8 = GIT_CNTRL;
+const U: u8 = GIT_PUNCT;
+const Z: u8 = GIT_CNTRL | GIT_SPACE;
+
+const SANE_CTYPE: [u8; 256] = [
+    X, X, X, X, X, X, X, X, X, Z, Z, X, X, Z, X, X,
+    X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
+    S, P, P, P, R, P, P, P, R, R, G, R, P, P, R, P,
+    D, D, D, D, D, D, D, D, D, D, P, P, P, P, P, G,
+    P, A, A, A, A, A, A, A, A, A, A, A, A, A, A, A,
+    A, A, A, A, A, A, A

@@ -1,0 +1,483 @@
+ {{max_heap.rs}}
+```rust
+//! MaxHeap module for the Megalania library.
+
+/// A max heap data structure for managing elements with priority.
+pub struct MaxHeap<T> {
+    data: Vec<T>,
+    comparator: Box<dyn Fn(&T, &T) -> i32>,
+}
+
+impl<T> MaxHeap<T> {
+    /// Creates a new max heap with the specified capacity and comparator.
+    pub fn new(capacity: usize, comparator: Box<dyn Fn(&T, &T) -> i32>) -> Self {
+        Self {
+            data: Vec::with_capacity(capacity),
+            comparator,
+        }
+    }
+
+    /// Creates a new max heap with the specified capacity and comparator.
+    pub fn with_capacity(capacity: usize, comparator: Box<dyn Fn(&T, &T) -> i32>) -> Self {
+        Self::new(capacity, comparator)
+    }
+
+    /// Inserts an element onto the heap.
+    pub fn insert(&mut self, item: T) -> bool {
+        self.data.push(item);
+        self.heapify_up(self.data.len() - 1);
+        true
+    }
+
+    /// Pops the maximum element from the heap.
+    pub fn pop(&mut self) -> Option<T> {
+        if self.data.is_empty() {
+            return None;
+        }
+        let last = self.data.len() - 1;
+        self.data.swap(0, last);
+        let max = self.data.pop();
+        if !self.data.is_empty() {
+            self.heapify_down(0);
+        }
+        max
+    }
+
+    /// Returns true if the heap is empty.
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    /// Returns the number of elements in the heap.
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+    
+    /// Returns the number of elements in the heap (alias for len).
+    pub fn count(&self) -> usize {
+        self.len()
+    }
+    
+    /// Returns a reference to the maximum element.
+    pub fn maximum(&self) -> Option<&T> {
+        self.data.first()
+    }
+    
+    /// Removes the maximum element from the heap.
+    pub fn remove_maximum(&mut self) -> bool {
+        self.pop().is_some()
+    }
+    
+    /// Updates the maximum element (re-heapifies).
+    pub fn update_maximum(&mut self) -> bool {
+        if self.data.is_empty() {
+            return false;
+        }
+        self.heapify_down(0);
+        true
+    }
+
+    fn heapify_up(&mut self, mut index: usize) {
+        while index > 0 {
+            let parent = (index - 1) / 2;
+            if (self.comparator)(&self.data[index], &self.data[parent]) > 0 {
+                self.data.swap(index, parent);
+                index = parent;
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn heapify_down(&mut self, mut index: usize) {
+        let len = self.data.len();
+        loop {
+            let left = 2 * index + 1;
+            let right = 2 * index + 2;
+            let mut largest = index;
+
+            if left < len && (self.comparator)(&self.data[left], &self.data[largest]) > 0 {
+                largest = left;
+            }
+            if right < len && (self.comparator)(&self.data[right], &self.data[largest]) > 0 {
+                largest = right;
+            }
+
+            if largest != index {
+                self.data.swap(index, largest);
+                index = largest;
+            } else {
+                break;
+            }
+        }
+    }
+}
+
+impl<T: Ord> Default for MaxHeap<T> {
+    fn default() -> Self {
+        Self {
+            data: Vec::new(),
+            comparator: Box::new(|a: &T, b: &T| {
+                if a > b { 1 }
+                else if a < b { -1 }
+                else { 0 }
+            }),
+        }
+    }
+}
+```
+
+{{packet_slab.rs}}
+```rust
+//! Packet slab allocator for efficient memory management.
+
+use crate::lzma_packet::LZMAPacket;
+
+/// A slab allocator for managing LZMA packets efficiently.
+pub struct PacketSlab {
+    packets: Vec<LZMAPacket>,
+    capacity: usize,
+}
+
+impl PacketSlab {
+    /// Creates a new packet slab with the specified capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            packets: Vec::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    /// Creates a new packet slab with the specified capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self::new(capacity)
+    }
+
+    /// Returns the capacity of the slab.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Returns the number of packets in the slab.
+    pub fn len(&self) -> usize {
+        self.packets.len()
+    }
+
+    /// Returns true if the slab is empty.
+    pub fn is_empty(&self) -> bool {
+        self.packets.is_empty()
+    }
+
+    /// Clears the slab.
+    pub fn clear(&mut self) {
+        self.packets.clear();
+    }
+    
+    /// Returns a slice of the packets in the slab.
+    pub fn packets(&self) -> &[LZMAPacket] {
+        &self.packets
+    }
+    
+    /// Returns a mutable slice of the packets in the slab.
+    pub fn packets_mut(&mut self) -> &mut [LZMAPacket] {
+        &mut self.packets
+    }
+    
+    /// Pushes a packet into the slab.
+    pub fn push(&mut self, packet: LZMAPacket) {
+        self.packets.push(packet);
+    }
+    
+    /// Removes and returns the last packet.
+    pub fn pop(&mut self) -> Option<LZMAPacket> {
+        self.packets.pop()
+    }
+    
+    /// Removes a packet at the specified index.
+    pub fn remove(&mut self, index: usize) -> LZMAPacket {
+        self.packets.remove(index)
+    }
+    
+    /// Inserts a packet at the specified index.
+    pub fn insert(&mut self, index: usize, packet: LZMAPacket) {
+        self.packets.insert(index, packet);
+    }
+}
+
+impl Default for PacketSlab {
+    fn default() -> Self {
+        Self::new(1024)
+    }
+}
+```
+
+{{packet_slab_undo_stack.rs}}
+```rust
+//! Undo stack for packet slab operations to support rollback functionality.
+
+use crate::lzma_packet::LZMAPacket;
+use crate::packet_slab::PacketSlab;
+
+/// Represents a single undo operation for the packet slab.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PacketSlabUndo {
+    pub index: usize,
+    pub operation: UndoOperation,
+    pub position: usize,
+    pub old_packet: Option<LZMAPacket>,
+}
+
+/// Types of undo operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UndoOperation {
+    Insert,
+    Delete,
+    Update,
+}
+
+/// A stack for managing packet slab undo operations.
+pub struct PacketSlabUndoStack {
+    stack: Vec<PacketSlabUndo>,
+}
+
+impl PacketSlabUndoStack {
+    /// Creates a new empty undo stack.
+    pub fn new() -> Self {
+        Self { stack: Vec::new() }
+    }
+
+    /// Creates a new undo stack with the specified capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            stack: Vec::with_capacity(capacity),
+        }
+    }
+
+    /// Pushes an undo operation onto the stack.
+    pub fn push(&mut self, undo: PacketSlabUndo) {
+        self.stack.push(undo);
+    }
+    
+    /// Inserts an undo operation onto the stack (alias for push).
+    pub fn insert(&mut self, undo: PacketSlabUndo) {
+        self.push(undo);
+    }
+
+    /// Pops an undo operation from the stack.
+    pub fn pop(&mut self) -> Option<PacketSlabUndo> {
+        self.stack.pop()
+    }
+
+    /// Returns true if the undo stack is empty.
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+    }
+
+    /// Returns the number of undo operations in the stack.
+    pub fn len(&self) -> usize {
+        self.stack.len()
+    }
+    
+    /// Returns the number of undo operations in the stack (alias for len).
+    pub fn count(&self) -> usize {
+        self.len()
+    }
+
+    /// Clears all undo operations from the stack.
+    pub fn clear(&mut self) {
+        self.stack.clear();
+    }
+    
+    /// Applies the undo operations to the slab.
+    pub fn apply(&mut self, slab: &mut PacketSlab) {
+        while let Some(undo) = self.pop() {
+            match undo.operation {
+                UndoOperation::Update => {
+                    if undo.index < slab.len() {
+                        if let Some(packet) = undo.old_packet {
+                            slab.packets_mut()[undo.index] = packet;
+                        }
+                    }
+                }
+                UndoOperation::Insert => {
+                    // Remove the inserted element at index
+                    if undo.index < slab.len() {
+                        slab.remove(undo.index);
+                    }
+                }
+                UndoOperation::Delete => {
+                    // Restore deleted packet at index
+                    if let Some(packet) = undo.old_packet {
+                        if undo.index <= slab.len() {
+                            slab.insert(undo.index, packet);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl Default for PacketSlabUndoStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+```
+
+{{substring_enumerator.rs}}
+```rust
+//! Substring enumeration for finding repeated patterns in data.
+
+/// Enumerates substrings in the input data for LZMA compression.
+pub struct SubstringEnumerator {
+    data: Vec<u8>,
+    min_length: usize,
+    max_length: usize,
+}
+
+impl SubstringEnumerator {
+    /// Creates a new substring enumerator with the specified data and length limits.
+    pub fn new(data: Vec<u8>, min_length: usize, max_length: usize) -> Self {
+        Self {
+            data,
+            min_length,
+            max_length,
+        }
+    }
+
+    /// Creates a new substring enumerator with specific data.
+    pub fn with_data(data: Vec<u8>) -> Self {
+        Self {
+            data,
+            min_length: 2,
+            max_length: 273,
+        }
+    }
+
+    /// Sets the minimum match length.
+    pub fn set_min_length(&mut self, length: usize) {
+        self.min_length = length;
+    }
+
+    /// Sets the maximum match length.
+    pub fn set_max_length(&mut self, length: usize) {
+        self.max_length = length;
+    }
+
+    /// Returns a reference to the underlying data.
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Finds the next substring match (placeholder implementation).
+    pub fn find_next_match(&self, position: usize) -> Option<(usize, usize)> {
+        // Simplified implementation - would normally search for matches
+        if position < self.data.len() {
+            Some((position, self.min_length))
+        } else {
+            None
+        }
+    }
+    
+    /// Iterates over substrings starting at the given position.
+    pub fn for_each<F>(&self, position: usize, mut f: F) 
+    where 
+        F: FnMut(usize, usize)
+    {
+        if position >= self.data.len() {
+            return;
+        }
+        
+        // Placeholder implementation: report a single match
+        if self.min_length <= self.max_length && position + self.min_length <= self.data.len() {
+            f(position, self.min_length);
+        }
+    }
+}
+
+impl Default for SubstringEnumerator {
+    fn default() -> Self {
+        Self::new(Vec::new(), 2, 273)
+    }
+}
+```
+
+{{lzma_packet.rs}}
+```rust
+//! LZMA Packet definitions and types.
+
+/// Types of LZMA packets used in the compression algorithm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LZMAPacketType {
+    /// Literal byte packet (single uncompressed byte).
+    Literal,
+    /// Match packet (backward reference with length and distance).
+    Match,
+    /// Short repeat packet (short distance repeat).
+    ShortRep,
+    /// Long repeat packet (long distance repeat).
+    LongRep,
+}
+
+/// Represents a single LZMA packet.
+#[derive(Debug, Clone)]
+pub struct LZMAPacket {
+    pub packet_type: LZMAPacketType,
+    pub length: usize,
+    pub distance: u32,
+}
+
+impl LZMAPacket {
+    /// Creates a new literal packet.
+    pub fn literal() -> Self {
+        Self {
+            packet_type: LZMAPacketType::Literal,
+            length: 1,
+            distance: 0,
+        }
+    }
+
+    /// Creates a new match packet.
+    pub fn match_packet(length: usize, distance: u32) -> Self {
+        Self {
+            packet_type: LZMAPacketType::Match,
+            length,
+            distance,
+        }
+    }
+    
+    /// Creates a new short repeat packet.
+    pub fn short_rep_packet() -> Self {
+        Self {
+            packet_type: LZMAPacketType::ShortRep,
+            length: 1,
+            distance: 0,
+        }
+    }
+}
+```
+
+{{lib.rs}}
+```rust
+pub mod encoder_interface;
+pub mod file_output;
+pub mod lzma_header_encoder;
+pub mod lzma_packet;
+pub mod lzma_packet_encoder;
+pub mod lzma_state;
+pub mod max_heap;
+pub mod memory_mapper;
+pub mod output_interface;
+pub mod packet_enumerator;
+pub mod packet_slab;
+pub mod packet_slab_neighbour;
+pub mod packet_slab_undo_stack;
+pub mod perplexity_encoder;
+pub mod perplexity_table;
+pub mod probability;
+pub mod probability_model;
+pub mod range_encoder;
+pub mod substring_enumerator;
+pub mod top_k_packet_finder;
+```

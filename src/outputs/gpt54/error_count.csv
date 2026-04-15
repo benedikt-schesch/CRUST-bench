@@ -1,0 +1,641 @@
+iteration,project,error_code,error_message,file_path,row,col
+0,Genetic_neural_network_for_simple_control,E0499,cannot borrow `*system_nn` as mutable more than once at a time,Genetic_neural_network_for_simple_control/src/model_system.rs,28,71
+0,Genetic_neural_network_for_simple_control,,"expected identifier, found reserved keyword `gen`",Genetic_neural_network_for_simple_control/src/general_math.rs,5,23
+0,Genetic_neural_network_for_simple_control,,"expected identifier, found reserved keyword `gen`",Genetic_neural_network_for_simple_control/src/genetic_operations.rs,121,29
+0,Graph_recogniser,": cannot find macro `check` in this scope
+  --> Graph_recogniser/src/cuckoohash.rs:30:1
+   |
+30 | check!(initial_size >= 2);
+   | ^^^^^
+   |
+note","`check` is imported here, but it is a module, not a macro",Graph_recogniser/src/cuckoohash.rs,4,5
+0,Graph_recogniser,": cannot find macro `check` in this scope
+  --> Graph_recogniser/src/log.rs:66:1
+   |
+66 | check!((log_type as u8) < 4 && priority <= 10);
+   | ^^^^^
+   |
+note","`check` is imported here, but it is a module, not a macro",Graph_recogniser/src/log.rs,4,5
+0,Graph_recogniser,": cannot find macro `check` in this scope
+  --> Graph_recogniser/src/openhash.rs:27:1
+   |
+27 | check!(initial_size != 0);
+   | ^^^^^
+   |
+note","`check` is imported here, but it is a module, not a macro",Graph_recogniser/src/openhash.rs,4,5
+0,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,64,1
+0,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,73,1
+0,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,97,1
+0,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,120,1
+0,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,89,1
+0,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,96,1
+0,LTRE,E0425,cannot find function `all_bitset_indices` in this scope,LTRE/src/ltre.rs,580,11
+0,Linear_Algebra_C,E0425,cannot find function `print_matrix_impl` in module `matrix`,Linear_Algebra_C/src/linear_algebra.rs,164,9
+0,Megalania,E0432,unresolved import `crate::output_interface`,Megalania/src/file_output.rs,1,12
+0,Megalania,E0432,unresolved import `crate::output_interface`,Megalania/src/lzma_header_encoder.rs,2,12
+0,Megalania,E0432,unresolved import `crate::encoder_interface`,Megalania/src/lzma_packet_encoder.rs,1,12
+0,Megalania,E0432,unresolved import `crate::probability`,Megalania/src/lzma_state.rs,1,12
+0,Megalania,E0432,unresolved import `crate::probability`,Megalania/src/lzma_state.rs,2,12
+0,Megalania,E0432,unresolved import `crate::encoder_interface`,Megalania/src/perplexity_encoder.rs,1,12
+0,Megalania,E0432,unresolved import `crate::encoder_interface`,Megalania/src/probability_model.rs,1,12
+0,Megalania,E0432,unresolved import `crate::probability`,Megalania/src/probability_model.rs,2,12
+0,Megalania,E0432,unresolved import `crate::probability`,Megalania/src/probability_model.rs,3,12
+0,Megalania,E0432,unresolved import `crate::encoder_interface`,Megalania/src/range_encoder.rs,1,12
+0,Megalania,E0432,unresolved import `crate::output_interface`,Megalania/src/range_encoder.rs,2,12
+0,Remimu,E0599,no method named `clone` found for struct `RegexMatcherState` in the current scope,Remimu/src/my_regex.rs,802,46
+0,Remimu,E0599,no method named `clone` found for struct `RegexMatcherState` in the current scope,Remimu/src/my_regex.rs,832,46
+0,Remimu,E0599,no method named `clone` found for struct `RegexMatcherState` in the current scope,Remimu/src/my_regex.rs,869,46
+0,Remimu,E0599,no method named `clone` found for struct `RegexMatcherState` in the current scope,Remimu/src/my_regex.rs,906,46
+0,Remimu,E0599,no method named `clone` found for struct `RegexMatcherState` in the current scope,Remimu/src/my_regex.rs,1016,46
+0,Remimu,E0599,no method named `clone` found for struct `RegexMatcherState` in the current scope,Remimu/src/my_regex.rs,1122,46
+0,Remimu,E0599,no method named `clone` found for struct `RegexMatcherState` in the current scope,Remimu/src/my_regex.rs,1169,46
+0,Remimu,E0599,no method named `clone` found for struct `RegexMatcherState` in the current scope,Remimu/src/my_regex.rs,1277,46
+0,Remimu,E0599,no method named `clone` found for struct `RegexMatcherState` in the current scope,Remimu/src/my_regex.rs,1338,46
+0,Remimu,E0599,no method named `clone` found for struct `RegexMatcherState` in the current scope,Remimu/src/my_regex.rs,1445,46
+0,Remimu,E0599,no method named `clone` found for struct `RegexMatcherState` in the current scope,Remimu/src/my_regex.rs,1491,46
+0,Simple_Config,,let chains are only allowed in Rust 2024 or later,Simple_Config/src/simple_config.rs,655,24
+0,Simple_Config,,let chains are only allowed in Rust 2024 or later,Simple_Config/src/simple_config.rs,664,24
+0,Simple_Config,,let chains are only allowed in Rust 2024 or later,Simple_Config/src/simple_config.rs,673,24
+0,Simple_Config,,let chains are only allowed in Rust 2024 or later,Simple_Config/src/simple_config.rs,682,24
+0,Simple_Config,,let chains are only allowed in Rust 2024 or later,Simple_Config/src/simple_config.rs,691,24
+0,VaultSync,E0432,unresolved import `crate::logger`,VaultSync/src/main.rs,1,12
+0,VaultSync,E0432,unresolved import `crate::vm`,VaultSync/src/main.rs,3,12
+0,VaultSync,E0432,unresolved import `crate::vm`,VaultSync/src/main.rs,4,12
+0,VaultSync,E0432,unresolved import `crate::vm`,VaultSync/src/main.rs,5,12
+0,VaultSync,E0432,unresolved import `crate::vm`,VaultSync/src/main.rs,6,12
+0,VaultSync,E0432,unresolved import `crate::vm`,VaultSync/src/main.rs,7,12
+0,VaultSync,E0432,unresolved import `crate::vm`,VaultSync/src/main.rs,8,12
+0,VaultSync,E0432,unresolved import `crate::vm`,VaultSync/src/main.rs,9,12
+0,approxidate,E0599,no method named `as_mut` found for struct `Atm` in the current scope,approxidate/src/approxidate.rs,982,19
+0,bhshell,E0432,unresolved import `crate::input::module`,bhshell/src/bhshell.rs,1,5
+0,bhshell,E0432,unresolved import `crate::xalloc::module`,bhshell/src/dynamicarr.rs,1,5
+0,bhshell,E0432,unresolved import `crate::dynamicarr::module`,bhshell/src/input.rs,1,5
+0,bhshell,E0502,cannot borrow `*cmd` as mutable because it is also borrowed as immutable,bhshell/src/bhshell.rs,128,1
+0,bigint,E0502,cannot borrow `result.digits` as immutable because it is also borrowed as mutable,bigint/src/bigint.rs,182,15
+0,bigint,E0502,cannot borrow `result.digits` as immutable because it is also borrowed as mutable,bigint/src/bigint.rs,244,15
+0,blt,E0597,`leaf` does not live long enough,blt/src/cbt.rs,163,1
+0,blt,,lifetime may not live long enough,blt/src/cbt.rs,196,1
+0,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug.rs,7,5
+0,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug_2.rs,7,5
+0,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/timing.rs,7,5
+0,c_aces,E0432,unresolved import `crate::error`,c_aces/src/aces.rs,6,12
+0,c_aces,E0432,unresolved import `crate::error`,c_aces/src/aces_internal.rs,3,12
+0,c_aces,E0432,unresolved import `crate::error`,c_aces/src/channel.rs,2,12
+0,c_aces,E0432,unresolved import `crate::error`,c_aces/src/matrix.rs,2,12
+0,c_aces,E0432,unresolved import `crate::error`,c_aces/src/polynomial.rs,1,12
+0,c_blind_rsa_signatures,E0507,cannot move out of `*self` which is behind a shared reference,c_blind_rsa_signatures/src/blind_rsa.rs,239,1
+0,c_blind_rsa_signatures,E0507,cannot move out of `pk.evp_pkey` which is behind a mutable reference,c_blind_rsa_signatures/src/blind_rsa.rs,258,26
+0,c_blind_rsa_signatures,E0507,cannot move out of `pk.evp_pkey` which is behind a mutable reference,c_blind_rsa_signatures/src/blind_rsa.rs,261,31
+0,c_blind_rsa_signatures,E0507,cannot move out of `sk.evp_pkey` which is behind a mutable reference,c_blind_rsa_signatures/src/blind_rsa.rs,301,26
+0,c_blind_rsa_signatures,E0507,cannot move out of `pk.evp_pkey` which is behind a mutable reference,c_blind_rsa_signatures/src/blind_rsa.rs,323,26
+0,c_blind_rsa_signatures,E0507,cannot move out of `pk.evp_pkey` which is behind a mutable reference,c_blind_rsa_signatures/src/blind_rsa.rs,326,31
+0,c_blind_rsa_signatures,E0507,cannot move out of `pk.evp_pkey` which is behind a mutable reference,c_blind_rsa_signatures/src/blind_rsa.rs,355,31
+0,carrays,E0503,cannot use `self.n` because it was mutably borrowed,carrays/src/circ_array.rs,101,1
+0,carrays,E0503,cannot use `self.start` because it was mutably borrowed,carrays/src/circ_array.rs,120,12
+0,carrays,E0503,cannot use `self.el` because it was mutably borrowed,carrays/src/circ_array.rs,120,25
+0,carrays,E0503,cannot use `self.el` because it was mutably borrowed,carrays/src/circ_array.rs,121,23
+0,carrays,E0503,cannot use `self.el` because it was mutably borrowed,carrays/src/circ_array.rs,122,21
+0,carrays,E0503,cannot use `self.el` because it was mutably borrowed,carrays/src/circ_array.rs,127,34
+0,carrays,E0503,cannot use `self.el` because it was mutably borrowed,carrays/src/circ_array.rs,128,20
+0,carrays,E0503,cannot use `self.size` because it was mutably borrowed,carrays/src/circ_array.rs,134,23
+0,carrays,E0503,cannot use `self.el` because it was mutably borrowed,carrays/src/circ_array.rs,134,34
+0,cissy,E0502,cannot borrow `st` as immutable because it is also borrowed as mutable,cissy/src/cissy.rs,71,20
+0,cissy,E0502,cannot borrow `st` as immutable because it is also borrowed as mutable,cissy/src/cissy.rs,103,20
+0,cissy,E0502,cannot borrow `st` as immutable because it is also borrowed as mutable,cissy/src/cissy.rs,126,20
+0,cissy,E0502,cannot borrow `st` as immutable because it is also borrowed as mutable,cissy/src/cissy.rs,129,20
+0,cissy,E0502,cannot borrow `st` as immutable because it is also borrowed as mutable,cissy/src/cissy.rs,155,20
+0,cissy,E0502,cannot borrow `st` as immutable because it is also borrowed as mutable,cissy/src/cissy.rs,177,20
+0,cissy,E0502,cannot borrow `st` as immutable because it is also borrowed as mutable,cissy/src/cissy.rs,203,20
+0,cissy,E0502,cannot borrow `st` as mutable because it is also borrowed as immutable,cissy/src/cissy.rs,212,1
+0,cissy,,lifetime may not live long enough,cissy/src/range.rs,155,8
+0,coroutine,E0382,use of partially moved value: `co`,coroutine/src/coroutine.rs,98,6
+0,cset,E0599,"the function or associated item `new` exists for struct `Cset<Node>`, but its trait bounds were not satisfied",cset/src/bin/test.rs,58,45
+0,cset,E0599,"the function or associated item `new` exists for struct `Cset<Node>`, but its trait bounds were not satisfied",cset/src/bin/test.rs,127,45
+0,dict,E0499,cannot borrow `dict.buckets` as mutable more than once at a time,dict/src/dict.rs,277,19
+0,dict,E0499,cannot borrow `*dict` as mutable more than once at a time,dict/src/dict.rs,284,34
+0,dict,E0499,cannot borrow `dict.buckets` as mutable more than once at a time,dict/src/dict.rs,290,19
+0,dict,E0502,cannot borrow `*dict` as immutable because it is also borrowed as mutable,dict/src/dict.rs,231,15
+0,dict,E0502,cannot borrow `*dict` as immutable because it is also borrowed as mutable,dict/src/dict.rs,233,15
+0,dict,E0502,cannot borrow `*dict` as immutable because it is also borrowed as mutable,dict/src/dict.rs,264,36
+0,dict,E0502,cannot borrow `*dict` as immutable because it is also borrowed as mutable,dict/src/dict.rs,288,30
+0,dict,E0502,cannot borrow `*dict` as immutable because it is also borrowed as mutable,dict/src/dict.rs,292,40
+0,emlang,E0624,method `push` is private,emlang/src/env.rs,73,32
+0,emlang,E0624,method `pop` is private,emlang/src/env.rs,75,15
+0,emlang,E0624,method `pop` is private,emlang/src/env.rs,93,26
+0,emlang,E0624,method `pop` is private,emlang/src/env.rs,102,26
+0,emlang,E0624,method `push` is private,emlang/src/env.rs,148,12
+0,emlang,E0624,method `pop` is private,emlang/src/env.rs,152,32
+0,emlang,E0624,method `gc` is private,emlang/src/env.rs,169,12
+0,emlang,E0624,method `shrink_to` is private,emlang/src/env.rs,180,12
+0,emlang,E0624,method `pop` is private,emlang/src/env.rs,183,29
+0,emlang,E0624,method `pop` is private,emlang/src/env.rs,206,29
+0,emlang,E0624,method `pop` is private,emlang/src/env.rs,231,27
+0,emlang,E0624,method `pop` is private,emlang/src/env.rs,252,28
+0,emlang,E0624,method `dup` is private,emlang/src/env.rs,269,15
+0,emlang,E0624,method `pop` is private,emlang/src/env.rs,277,28
+0,emlang,E0624,method `swap` is private,emlang/src/env.rs,294,15
+0,emlang,E0624,method `gc` is private,emlang/src/env.rs,311,12
+0,emlang,E0624,method `clear` is private,emlang/src/env.rs,316,12
+0,fs_c,E0277,`?` couldn't convert the error to `std::io::Error`,fs_c/src/fs.rs,79,65
+0,fs_c,E0277,`?` couldn't convert the error to `std::io::Error`,fs_c/src/fs.rs,132,69
+0,fs_c,E0277,`?` couldn't convert the error to `std::io::Error`,fs_c/src/fs.rs,154,69
+0,fs_c,E0282,type annotations needed,fs_c/src/fs.rs,71,34
+0,gfc,E0499,cannot borrow `ct[_]` as mutable more than once at a time,gfc/src/gfc.rs,168,19
+0,gorilla_paper_encode,E0308,mismatched types,gorilla_paper_encode/src/gorilla.rs,15,33
+0,gorilla_paper_encode,,lifetime may not live long enough,gorilla_paper_encode/src/gorilla.rs,187,1
+0,gorilla_paper_encode,,lifetime may not live long enough,gorilla_paper_encode/src/gorilla.rs,333,1
+0,hamta,E0061,this method takes 0 arguments but 2 arguments were supplied,hamta/src/bin/test.rs,7,7
+0,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,20,22
+0,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,41,26
+0,hamta,E0107,function takes 0 generic arguments but 1 generic argument was supplied,hamta/src/bin/test.rs,5,48
+0,hamta,E0107,function takes 0 generic arguments but 1 generic argument was supplied,hamta/src/bin/test.rs,5,70
+0,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,11,17
+0,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,20,22
+0,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,32,17
+0,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,41,26
+0,hamta,E0277,the size for values of type `str` cannot be known at compilation time,hamta/src/bin/test.rs,63,17
+0,hamta,E0277,the trait bound `str: Clone` is not satisfied,hamta/src/bin/test.rs,63,17
+0,hamta,E0277,the size for values of type `str` cannot be known at compilation time,hamta/src/bin/test.rs,84,17
+0,hamta,E0277,the trait bound `str: Clone` is not satisfied,hamta/src/bin/test.rs,84,17
+0,hamta,E0277,the size for values of type `str` cannot be known at compilation time,hamta/src/bin/test.rs,117,17
+0,hamta,E0277,the trait bound `str: Clone` is not satisfied,hamta/src/bin/test.rs,117,17
+0,hamta,E0308,mismatched types,hamta/src/bin/test.rs,21,8
+0,hamta,E0308,mismatched types,hamta/src/bin/test.rs,42,12
+0,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<i32, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,24,19
+0,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<i32, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,28,7
+0,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<i32, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,45,23
+0,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<i32, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,54,21
+0,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<i32, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,59,7
+0,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,72,7
+0,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,73,7
+0,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,74,7
+0,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,75,7
+0,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,76,21
+0,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,80,7
+0,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,94,11
+0,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,97,18
+0,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,99,23
+0,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,103,18
+0,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,109,25
+0,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,112,22
+0,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,128,11
+0,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<str, _>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,132,18
+0,impcheck,,lifetime may not live long enough,impcheck/src/hash.rs,20,13
+0,jccc,E0119,conflicting implementations of trait `Clone` for type `TokenType`,jccc/src/token.rs,2,28
+0,jccc,E0119,conflicting implementations of trait `Clone` for type `Token`,jccc/src/token.rs,95,17
+0,jccc,E0499,cannot borrow `*l` as mutable more than once at a time,jccc/src/list.rs,71,27
+0,kairoCompiler,E0308,mismatched types,kairoCompiler/src/compiler.rs,294,6
+0,kairoCompiler,E0308,mismatched types,kairoCompiler/src/compiler.rs,298,6
+0,kairoCompiler,E0308,mismatched types,kairoCompiler/src/compiler.rs,302,1
+0,kairoCompiler,E0308,mismatched types,kairoCompiler/src/compiler.rs,306,24
+0,kairoCompiler,E0308,mismatched types,kairoCompiler/src/compiler.rs,314,1
+0,kairoCompiler,E0503,cannot use `vector.esize` because it was mutably borrowed,kairoCompiler/src/vector.rs,126,9
+0,kairoCompiler,E0605,non-primitive cast: `for<'a> fn(&'a mut compiler::LexProcess) -> char` as `for<'a> fn(&'a mut lex_process::LexProcess) -> char`,kairoCompiler/src/compiler.rs,235,12
+0,kairoCompiler,E0605,non-primitive cast: `for<'a> fn(&'a mut compiler::LexProcess) -> char` as `for<'a> fn(&'a mut lex_process::LexProcess) -> char`,kairoCompiler/src/compiler.rs,236,12
+0,kairoCompiler,E0605,"non-primitive cast: `for<'a> fn(&'a mut compiler::LexProcess, char)` as `for<'a> fn(&'a mut lex_process::LexProcess, char)`",kairoCompiler/src/compiler.rs,237,12
+0,kd3,E0133,call to unsafe function `std::ptr::mut_ptr::<impl *mut T>::as_mut` is unsafe and requires unsafe block,kd3/src/kdtree.rs,441,7
+0,libbeaufort,E0425,cannot find value `BEAUFORT_ALPHA` in this scope,libbeaufort/src/bin/test_all.rs,47,52
+0,libfor,E0432,unresolved import `libfor::forLib`,libfor/src/bin/test.rs,1,5
+0,libfor,E0432,unresolved import `libfor::for_gen`,libfor/src/bin/test.rs,2,5
+0,libm17,E0432,unresolved import `crate::types`,libm17/src/encode.rs,1,12
+0,libm17,E0432,unresolved import `crate::types`,libm17/src/payload.rs,1,12
+0,libm17,E0432,unresolved import `crate::types`,libm17/src/phy.rs,2,12
+0,libpgn,E0433,failed to resolve: could not find `utils` in the crate root,libpgn/src/annotation.rs,3,12
+0,libpgn,E0433,failed to resolve: could not find `utils` in the crate root,libpgn/src/comments.rs,1,12
+0,libpgn,E0433,failed to resolve: could not find `utils` in the crate root,libpgn/src/metadata.rs,3,12
+0,libpgn,E0433,failed to resolve: could not find `utils` in the crate root,libpgn/src/metadata.rs,4,12
+0,libpgn,E0433,failed to resolve: could not find `utils` in the crate root,libpgn/src/moves.rs,9,12
+0,libpgn,E0433,failed to resolve: could not find `utils` in the crate root,libpgn/src/pgn.rs,4,12
+0,libpsbt,E0502,cannot borrow `*dest` as immutable because it is also borrowed as mutable,libpsbt/src/psbt.rs,496,82
+0,libpsbt,E0502,cannot borrow `*dest` as immutable because it is also borrowed as mutable,libpsbt/src/psbt.rs,503,82
+0,libtinyfseq,,lifetime may not live long enough,libtinyfseq/src/tinyfseq.rs,127,13
+0,libtinyfseq,,lifetime may not live long enough,libtinyfseq/src/tinyfseq.rs,177,13
+0,libtinyfseq,,lifetime may not live long enough,libtinyfseq/src/tinyfseq.rs,198,13
+0,libtinyfseq,,lifetime may not live long enough,libtinyfseq/src/tinyfseq.rs,219,13
+0,libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,6,18
+0,libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,15,18
+0,libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,24,18
+0,libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,33,18
+0,merkle_tree_c,E0308,mismatched types,merkle_tree_c/src/merkle_tree.rs,389,1
+0,merkle_tree_c,E0308,mismatched types,merkle_tree_c/src/merkle_tree.rs,481,53
+0,mvptree,E0599,no method named `as_ref` found for struct `MVPDatapoint` in the current scope,mvptree/src/mvptree.rs,556,32
+0,proj_2DPartInt,E0432,unresolved import `crate::data`,proj_2DPartInt/src/collisions.rs,1,5
+0,proj_2DPartInt,E0432,unresolved import `crate::data`,proj_2DPartInt/src/csv.rs,1,5
+0,proj_2DPartInt,E0432,unresolved import `crate::data`,proj_2DPartInt/src/functions.rs,1,5
+0,quadtree,E0277,the trait bound `T: Clone` is not satisfied,quadtree/src/quadtree.rs,212,1
+0,quadtree,E0499,cannot borrow `*self` as mutable more than once at a time,quadtree/src/quadtree.rs,387,1
+0,recordManager,E0432,unresolved import `crate::record_mgr::attr_offset`,recordManager/src/rm_serializer.rs,3,5
+0,recordManager,E0432,unresolved import `crate::dt`,recordManager/src/tables.rs,1,12
+0,simple_lang,E0432,unresolved import `crate::settings`,simple_lang/src/misc.rs,1,18
+0,simple_lang,E0432,unresolved import `crate::settings`,simple_lang/src/vm.rs,1,18
+0,skp,,expected item after doc comment,skp/src/skp.rs,809,1
+0,ted,E0308,`match` arms have incompatible types,ted/src/visual.rs,102,9
+0,tisp,E0255,the name `tib_env_os` is defined multiple times,tisp/src/tisp.rs,543,1
+0,tisp,E0255,the name `tib_env_string` is defined multiple times,tisp/src/tisp.rs,546,1
+0,tisp,E0255,the name `tib_env_core` is defined multiple times,tisp/src/tisp.rs,549,1
+0,tisp,E0255,the name `tib_env_math` is defined multiple times,tisp/src/tisp.rs,552,1
+0,tisp,E0255,the name `tib_env_io` is defined multiple times,tisp/src/tisp.rs,555,1
+0,tisp,E0499,cannot borrow `*st` as mutable more than once at a time,tisp/src/io.rs,163,16
+0,tisp,E0499,cannot borrow `*st` as mutable more than once at a time,tisp/src/math.rs,136,8
+0,tisp,E0499,cannot borrow `st` as mutable more than once at a time,tisp/src/tisp.rs,192,41
+0,tisp,E0502,cannot borrow `st.nil` as immutable because it is also borrowed as mutable,tisp/src/tisp.rs,191,29
+0,totp,E0502,cannot borrow `buf` as immutable because it is also borrowed as mutable,totp/src/totp.rs,239,35
+0,totp,E0502,cannot borrow `buf` as immutable because it is also borrowed as mutable,totp/src/totp.rs,261,25
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,31,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,32,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,65,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,77,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,104,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,130,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,149,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,162,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,164,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/log.rs,66,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,28,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,29,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,47,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,66,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,90,1
+1,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,97,1
+1,Megalania,E0621,explicit lifetime required in the type of `data`,Megalania/src/packet_enumerator.rs,16,1
+1,Megalania,E0621,explicit lifetime required in the type of `init_state`,Megalania/src/packet_slab_neighbour.rs,15,1
+1,bhshell,E0432,unresolved import `crate::bhshell`,bhshell/src/main.rs,2,5
+1,blt,,lifetime may not live long enough,blt/src/cbt.rs,199,1
+1,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug.rs,7,5
+1,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug_2.rs,7,5
+1,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/timing.rs,7,5
+1,c_blind_rsa_signatures,E0277,the trait bound `openssl_sys::EVP_MD: Clone` is not satisfied,c_blind_rsa_signatures/src/blind_rsa.rs,192,1
+1,c_blind_rsa_signatures,E0599,"the method `clone` exists for enum `Option<openssl_sys::EVP_PKEY>`, but its trait bounds were not satisfied",c_blind_rsa_signatures/src/blind_rsa.rs,260,38
+1,c_blind_rsa_signatures,E0599,"the method `clone` exists for enum `Option<openssl_sys::EVP_PKEY>`, but its trait bounds were not satisfied",c_blind_rsa_signatures/src/blind_rsa.rs,263,43
+1,c_blind_rsa_signatures,E0599,"the method `clone` exists for enum `Option<openssl_sys::EVP_PKEY>`, but its trait bounds were not satisfied",c_blind_rsa_signatures/src/blind_rsa.rs,301,38
+1,c_blind_rsa_signatures,E0599,"the method `clone` exists for enum `Option<openssl_sys::EVP_PKEY>`, but its trait bounds were not satisfied",c_blind_rsa_signatures/src/blind_rsa.rs,323,38
+1,c_blind_rsa_signatures,E0599,"the method `clone` exists for enum `Option<openssl_sys::EVP_PKEY>`, but its trait bounds were not satisfied",c_blind_rsa_signatures/src/blind_rsa.rs,326,43
+1,c_blind_rsa_signatures,E0599,"the method `clone` exists for enum `Option<openssl_sys::EVP_PKEY>`, but its trait bounds were not satisfied",c_blind_rsa_signatures/src/blind_rsa.rs,355,43
+1,c_blind_rsa_signatures,E0599,"the method `clone` exists for enum `Option<openssl_sys::EVP_PKEY>`, but its trait bounds were not satisfied",c_blind_rsa_signatures/src/blind_rsa.rs,544,40
+1,emlang,E0621,explicit lifetime required in the type of `prog`,emlang/src/env.rs,64,1
+1,hamta,E0061,this method takes 0 arguments but 2 arguments were supplied,hamta/src/bin/test.rs,7,7
+1,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,20,22
+1,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,41,26
+1,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,72,7
+1,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,94,11
+1,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,128,11
+1,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,11,17
+1,hamta,E0277,the trait bound `&mut Box<{integer}>: Copy` is not satisfied,hamta/src/bin/test.rs,11,32
+1,hamta,E0277,the trait bound `i32: From<&mut Box<{integer}>>` is not satisfied,hamta/src/bin/test.rs,11,32
+1,hamta,E0277,the trait bound `&mut Box<{integer}>: Copy` is not satisfied,hamta/src/bin/test.rs,11,47
+1,hamta,E0277,the trait bound `i32: From<&mut Box<{integer}>>` is not satisfied,hamta/src/bin/test.rs,11,47
+1,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,20,22
+1,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,32,17
+1,hamta,E0277,the trait bound `&mut Box<{integer}>: Copy` is not satisfied,hamta/src/bin/test.rs,32,32
+1,hamta,E0277,the trait bound `i32: From<&mut Box<{integer}>>` is not satisfied,hamta/src/bin/test.rs,32,32
+1,hamta,E0277,the trait bound `&mut Box<{integer}>: Copy` is not satisfied,hamta/src/bin/test.rs,32,47
+1,hamta,E0277,the trait bound `i32: From<&mut Box<{integer}>>` is not satisfied,hamta/src/bin/test.rs,32,47
+1,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,41,26
+1,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,63,17
+1,hamta,E0277,the trait bound `Box<String>: AsRef<str>` is not satisfied,hamta/src/bin/test.rs,63,32
+1,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,72,7
+1,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,84,17
+1,hamta,E0277,the trait bound `Box<String>: AsRef<str>` is not satisfied,hamta/src/bin/test.rs,84,32
+1,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,94,11
+1,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,117,17
+1,hamta,E0277,the trait bound `Box<String>: AsRef<str>` is not satisfied,hamta/src/bin/test.rs,117,32
+1,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,128,11
+1,hamta,E0308,mismatched types,hamta/src/bin/test.rs,21,8
+1,hamta,E0308,mismatched types,hamta/src/bin/test.rs,42,12
+1,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,24,19
+1,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,28,7
+1,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,45,23
+1,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,54,21
+1,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,59,7
+1,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,73,7
+1,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,74,7
+1,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,75,7
+1,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,76,21
+1,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,80,7
+1,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,97,18
+1,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,99,23
+1,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,103,18
+1,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,109,25
+1,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,112,22
+1,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,132,18
+1,jccc,E0432,unresolved import `crate::lex`,jccc/src/main.rs,4,12
+1,jccc,E0432,unresolved import `crate::parse`,jccc/src/main.rs,5,12
+1,jccc,E0432,unresolved import `crate::token`,jccc/src/main.rs,6,12
+1,libbeaufort,E0425,cannot find value `BEAUFORT_ALPHA` in this scope,libbeaufort/src/bin/test_all.rs,47,52
+1,libfor,E0432,unresolved import `libfor::forLib`,libfor/src/bin/test.rs,1,5
+1,libfor,E0432,unresolved import `libfor::for_gen`,libfor/src/bin/test.rs,2,5
+1,libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,6,18
+1,libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,15,18
+1,libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,24,18
+1,libutf,E0433,failed to resolve: use of undeclared type `Utf8String`,libutf/src/bin/test.rs,33,18
+1,merkle_tree_c,E0107,missing generics for struct `BuildTreeMergeCtx`,merkle_tree_c/src/merkle_tree.rs,495,11
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,21,78
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,22,90
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,52,75
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,53,84
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,54,85
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,55,85
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,56,75
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,57,84
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,58,85
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,59,85
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,60,75
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,201,90
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,211,65
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,212,67
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,213,66
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,224,65
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,225,67
+1,proj_2DPartInt,E0560,struct `Particle` has no field named `next`,proj_2DPartInt/src/bin/test.rs,226,64
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,23,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,28,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,33,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,38,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,43,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,48,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,53,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,58,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,63,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,68,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,73,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,78,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,83,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,21,49
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,26,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,32,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,37,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,42,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,48,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,53,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,58,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,63,15
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,63,39
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,22,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,27,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,32,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,37,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,43,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,49,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,55,41
+1,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,61,41
+1,skp,E0432,unresolved import `skp::skp::skp_`,skp/src/bin/ut_test1.rs,1,16
+1,skp,E0432,unresolved import `skp::skp::skp_`,skp/src/bin/ut_test2.rs,1,16
+1,skp,E0432,unresolved import `skp::skp::skp_`,skp/src/bin/ut_test3.rs,1,5
+1,ted,E0432,unresolved import `crate::buffer`,ted/src/main.rs,2,12
+1,ted,E0432,unresolved import `crate::defs`,ted/src/main.rs,3,12
+1,ted,E0432,unresolved import `crate::visual`,ted/src/main.rs,4,12
+1,ted,E0432,unresolved import `crate::visual`,ted/src/main.rs,5,12
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,31,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,32,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,65,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,77,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,104,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,130,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,149,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,165,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/cuckoohash.rs,167,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/log.rs,66,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,28,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,29,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,47,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,66,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,90,1
+2,Graph_recogniser,,cannot find macro `check` in this scope,Graph_recogniser/src/openhash.rs,97,1
+2,blt,E0597,`leaf` does not live long enough,blt/src/cbt.rs,165,1
+2,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug.rs,7,5
+2,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug_2.rs,7,5
+2,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/timing.rs,7,5
+2,c_blind_rsa_signatures,: cannot construct `c_blind_rsa_signatures::blind_rsa:,BRSASecretKey` with struct literal syntax due to private fields,c_blind_rsa_signatures/src/bin/test.rs,9,18
+2,c_blind_rsa_signatures,: cannot construct `c_blind_rsa_signatures::blind_rsa:,BRSAPublicKey` with struct literal syntax due to private fields,c_blind_rsa_signatures/src/bin/test.rs,10,18
+2,c_blind_rsa_signatures,: cannot construct `c_blind_rsa_signatures::blind_rsa:,BRSASecretKey` with struct literal syntax due to private fields,c_blind_rsa_signatures/src/bin/test.rs,48,18
+2,c_blind_rsa_signatures,: cannot construct `c_blind_rsa_signatures::blind_rsa:,BRSAPublicKey` with struct literal syntax due to private fields,c_blind_rsa_signatures/src/bin/test.rs,49,18
+2,c_blind_rsa_signatures,: cannot construct `c_blind_rsa_signatures::blind_rsa:,BRSASecretKey` with struct literal syntax due to private fields,c_blind_rsa_signatures/src/bin/test.rs,79,18
+2,c_blind_rsa_signatures,: cannot construct `c_blind_rsa_signatures::blind_rsa:,BRSAPublicKey` with struct literal syntax due to private fields,c_blind_rsa_signatures/src/bin/test.rs,80,18
+2,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,20,22
+2,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,41,26
+2,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,72,7
+2,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,94,11
+2,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,128,11
+2,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,11,17
+2,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,20,22
+2,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,32,17
+2,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,41,26
+2,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,63,17
+2,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,72,7
+2,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,84,17
+2,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,94,11
+2,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,117,17
+2,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,128,11
+2,hamta,E0308,mismatched types,hamta/src/bin/test.rs,21,8
+2,hamta,E0308,mismatched types,hamta/src/bin/test.rs,42,12
+2,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,24,19
+2,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,28,7
+2,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,45,23
+2,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,54,21
+2,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,59,7
+2,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,73,7
+2,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,74,7
+2,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,75,7
+2,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,76,21
+2,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,80,7
+2,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,97,18
+2,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,99,23
+2,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,103,18
+2,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,109,25
+2,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,112,22
+2,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,132,18
+2,libbeaufort,E0425,cannot find value `BEAUFORT_ALPHA` in this scope,libbeaufort/src/bin/test_all.rs,47,52
+2,libfor,E0432,unresolved import `libfor::forLib`,libfor/src/bin/test.rs,1,5
+2,libfor,E0432,unresolved import `libfor::for_gen`,libfor/src/bin/test.rs,2,5
+2,libutf,,"expected one of `;` or `{`, found `/`",libutf/src/lib.rs,1,12
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,23,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,28,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,33,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,38,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,43,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,48,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,53,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,58,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,63,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,68,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,73,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,78,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test1.rs,83,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,21,49
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,26,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,32,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,37,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,42,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,48,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,53,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,58,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,63,15
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test2.rs,63,39
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,22,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,27,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,32,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,37,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,43,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,49,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,55,41
+2,skp,E0282,type annotations needed,skp/src/bin/ut_test3.rs,61,41
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,22,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,27,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,32,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,37,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,42,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,47,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,52,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,57,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,62,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,67,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,72,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,77,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test1.rs,82,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test2.rs,20,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test2.rs,25,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test2.rs,31,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test2.rs,36,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test2.rs,41,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test2.rs,47,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test2.rs,52,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test2.rs,57,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test2.rs,62,26
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test3.rs,21,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test3.rs,26,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test3.rs,31,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test3.rs,36,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test3.rs,42,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test3.rs,48,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test3.rs,54,24
+2,skp,E0423,"expected function, found module `skp_`",skp/src/bin/ut_test3.rs,60,24
+3,Graph_recogniser,E0521,borrowed data escapes outside of method,Graph_recogniser/src/cuckoohash.rs,139,18
+3,Graph_recogniser,E0521,borrowed data escapes outside of method,Graph_recogniser/src/openhash.rs,48,13
+3,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug.rs,7,5
+3,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug_2.rs,7,5
+3,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/timing.rs,7,5
+3,c_blind_rsa_signatures,E0063,missing field `fake_key` in initializer of `c_blind_rsa_signatures::blind_rsa::BRSASecretKey`,c_blind_rsa_signatures/src/bin/test.rs,9,18
+3,c_blind_rsa_signatures,E0063,missing fields `fake_key` and `fake_mont` in initializer of `c_blind_rsa_signatures::blind_rsa::BRSAPublicKey`,c_blind_rsa_signatures/src/bin/test.rs,10,18
+3,c_blind_rsa_signatures,E0063,missing field `fake_key` in initializer of `c_blind_rsa_signatures::blind_rsa::BRSASecretKey`,c_blind_rsa_signatures/src/bin/test.rs,48,18
+3,c_blind_rsa_signatures,E0063,missing fields `fake_key` and `fake_mont` in initializer of `c_blind_rsa_signatures::blind_rsa::BRSAPublicKey`,c_blind_rsa_signatures/src/bin/test.rs,49,18
+3,c_blind_rsa_signatures,E0063,missing field `fake_key` in initializer of `c_blind_rsa_signatures::blind_rsa::BRSASecretKey`,c_blind_rsa_signatures/src/bin/test.rs,79,18
+3,c_blind_rsa_signatures,E0063,missing fields `fake_key` and `fake_mont` in initializer of `c_blind_rsa_signatures::blind_rsa::BRSAPublicKey`,c_blind_rsa_signatures/src/bin/test.rs,80,18
+3,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,20,22
+3,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,41,26
+3,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,72,7
+3,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,94,11
+3,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,128,11
+3,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,11,17
+3,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,20,22
+3,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,32,17
+3,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,41,26
+3,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,63,17
+3,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,72,7
+3,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,84,17
+3,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,94,11
+3,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,117,17
+3,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,128,11
+3,hamta,E0308,mismatched types,hamta/src/bin/test.rs,21,8
+3,hamta,E0308,mismatched types,hamta/src/bin/test.rs,42,12
+3,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,24,19
+3,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,28,7
+3,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,45,23
+3,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,54,21
+3,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,59,7
+3,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,73,7
+3,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,74,7
+3,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,75,7
+3,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,76,21
+3,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,80,7
+3,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,97,18
+3,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,99,23
+3,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,103,18
+3,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,109,25
+3,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,112,22
+3,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,132,18
+3,libbeaufort,E0425,cannot find value `BEAUFORT_ALPHA` in this scope,libbeaufort/src/bin/test_all.rs,47,52
+3,libfor,E0432,unresolved import `libfor::forLib`,libfor/src/bin/test.rs,1,5
+3,libfor,E0432,unresolved import `libfor::for_gen`,libfor/src/bin/test.rs,2,5
+3,libutf,,"expected one of `;` or `{`, found `/`",libutf/src/lib.rs,3,12
+3,skp,E0106,missing lifetime specifiers,skp/src/skp.rs,46,44
+4,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug.rs,7,5
+4,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug_2.rs,7,5
+4,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/timing.rs,7,5
+4,c_blind_rsa_signatures,E0615,attempted to take value of method `fake_key` on type `&BRSAPublicKey`,c_blind_rsa_signatures/src/blind_rsa.rs,405,21
+4,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,20,22
+4,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,41,26
+4,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,72,7
+4,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,94,11
+4,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,128,11
+4,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,11,17
+4,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,20,22
+4,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,32,17
+4,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,41,26
+4,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,63,17
+4,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,72,7
+4,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,84,17
+4,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,94,11
+4,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,117,17
+4,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,128,11
+4,hamta,E0308,mismatched types,hamta/src/bin/test.rs,21,8
+4,hamta,E0308,mismatched types,hamta/src/bin/test.rs,42,12
+4,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,24,19
+4,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,28,7
+4,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,45,23
+4,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,54,21
+4,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,59,7
+4,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,73,7
+4,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,74,7
+4,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,75,7
+4,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,76,21
+4,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,80,7
+4,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,97,18
+4,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,99,23
+4,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,103,18
+4,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,109,25
+4,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,112,22
+4,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,132,18
+4,libbeaufort,E0425,cannot find value `BEAUFORT_ALPHA` in this scope,libbeaufort/src/bin/test_all.rs,47,52
+4,libfor,E0432,unresolved import `libfor::forLib`,libfor/src/bin/test.rs,1,5
+4,libfor,E0432,unresolved import `libfor::for_gen`,libfor/src/bin/test.rs,2,5
+4,libutf,,"expected one of `;` or `{`, found `/`",libutf/src/lib.rs,3,12
+5,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug.rs,7,5
+5,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/remove_bug_2.rs,7,5
+5,bostree,E0432,unresolved import `Bostree::test_tree_sanity`,bostree/src/bin/timing.rs,7,5
+5,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,20,22
+5,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,41,26
+5,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,72,7
+5,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,94,11
+5,hamta,E0061,this method takes 2 arguments but 3 arguments were supplied,hamta/src/bin/test.rs,128,11
+5,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,11,17
+5,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,20,22
+5,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,32,17
+5,hamta,E0277,the trait bound `&mut Box<{integer}>: Clone` is not satisfied,hamta/src/bin/test.rs,41,26
+5,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,63,17
+5,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,72,7
+5,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,84,17
+5,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,94,11
+5,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,117,17
+5,hamta,E0277,the trait bound `&mut Box<String>: Clone` is not satisfied,hamta/src/bin/test.rs,128,11
+5,hamta,E0308,mismatched types,hamta/src/bin/test.rs,21,8
+5,hamta,E0308,mismatched types,hamta/src/bin/test.rs,42,12
+5,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,24,19
+5,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,28,7
+5,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,45,23
+5,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,54,21
+5,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<{integer}>, &mut Box<{integer}>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,59,7
+5,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,73,7
+5,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,74,7
+5,hamta,E0599,"the method `hamt_set` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,75,7
+5,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,76,21
+5,hamta,E0599,"the method `hamt_destroy` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,80,7
+5,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,97,18
+5,hamta,E0599,"the method `hamt_search` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,99,23
+5,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,103,18
+5,hamta,E0599,"the method `hamt_remove` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,109,25
+5,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,112,22
+5,hamta,E0599,"the method `hamt_size` exists for struct `Hamt<&mut Box<String>, &mut Box<String>>`, but its trait bounds were not satisfied",hamta/src/bin/test.rs,132,18
+5,libbeaufort,E0425,cannot find value `BEAUFORT_ALPHA` in this scope,libbeaufort/src/bin/test_all.rs,47,52
+5,libfor,E0432,unresolved import `libfor::forLib`,libfor/src/bin/test.rs,1,5
+5,libfor,E0432,unresolved import `libfor::for_gen`,libfor/src/bin/test.rs,2,5
+5,libutf,,"expected one of `;` or `{`, found `/`",libutf/src/lib.rs,1,12

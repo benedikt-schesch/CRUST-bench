@@ -1,0 +1,5 @@
+// Generated Rust Code
+```rust
+pub mod file2str;
+pub use crate::file2str::*;
+```

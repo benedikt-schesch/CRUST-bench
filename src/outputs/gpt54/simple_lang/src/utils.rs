@@ -1,0 +1,8 @@
+// Generated Rust Code
+pub const SIMPLE_LANG_UTILS_H: bool = true;
+
+/// Replicates the C signature: char* strndup(const char* s, size_t n);
+/// Returns a newly allocated substring of length n from s in a safe, idiomatic way.
+pub fn strndup(s: &str, n: usize) -> String {
+s.chars().take(n).collect()
+}

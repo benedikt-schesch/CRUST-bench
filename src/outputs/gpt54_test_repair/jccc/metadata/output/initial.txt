@@ -1,0 +1,1555 @@
+{{codegen.rs}}
+```rust
+use std::sync::{Mutex, OnceLock};
+
+use crate::token::TokenType;
+
+/// A placeholder enum for an operation type that might be applied to registers.
+#[derive(Debug, Clone, Copy)]
+pub enum Op {
+    OP_ADD,
+    OP_SUB,
+    OP_MOV,
+    OP_NOP,
+}
+
+/// Represents the code generation state.
+#[derive(Debug, Clone, Copy)]
+pub struct GenState {
+    pub registers_in_use: u32,
+    pub rsp_offset: u32,
+}
+
+fn gen_state() -> &'static Mutex<GenState> {
+    static GEN_STATE: OnceLock<Mutex<GenState>> = OnceLock::new();
+    GEN_STATE.get_or_init(|| {
+        Mutex::new(GenState {
+            registers_in_use: 0,
+            rsp_offset: 0,
+        })
+    })
+}
+
+fn ttype_to_op(t: TokenType) -> Op {
+    match t {
+        TokenType::TT_PLUS => Op::OP_ADD,
+        TokenType::TT_MINUS => Op::OP_SUB,
+        _ => Op::OP_NOP,
+    }
+}
+
+/// Generates code to operate on RAX with RDI according to the provided Op.
+pub fn op_on_rax_with_rdi(op: Op) -> String {
+    let op_str = match op {
+        Op::OP_ADD => "add",
+        Op::OP_SUB => "sub",
+        Op::OP_MOV => "mov",
+        Op::OP_NOP => "",
+    };
+    format!("\t{} rax, rdi\n", op_str)
+}
+
+/// Initializes code for an integer literal.
+pub fn init_int_literal(val: i32) -> String {
+    let mut state = gen_state().lock().expect("gen state poisoned");
+    state.rsp_offset += 8;
+    format!("\tmov [rsp+{}], {}", state.rsp_offset, val)
+}
+
+/// Tests the function that initializes integer literals.
+pub fn test_init_int_literal() -> i32 {
+    code_gen_init();
+    assert!(init_int_literal(100) == "\tmov [rsp+8], 100");
+    0
+}
+
+/// Initializes the code generator.
+pub fn code_gen_init() {
+    let mut state = gen_state().lock().expect("gen state poisoned");
+    state.registers_in_use = 0;
+    state.rsp_offset = 0;
+}
+
+/// Starts the main function (assembly or IR) generation.
+pub fn start_main() -> String {
+    "global _start\nsection .text\n\n_start:\n".to_string()
+}
+
+/// Starts a generic function definition.
+pub fn start_func() -> String {
+    "\tsub rsp, 32\tmov [rsp], r12\tmov [rsp+8], r13\tmov [rsp+16], r14\tmov [rsp+24], r15"
+        .to_string()
+}
+
+/// Tests the operation on RAX with RDI.
+pub fn test_op_on_rax_with_rdi() -> i32 {
+    let out = op_on_rax_with_rdi(Op::OP_ADD);
+    assert!(out == "\tadd rax, rdi\n");
+    let out2 = op_on_rax_with_rdi(Op::OP_MOV);
+    assert!(out2 == "\tmov rax, rdi\n");
+    let _ = ttype_to_op(TokenType::TT_PLUS);
+    0
+}
+
+/// Ends a function definition (assembly or IR).
+pub fn end_func() -> String {
+    "\tmov r12, [rsp]\tmov r13, [rsp+8]\tmov r14, [rsp+16]\tmov r15, [rsp+24]\tadd rsp, 32"
+        .to_string()
+}
+
+/// Ends the main function with a custom return value.
+pub fn end_main_custom_return(val: i32) -> String {
+    format!("\tmov rax, 60\n\tmov rdi, {}\n\tsyscall\n", val)
+}
+
+/// Ends the main function with a default return.
+pub fn end_main() -> String {
+    "\tmov rax, 60\tmov rdi, 0\tsyscall".to_string()
+}
+```
+
+{{cst.rs}}
+```rust
+use crate::list::List;
+
+/// Represents different node types in the AST/CST.
+#[derive(Debug, Clone)]
+pub enum NodeType {
+    NT_STMT,
+    NT_EXPR,
+    NT_BLOCK_STMT,
+    NT_RETURN_STMT,
+    NT_FUNCDECL,
+    NT_FUNCCALL,
+    NT_LITERAL,
+}
+
+/// A block statement containing a list of statements.
+#[derive(Debug)]
+pub struct BlockStatement {
+    pub stmts: List,
+}
+
+/// A function declaration, including its body and name.
+#[derive(Debug)]
+pub struct FunctionDeclaration {
+    pub body: BlockStatement,
+    pub name: String,
+}
+
+/// A top-level declaration node that holds a function declaration in this simplified design.
+#[derive(Debug)]
+pub struct TopLevelDeclaration {
+    pub fd: FunctionDeclaration,
+    pub node_type: NodeType,
+}
+
+/// A function call node with a simple string name.
+#[derive(Debug, Clone)]
+pub struct FunctionCall {
+    pub name: String,
+}
+
+/// An expression node that can hold either a function call or a literal string.
+#[derive(Debug)]
+pub struct Expression {
+    pub fc: Option<FunctionCall>,
+    pub literal: Option<String>,
+    pub node_type: NodeType,
+}
+
+/// A file tree representing a list of top-level declarations.
+#[derive(Debug)]
+pub struct ConcreteFileTree {
+    pub decls: List,
+}
+```
+
+{{hashmap.rs}}
+```rust
+use std::any::Any;
+use std::fmt;
+
+/// Represents a node in the bucket chain.
+#[derive(Debug)]
+pub struct BucketNode {
+    pub key: String,
+    pub value: Box<dyn Any>,
+    pub next: Option<Box<BucketNode>>,
+}
+
+/// Represents a simple Hashmap structure.
+#[derive(Debug)]
+pub struct Hashmap {
+    pub buckets: Vec<Option<Box<BucketNode>>>,
+    pub size: i32,
+    pub cap: i32,
+    pub hash: fn(&str) -> u32,
+    /// An equality function taking two &str and returning a bool (true if equal).
+    pub equals: fn(&str, &str) -> bool,
+}
+
+pub fn create_hashmap(cap: i32) -> Hashmap {
+    let capacity = if cap < 0 { 0 } else { cap as usize };
+    Hashmap {
+        buckets: std::iter::repeat_with(|| None).take(capacity).collect(),
+        size: 0,
+        cap,
+        hash: fnva1,
+        equals: equal_key,
+    }
+}
+
+/// Gets a value from the Hashmap.
+pub fn hm_get<'a>(h: &'a Hashmap, key: &'a str) -> Option<&'a BucketNode> {
+    if h.cap <= 0 || h.buckets.is_empty() {
+        return None;
+    }
+    let a = ((h.hash)(key) % (h.cap as u32)) as usize;
+    let b = h.buckets.get(a)?.as_deref()?;
+    if (h.equals)(&b.key, key) {
+        Some(b)
+    } else {
+        None
+    }
+}
+
+/// Sets a key-value pair in the Hashmap.
+pub fn hm_set(h: &mut Hashmap, key: &str, value: Box<dyn Any>) -> i32 {
+    if h.cap <= 0 {
+        return -1;
+    }
+    let a = ((h.hash)(key) % (h.cap as u32)) as usize;
+    let is_empty = h.buckets.get(a).map(|x| x.is_none()).unwrap_or(true);
+    if is_empty {
+        if h.size == h.cap {
+            double_cap(h);
+        }
+        let a2 = ((h.hash)(key) % (h.cap as u32)) as usize;
+        h.size += 1;
+        h.buckets[a2] = Some(Box::new(BucketNode {
+            key: key.to_string(),
+            value,
+            next: None,
+        }));
+        0
+    } else {
+        -1
+    }
+}
+
+/// Tests setting and getting a value in the Hashmap.
+pub fn test_hash_set_and_get() -> i32 {
+    let mut h = create_hashmap(100);
+    let ret = hm_set(&mut h, "test", Box::new(String::from("jake")));
+    assert!(ret != -1);
+    let got = hm_get(&h, "test").expect("expected hashmap value");
+    let s = got
+        .value
+        .downcast_ref::<String>()
+        .expect("expected String value");
+    assert!(s == "jake");
+    0
+}
+
+/// Doubles the capacity of the Hashmap.
+pub fn double_cap(h: &mut Hashmap) {
+    let new_cap = if h.cap <= 0 { 0 } else { h.cap * 2 };
+    let mut new_buckets: Vec<Option<Box<BucketNode>>> =
+        std::iter::repeat_with(|| None).take(new_cap as usize).collect();
+
+    for bucket in h.buckets.drain(..) {
+        if let Some(node) = bucket {
+            let a = if h.cap > 0 {
+                ((h.hash)(&node.key) % (h.cap as u32)) as usize
+            } else {
+                0
+            };
+            if a < new_buckets.len() {
+                new_buckets[a] = Some(node);
+            }
+        }
+    }
+    h.buckets = new_buckets;
+    h.cap = new_cap;
+}
+
+/// A sample FNV-1 hash function.
+pub fn fnva1(value: &str) -> u32 {
+    let mut h: u64 = 16777619;
+    let prime: u64 = 2166136261;
+    for b in value.bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(prime);
+    }
+    h as u32
+}
+
+/// Tests initializing the Hashmap.
+pub fn test_hash_init() -> i32 {
+    let h = create_hashmap(100);
+    assert!(h.size == 0);
+    assert!(h.cap == 100);
+    0
+}
+
+/// Destroys the Hashmap and frees resources.
+pub fn destroy_hashmap(h: &mut Hashmap) {
+    h.buckets.clear();
+    h.size = 0;
+    h.cap = 0;
+}
+
+/// Tests initializing the Hashmap and storing a value.
+pub fn test_hash_init_and_store() -> i32 {
+    let mut h = create_hashmap(100);
+    assert!(h.size == 0);
+    assert!(h.cap == 100);
+    let ret = hm_set(&mut h, "test", Box::new(String::from("jake")));
+    assert!(ret != -1);
+    let ind = ((h.hash)("test") % (h.cap as u32)) as usize;
+    let b = h.buckets[ind].as_ref().expect("bucket missing");
+    assert!(b.key == "test");
+    assert!(h.size == 1);
+    assert!(h.cap == 100);
+    0
+}
+
+/// Tests setting a key-value pair, then doubling capacity, then getting the value.
+pub fn test_hash_set_and_double_get() -> i32 {
+    let mut h = create_hashmap(100);
+    let ret = hm_set(&mut h, "test", Box::new(String::from("jake")));
+    assert!(ret != -1);
+    double_cap(&mut h);
+    let got = hm_get(&h, "test").expect("expected hashmap value");
+    let s = got
+        .value
+        .downcast_ref::<String>()
+        .expect("expected String value");
+    assert!(s == "jake");
+    0
+}
+
+/// Compares two string keys for equality.
+pub fn equal_key(a: &str, b: &str) -> bool {
+    a == b
+}
+```
+
+{{lex.rs}}
+```rust
+use std::io::Read;
+
+use crate::token::{Token, TokenType};
+
+pub const TOKEN_PUTBACKS: usize = 5;
+
+/// Represents a lexer for tokenizing input.
+#[derive(Debug)]
+pub struct Lexer {
+    /// An optional file; in C this would be a FILE*, here we keep it as a File for demonstration.
+    pub fp: Option<std::fs::File>,
+    pub current_file: String,
+    pub buffer: [u8; 1],
+    pub position: i64,
+    pub last_column: i32,
+    pub column: i32,
+    pub line: i32,
+    pub unlexed: [Token; TOKEN_PUTBACKS],
+    pub unlexed_count: u32,
+}
+
+fn make_token() -> Token {
+    Token {
+        token_type: TokenType::TT_NO_TOKEN,
+        contents: String::new(),
+        length: 0,
+        source_file: String::new(),
+        line: 0,
+        column: 0,
+    }
+}
+
+fn operator_strings() -> &'static [&'static str] {
+    &[
+        "-", "+", "*", "/", "=", ":", "%", "&", "&&", "|", "||", "-=", "+=", "++", "--", "/=",
+        "*=", "%=", "&=", "|=", "&&=", "||=", ">", "<", "<=", ">=", "<<", ">>", "!", "==", "!=",
+        "^", "^=", "->", "<<=", ">>=",
+    ]
+}
+
+/// Gets the next character from the lexer.
+pub fn lexer_getchar(l: &mut Lexer) -> i32 {
+    l.position += 1;
+    l.last_column = l.column;
+    let mut one = [0u8; 1];
+    let read_res = if let Some(fp) = l.fp.as_mut() {
+        fp.read(&mut one).unwrap_or(0)
+    } else {
+        0
+    };
+    if read_res == 0 {
+        l.buffer[0] = 0;
+        return -1;
+    }
+    l.buffer[0] = one[0];
+    if l.buffer[0] == b'\n' {
+        l.line += 1;
+        l.column = 0;
+    } else {
+        l.column += 1;
+    }
+    l.buffer[0] as i32
+}
+
+/// Retrieves the next token from the lexer.
+pub fn real_lex(l: &mut Lexer, t: &mut Token) -> i32 {
+    if l.unlexed_count > 0 {
+        l.unlexed_count -= 1;
+        let idx = l.unlexed_count as usize;
+        *t = Token {
+            token_type: l.unlexed[idx].token_type.clone(),
+            contents: l.unlexed[idx].contents.clone(),
+            length: l.unlexed[idx].length,
+            source_file: l.unlexed[idx].source_file.clone(),
+            line: l.unlexed[idx].line,
+            column: l.unlexed[idx].column,
+        };
+        return 0;
+    }
+
+    skip_to_token(l);
+
+    let init = lexer_getchar(l);
+    t.contents.clear();
+    t.source_file = l.current_file.clone();
+
+    static EOF_STR: &str = "[end of file]";
+    if init == -1 {
+        t.contents = EOF_STR.to_string();
+        t.length = EOF_STR.len();
+        t.token_type = TokenType::TT_EOF;
+        t.line = l.line;
+        t.column = l.column;
+        return 0;
+    }
+
+    let init_ch = char::from_u32(init as u32).unwrap_or('\0');
+
+    if init_ch == ' ' || init_ch == '\t' {
+        return -1;
+    }
+
+    static NLINE: &str = "[newline]";
+    if init_ch == '\n' {
+        t.contents = NLINE.to_string();
+        t.length = NLINE.len();
+        t.token_type = TokenType::TT_NEWLINE;
+        t.line = l.line;
+        t.column = l.column;
+        return 0;
+    }
+
+    let mut pos = 0usize;
+    t.contents.push(init_ch);
+    pos += 1;
+
+    if in_string(init_ch, "(){}[];~#,.:?~") != 0 {
+        t.length = pos;
+        t.token_type = ttype_one_char(init_ch);
+        t.line = l.line;
+        t.column = l.column;
+        return 0;
+    }
+
+    let mut c = 0i32;
+    let starting_line;
+    let starting_col;
+    if is_valid_numeric_or_id_char(init_ch) != 0 {
+        starting_line = l.line;
+        starting_col = l.column;
+        loop {
+            c = lexer_getchar(l);
+            if c == -1 {
+                break;
+            }
+            let ch = char::from_u32(c as u32).unwrap_or('\0');
+            if is_valid_numeric_or_id_char(ch) == 0 {
+                break;
+            }
+            t.contents.push(ch);
+            pos += 1;
+        }
+        if c != -1 {
+            let _ = lexer_ungetchar(l);
+        }
+        t.token_type = ttype_many_chars(&t.contents);
+        t.length = pos;
+        t.line = starting_line;
+        t.column = starting_col;
+        return 0;
+    }
+
+    if starts_operator(init_ch) != 0 {
+        loop {
+            if valid_operator_sequence(&t.contents) == 0 {
+                break;
+            }
+            c = lexer_getchar(l);
+            if c == -1 {
+                break;
+            }
+            let ch = char::from_u32(c as u32).unwrap_or('\0');
+            t.contents.push(ch);
+            pos += 1;
+        }
+
+        if c != -1 {
+            let _ = lexer_ungetchar(l);
+            let _ = t.contents.pop();
+        }
+        t.token_type = ttype_from_string(&t.contents);
+        t.length = pos;
+        return 0;
+    }
+
+    0
+}
+
+/// Un-gets (pushes back) the last character.
+pub fn lexer_ungetchar(l: &mut Lexer) -> i32 {
+    if l.position < 0 {
+        return 0;
+    }
+    l.position -= 1;
+    l.column = l.last_column;
+    if l.buffer[0] == b'\n' {
+        l.line -= 1;
+    }
+    1
+}
+
+/// Determines a token type from a multi-character sequence.
+pub fn ttype_many_chars(contents: &str) -> TokenType {
+    match contents {
+        "auto" => TokenType::TT_AUTO,
+        "break" => TokenType::TT_BREAK,
+        "continue" => TokenType::TT_CONTINUE,
+        "const" => TokenType::TT_CONST,
+        "case" => TokenType::TT_CASE,
+        "char" => TokenType::TT_CHAR,
+        "do" => TokenType::TT_DO,
+        "double" => TokenType::TT_DOUBLE,
+        "default" => TokenType::TT_DEFAULT,
+        "enum" => TokenType::TT_ENUM,
+        "else" => TokenType::TT_ELSE,
+        "extern" => TokenType::TT_EXTERN,
+        "float" => TokenType::TT_FLOAT,
+        "for" => TokenType::TT_FOR,
+        "goto" => TokenType::TT_GOTO,
+        "int" => TokenType::TT_INT,
+        "if" => TokenType::TT_IF,
+        "long" => TokenType::TT_LONG,
+        "return" => TokenType::TT_RETURN,
+        "register" => TokenType::TT_REGISTER,
+        "struct" => TokenType::TT_STRUCT,
+        "signed" => TokenType::TT_SIGNED,
+        "sizeof" => TokenType::TT_SIZEOF,
+        "static" => TokenType::TT_STATIC,
+        "short" => TokenType::TT_SHORT,
+        "switch" => TokenType::TT_SWITCH,
+        "typedef" => TokenType::TT_TYPEDEF,
+        "union" => TokenType::TT_UNION,
+        "unsigned" => TokenType::TT_UNSIGNED,
+        "void" => TokenType::TT_VOID,
+        "volatile" => TokenType::TT_VOLATILE,
+        "while" => TokenType::TT_WHILE,
+        "&&" => TokenType::TT_LAND,
+        "||" => TokenType::TT_LOR,
+        "-=" => TokenType::TT_DEC,
+        "+=" => TokenType::TT_INC,
+        "++" => TokenType::TT_PLUSPLUS,
+        "--" => TokenType::TT_MINUSMINUS,
+        "/=" => TokenType::TT_DIVEQ,
+        "*=" => TokenType::TT_MULEQ,
+        "%=" => TokenType::TT_MODEQ,
+        "&=" => TokenType::TT_BANDEQ,
+        "|=" => TokenType::TT_BOREQ,
+        "&&=" => TokenType::TT_LANDEQ,
+        "||=" => TokenType::TT_LOREQ,
+        "<=" => TokenType::TT_LESSEQ,
+        ">=" => TokenType::TT_GREATEREQ,
+        "<<" => TokenType::TT_LEFTSHIFT,
+        ">>" => TokenType::TT_RIGHTSHIFT,
+        "==" => TokenType::TT_EQUALS,
+        "^=" => TokenType::TT_XOREQ,
+        "->" => TokenType::TT_POINT,
+        "<<=" => TokenType::TT_LEFTSHIFTEQUALS,
+        ">>=" => TokenType::TT_RIGHTSHIFTEQUALS,
+        "!=" => TokenType::TT_NOTEQ,
+        _ => {
+            if contents.is_empty() {
+                return TokenType::TT_NO_TOKEN;
+            }
+
+            let mut all_numeric = true;
+            let mut count_us = 0;
+
+            for c in contents.chars() {
+                if c == '.' {
+                    return TokenType::TT_LITERAL;
+                }
+                if c == 'u' {
+                    count_us += 1;
+                }
+                if !(c.is_ascii_digit() || c == 'u') {
+                    all_numeric = false;
+                }
+                if c == '\'' || c == '"' {
+                    return TokenType::TT_LITERAL;
+                }
+            }
+
+            if all_numeric {
+                if count_us == 1 && contents.ends_with('u') {
+                    return TokenType::TT_LITERAL;
+                }
+                if count_us == 0 {
+                    return TokenType::TT_LITERAL;
+                }
+            }
+
+            TokenType::TT_IDENTIFIER
+        }
+    }
+}
+
+/// Tests the function that identifies token types by name.
+pub fn test_ttype_name() -> i32 {
+    assert!(ttype_name(TokenType::TT_LITERAL) == "literal");
+    assert!(ttype_name(TokenType::TT_PLUS) == "+");
+    assert!(ttype_name(TokenType::TT_SIZEOF) == "sizeof");
+    assert!(ttype_name(TokenType::TT_WHILE) == "while");
+    0
+}
+
+/// Determines a token type from a single character.
+pub fn ttype_one_char(c: char) -> TokenType {
+    match c {
+        '(' => TokenType::TT_OPAREN,
+        ')' => TokenType::TT_CPAREN,
+        '{' => TokenType::TT_OBRACE,
+        '}' => TokenType::TT_CBRACE,
+        '[' => TokenType::TT_OBRACKET,
+        ']' => TokenType::TT_CBRACKET,
+        ';' => TokenType::TT_SEMI,
+        '.' => TokenType::TT_PERIOD,
+        ',' => TokenType::TT_COMMA,
+        '-' => TokenType::TT_MINUS,
+        '+' => TokenType::TT_PLUS,
+        '*' => TokenType::TT_STAR,
+        '/' => TokenType::TT_SLASH,
+        '=' => TokenType::TT_ASSIGN,
+        ':' => TokenType::TT_COLON,
+        '%' => TokenType::TT_MOD,
+        '&' => TokenType::TT_BAND,
+        '|' => TokenType::TT_BOR,
+        '>' => TokenType::TT_GREATER,
+        '<' => TokenType::TT_LESS,
+        '!' => TokenType::TT_LNOT,
+        '~' => TokenType::TT_BNOT,
+        '^' => TokenType::TT_XOR,
+        '#' => TokenType::TT_POUND,
+        '?' => TokenType::TT_QMARK,
+        _ => {
+            if c.is_ascii_digit() {
+                TokenType::TT_LITERAL
+            } else {
+                TokenType::TT_IDENTIFIER
+            }
+        }
+    }
+}
+
+/// Returns the name of a token type as a string.
+pub fn ttype_name(tt: TokenType) -> String {
+    match tt {
+        TokenType::TT_LITERAL => "literal",
+        TokenType::TT_IDENTIFIER => "identifier",
+        TokenType::TT_OPAREN => "open paren",
+        TokenType::TT_CPAREN => "close paren",
+        TokenType::TT_OBRACE => "open brace",
+        TokenType::TT_CBRACE => "close brace",
+        TokenType::TT_OBRACKET => "open bracket",
+        TokenType::TT_CBRACKET => "close bracket",
+        TokenType::TT_SEMI => "semicolon",
+        TokenType::TT_NO_TOKEN => "no token",
+        TokenType::TT_EOF => "end of file",
+        TokenType::TT_NEWLINE => "newline",
+        TokenType::TT_POUND => "pound",
+        TokenType::TT_PERIOD => ".",
+        TokenType::TT_COMMA => ",",
+        TokenType::TT_QMARK => "?",
+        TokenType::TT_MINUS => "-",
+        TokenType::TT_PLUS => "+",
+        TokenType::TT_STAR => "*",
+        TokenType::TT_SLASH => "/",
+        TokenType::TT_ASSIGN => "=",
+        TokenType::TT_COLON => ":",
+        TokenType::TT_MOD => "%",
+        TokenType::TT_BAND => "&",
+        TokenType::TT_LAND => "&&",
+        TokenType::TT_BOR => "|",
+        TokenType::TT_LOR => "||",
+        TokenType::TT_DEC => "-=",
+        TokenType::TT_INC => "+=",
+        TokenType::TT_PLUSPLUS => "++",
+        TokenType::TT_MINUSMINUS => "--",
+        TokenType::TT_DIVEQ => "/=",
+        TokenType::TT_MULEQ => "*=",
+        TokenType::TT_MODEQ => "%=",
+        TokenType::TT_BANDEQ => "&=",
+        TokenType::TT_BOREQ => "|=",
+        TokenType::TT_LANDEQ => "&&=",
+        TokenType::TT_LOREQ => "||=",
+        TokenType::TT_GREATER => ">",
+        TokenType::TT_LESS => "<",
+        TokenType::TT_LESSEQ => "<=",
+        TokenType::TT_GREATEREQ => ">=",
+        TokenType::TT_LEFTSHIFT => "<<",
+        TokenType::TT_RIGHTSHIFT => ">>",
+        TokenType::TT_LNOT => "!",
+        TokenType::TT_BNOT => "~",
+        TokenType::TT_EQUALS => "==",
+        TokenType::TT_NOTEQ => "!=",
+        TokenType::TT_XOR => "^",
+        TokenType::TT_XOREQ => "^=",
+        TokenType::TT_POINT => "->",
+        TokenType::TT_LEFTSHIFTEQUALS => "<<=",
+        TokenType::TT_RIGHTSHIFTEQUALS => ">>=",
+        TokenType::TT_AUTO => "auto",
+        TokenType::TT_BREAK => "break",
+        TokenType::TT_CHAR => "char",
+        TokenType::TT_CONST => "const",
+        TokenType::TT_CASE => "case",
+        TokenType::TT_CONTINUE => "continue",
+        TokenType::TT_DOUBLE => "double",
+        TokenType::TT_DO => "do",
+        TokenType::TT_DEFAULT => "default",
+        TokenType::TT_ENUM => "enum",
+        TokenType::TT_ELSE => "else",
+        TokenType::TT_EXTERN => "extern",
+        TokenType::TT_FLOAT => "float",
+        TokenType::TT_FOR => "for",
+        TokenType::TT_GOTO => "goto",
+        TokenType::TT_IF => "if",
+        TokenType::TT_INT => "int",
+        TokenType::TT_LONG => "long",
+        TokenType::TT_RETURN => "return",
+        TokenType::TT_REGISTER => "register",
+        TokenType::TT_STATIC => "static",
+        TokenType::TT_SWITCH => "switch",
+        TokenType::TT_SHORT => "short",
+        TokenType::TT_SIGNED => "signed",
+        TokenType::TT_STRUCT => "struct",
+        TokenType::TT_SIZEOF => "sizeof",
+        TokenType::TT_TYPEDEF => "typedef",
+        TokenType::TT_UNSIGNED => "unsigned",
+        TokenType::TT_UNION => "union",
+        TokenType::TT_VOID => "void",
+        TokenType::TT_VOLATILE => "volatile",
+        TokenType::TT_WHILE => "while",
+    }
+    .to_string()
+}
+
+/// Checks if the provided operator sequence is valid.
+pub fn valid_operator_sequence(op: &str) -> i32 {
+    if operator_strings().iter().any(|s| *s == op) {
+        1
+    } else {
+        0
+    }
+}
+
+/// Main lex function to tokenize input into a given Token.
+pub fn lex(l: &mut Lexer, token: &mut Token) -> i32 {
+    loop {
+        real_lex(l, token);
+        if token.token_type != TokenType::TT_NEWLINE {
+            break;
+        }
+    }
+    0
+}
+
+/// Tests the function that determines token types for a single character.
+pub fn test_ttype_one_char() -> i32 {
+    assert!(ttype_one_char('a') == TokenType::TT_IDENTIFIER);
+    assert!(ttype_one_char('1') == TokenType::TT_LITERAL);
+    assert!(ttype_one_char('+') == TokenType::TT_PLUS);
+    assert!(ttype_one_char('-') == TokenType::TT_MINUS);
+    assert!(ttype_one_char('>') == TokenType::TT_GREATER);
+    assert!(ttype_one_char('~') == TokenType::TT_BNOT);
+    0
+}
+
+/// Checks if a character starts an operator sequence.
+pub fn starts_operator(c: char) -> i32 {
+    match c {
+        '-' | '+' | '*' | '/' | '=' | ':' | '%' | '&' | '|' | '<' | '>' | '!' | '~' | '^' => 1,
+        _ => 0,
+    }
+}
+
+/// Tests the function that determines token types from a string.
+pub fn test_ttype_from_string() -> i32 {
+    assert!(ttype_from_string("+") == TokenType::TT_PLUS);
+    assert!(ttype_from_string("=") == TokenType::TT_ASSIGN);
+    assert!(ttype_from_string("1") == TokenType::TT_LITERAL);
+    assert!(ttype_from_string("1.2") == TokenType::TT_LITERAL);
+    assert!(ttype_from_string("1u") == TokenType::TT_LITERAL);
+    assert!(ttype_from_string("1.2f") == TokenType::TT_LITERAL);
+    assert!(ttype_from_string("1.f") == TokenType::TT_LITERAL);
+    assert!(ttype_from_string("\"Planck\"") == TokenType::TT_LITERAL);
+    assert!(ttype_from_string("'Language'") == TokenType::TT_LITERAL);
+    assert!(ttype_from_string("Jaba") == TokenType::TT_IDENTIFIER);
+    assert!(ttype_from_string("cat_") == TokenType::TT_IDENTIFIER);
+    assert!(ttype_from_string("(") == TokenType::TT_OPAREN);
+    assert!(ttype_from_string("}") == TokenType::TT_CBRACE);
+    assert!(ttype_from_string(";") == TokenType::TT_SEMI);
+    0
+}
+
+/// Derives a TokenType from a string input.
+pub fn ttype_from_string(contents: &str) -> TokenType {
+    if contents.len() == 1 {
+        let c = contents.chars().next().unwrap_or('\0');
+        ttype_one_char(c)
+    } else {
+        ttype_many_chars(contents)
+    }
+}
+
+/// Checks if character c is in the string s.
+pub fn in_string(c: char, s: &str) -> i32 {
+    if s.chars().any(|d| d == c) {
+        1
+    } else {
+        0
+    }
+}
+
+/// Tests the function that determines token types from multiple characters.
+pub fn test_ttype_many_chars() -> i32 {
+    assert!(ttype_many_chars("foo") == TokenType::TT_IDENTIFIER);
+    assert!(ttype_many_chars("struct") == TokenType::TT_STRUCT);
+    assert!(ttype_many_chars("while") == TokenType::TT_WHILE);
+    0
+}
+
+/// Skips characters until the next token is found.
+pub fn skip_to_token(l: &mut Lexer) -> i32 {
+    let mut cur;
+    let mut prev;
+    let mut in_block = 0;
+    let mut pass = 0;
+
+    cur = lexer_getchar(l);
+    if cur != -1 {
+        prev = cur;
+        let ch = char::from_u32(cur as u32).unwrap_or('\0');
+        if !(ch == ' ' || ch == '\t' || ch == '/') {
+            let _ = lexer_ungetchar(l);
+            return 0;
+        }
+    } else {
+        return -1;
+    }
+
+    loop {
+        cur = lexer_getchar(l);
+        if cur == -1 {
+            break;
+        }
+        let cur_ch = char::from_u32(cur as u32).unwrap_or('\0');
+        let prev_ch = char::from_u32(prev as u32).unwrap_or('\0');
+
+        if cur_ch == '/' && prev_ch == '/' && in_block == 0 {
+            in_block = 1;
+        } else if cur_ch == '*' && prev_ch == '/' && in_block == 0 {
+            in_block = 2;
+            pass = 2;
+        } else if (in_block == 1 && cur_ch == '\n')
+            || (in_block == 2 && cur_ch == '/' && prev_ch == '*' && pass <= 0)
+        {
+            in_block = 0;
+        } else if prev_ch == '/' && !(cur_ch == '*' || cur_ch == '/') && in_block == 0 {
+            let _ = lexer_ungetchar(l);
+            return 0;
+        }
+
+        if !(cur_ch == ' ' || cur_ch == '\t' || cur_ch == '/') && in_block == 0 {
+            let _ = lexer_ungetchar(l);
+            return 0;
+        }
+
+        pass -= 1;
+        prev = cur;
+    }
+    -1
+}
+
+/// Pushes a token back into the lexer's buffer.
+pub fn unlex(l: &mut Lexer, t: &Token) -> i32 {
+    if l.unlexed_count as usize >= TOKEN_PUTBACKS {
+        return -1;
+    }
+    let idx = l.unlexed_count as usize;
+    l.unlexed[idx] = Token {
+        token_type: t.token_type.clone(),
+        contents: t.contents.clone(),
+        length: t.length,
+        source_file: t.source_file.clone(),
+        line: t.line,
+        column: t.column,
+    };
+    l.unlexed_count += 1;
+    0
+}
+
+/// Checks if c is a valid numeric or identifier character.
+pub fn is_valid_numeric_or_id_char(c: char) -> i32 {
+    if c.is_ascii_alphanumeric() || c == '_' || c == '.' {
+        1
+    } else {
+        0
+    }
+}
+
+impl Clone for TokenType {
+    fn clone(&self) -> Self {
+        match self {
+            TokenType::TT_LITERAL => TokenType::TT_LITERAL,
+            TokenType::TT_IDENTIFIER => TokenType::TT_IDENTIFIER,
+            TokenType::TT_OPAREN => TokenType::TT_OPAREN,
+            TokenType::TT_CPAREN => TokenType::TT_CPAREN,
+            TokenType::TT_OBRACE => TokenType::TT_OBRACE,
+            TokenType::TT_CBRACE => TokenType::TT_CBRACE,
+            TokenType::TT_OBRACKET => TokenType::TT_OBRACKET,
+            TokenType::TT_CBRACKET => TokenType::TT_CBRACKET,
+            TokenType::TT_SEMI => TokenType::TT_SEMI,
+            TokenType::TT_NO_TOKEN => TokenType::TT_NO_TOKEN,
+            TokenType::TT_EOF => TokenType::TT_EOF,
+            TokenType::TT_NEWLINE => TokenType::TT_NEWLINE,
+            TokenType::TT_POUND => TokenType::TT_POUND,
+            TokenType::TT_PERIOD => TokenType::TT_PERIOD,
+            TokenType::TT_COMMA => TokenType::TT_COMMA,
+            TokenType::TT_QMARK => TokenType::TT_QMARK,
+            TokenType::TT_MINUS => TokenType::TT_MINUS,
+            TokenType::TT_PLUS => TokenType::TT_PLUS,
+            TokenType::TT_STAR => TokenType::TT_STAR,
+            TokenType::TT_SLASH => TokenType::TT_SLASH,
+            TokenType::TT_ASSIGN => TokenType::TT_ASSIGN,
+            TokenType::TT_COLON => TokenType::TT_COLON,
+            TokenType::TT_MOD => TokenType::TT_MOD,
+            TokenType::TT_BAND => TokenType::TT_BAND,
+            TokenType::TT_LAND => TokenType::TT_LAND,
+            TokenType::TT_BOR => TokenType::TT_BOR,
+            TokenType::TT_LOR => TokenType::TT_LOR,
+            TokenType::TT_DEC => TokenType::TT_DEC,
+            TokenType::TT_INC => TokenType::TT_INC,
+            TokenType::TT_PLUSPLUS => TokenType::TT_PLUSPLUS,
+            TokenType::TT_MINUSMINUS => TokenType::TT_MINUSMINUS,
+            TokenType::TT_DIVEQ => TokenType::TT_DIVEQ,
+            TokenType::TT_MULEQ => TokenType::TT_MULEQ,
+            TokenType::TT_MODEQ => TokenType::TT_MODEQ,
+            TokenType::TT_BANDEQ => TokenType::TT_BANDEQ,
+            TokenType::TT_BOREQ => TokenType::TT_BOREQ,
+            TokenType::TT_LANDEQ => TokenType::TT_LANDEQ,
+            TokenType::TT_LOREQ => TokenType::TT_LOREQ,
+            TokenType::TT_GREATER => TokenType::TT_GREATER,
+            TokenType::TT_LESS => TokenType::TT_LESS,
+            TokenType::TT_LESSEQ => TokenType::TT_LESSEQ,
+            TokenType::TT_GREATEREQ => TokenType::TT_GREATEREQ,
+            TokenType::TT_LEFTSHIFT => TokenType::TT_LEFTSHIFT,
+            TokenType::TT_RIGHTSHIFT => TokenType::TT_RIGHTSHIFT,
+            TokenType::TT_LNOT => TokenType::TT_LNOT,
+            TokenType::TT_BNOT => TokenType::TT_BNOT,
+            TokenType::TT_EQUALS => TokenType::TT_EQUALS,
+            TokenType::TT_NOTEQ => TokenType::TT_NOTEQ,
+            TokenType::TT_XOR => TokenType::TT_XOR,
+            TokenType::TT_XOREQ => TokenType::TT_XOREQ,
+            TokenType::TT_POINT => TokenType::TT_POINT,
+            TokenType::TT_LEFTSHIFTEQUALS => TokenType::TT_LEFTSHIFTEQUALS,
+            TokenType::TT_RIGHTSHIFTEQUALS => TokenType::TT_RIGHTSHIFTEQUALS,
+            TokenType::TT_AUTO => TokenType::TT_AUTO,
+            TokenType::TT_BREAK => TokenType::TT_BREAK,
+            TokenType::TT_CHAR => TokenType::TT_CHAR,
+            TokenType::TT_CONST => TokenType::TT_CONST,
+            TokenType::TT_CASE => TokenType::TT_CASE,
+            TokenType::TT_CONTINUE => TokenType::TT_CONTINUE,
+            TokenType::TT_DOUBLE => TokenType::TT_DOUBLE,
+            TokenType::TT_DO => TokenType::TT_DO,
+            TokenType::TT_DEFAULT => TokenType::TT_DEFAULT,
+            TokenType::TT_ENUM => TokenType::TT_ENUM,
+            TokenType::TT_ELSE => TokenType::TT_ELSE,
+            TokenType::TT_EXTERN => TokenType::TT_EXTERN,
+            TokenType::TT_FLOAT => TokenType::TT_FLOAT,
+            TokenType::TT_FOR => TokenType::TT_FOR,
+            TokenType::TT_GOTO => TokenType::TT_GOTO,
+            TokenType::TT_IF => TokenType::TT_IF,
+            TokenType::TT_INT => TokenType::TT_INT,
+            TokenType::TT_LONG => TokenType::TT_LONG,
+            TokenType::TT_RETURN => TokenType::TT_RETURN,
+            TokenType::TT_REGISTER => TokenType::TT_REGISTER,
+            TokenType::TT_STATIC => TokenType::TT_STATIC,
+            TokenType::TT_SWITCH => TokenType::TT_SWITCH,
+            TokenType::TT_SHORT => TokenType::TT_SHORT,
+            TokenType::TT_SIGNED => TokenType::TT_SIGNED,
+            TokenType::TT_STRUCT => TokenType::TT_STRUCT,
+            TokenType::TT_SIZEOF => TokenType::TT_SIZEOF,
+            TokenType::TT_TYPEDEF => TokenType::TT_TYPEDEF,
+            TokenType::TT_UNSIGNED => TokenType::TT_UNSIGNED,
+            TokenType::TT_UNION => TokenType::TT_UNION,
+            TokenType::TT_VOID => TokenType::TT_VOID,
+            TokenType::TT_VOLATILE => TokenType::TT_VOLATILE,
+            TokenType::TT_WHILE => TokenType::TT_WHILE,
+        }
+    }
+}
+
+impl Clone for Token {
+    fn clone(&self) -> Self {
+        Token {
+            token_type: self.token_type.clone(),
+            contents: self.contents.clone(),
+            length: self.length,
+            source_file: self.source_file.clone(),
+            line: self.line,
+            column: self.column,
+        }
+    }
+}
+
+impl Default for Lexer {
+    fn default() -> Self {
+        Lexer {
+            fp: None,
+            current_file: String::new(),
+            buffer: [0],
+            position: 0,
+            last_column: 0,
+            column: 1,
+            line: 1,
+            unlexed: [
+                make_token(),
+                make_token(),
+                make_token(),
+                make_token(),
+                make_token(),
+            ],
+            unlexed_count: 0,
+        }
+    }
+}
+```
+
+{{list.rs}}
+```rust
+use std::any::Any;
+
+/// A block in a linked list that holds multiple elements.
+#[derive(Debug)]
+pub struct ListBlock {
+    pub array: Vec<Box<dyn Any>>,
+    pub size: i32,
+    pub full: i32,
+    pub next: Option<Box<ListBlock>>,
+}
+
+/// A linked list structure consisting of blocks.
+#[derive(Debug)]
+pub struct List {
+    pub head: Option<Box<ListBlock>>,
+    /// In pure safe Rust, storing a raw pointer is discouraged. This is just
+    /// a placeholder to mimic C's design. An idiomatic approach would handle
+    /// linked traversal safely, potentially removing a raw tail pointer.
+    pub tail: Option<*mut ListBlock>,
+    pub blocksize: i32,
+}
+
+/// Retrieves an element from the list by index, if it exists.
+pub fn lget_element(l: &mut List, index: i32) -> Option<&mut Box<dyn Any>> {
+    if index < 0 {
+        return None;
+    }
+    let mut i = index;
+    let mut cur = l.head.as_mut()?;
+    loop {
+        if i < cur.size {
+            if i >= cur.full {
+                return None;
+            }
+            return cur.array.get_mut(i as usize);
+        }
+        i -= cur.size;
+        match cur.next.as_mut() {
+            Some(next) => cur = next,
+            None => return None,
+        }
+    }
+}
+
+/// Destroys the list and frees resources.
+pub fn destroy_list(l: &mut List) -> i32 {
+    l.head = None;
+    l.tail = None;
+    0
+}
+
+/// Adds an element to the list.
+pub fn ladd_element(l: &mut List, element: Box<dyn Any>) -> i32 {
+    if l.head.is_none() {
+        l.head = Some(new_block(l));
+    }
+
+    let mut cur = l.head.as_mut().expect("head exists");
+    loop {
+        if cur.next.is_none() {
+            break;
+        }
+        let next = cur.next.as_mut().expect("next exists");
+        cur = next;
+    }
+
+    if cur.full < cur.size {
+        cur.array.push(element);
+        cur.full += 1;
+    } else {
+        cur.next = Some(new_block(l));
+        let next = cur.next.as_mut().expect("next exists");
+        next.array.push(element);
+        next.full += 1;
+    }
+    0
+}
+
+/// Allocates a new block and links it into the list.
+pub fn new_block(l: &mut List) -> Box<ListBlock> {
+    Box::new(ListBlock {
+        array: Vec::with_capacity(l.blocksize.max(0) as usize),
+        size: l.blocksize,
+        full: 0,
+        next: None,
+    })
+}
+
+/// Iterates over the list with a provided function.
+pub fn literate(l: &mut List, func: fn(&mut Box<dyn Any>) -> i32) -> i32 {
+    let mut acc = 0;
+    let mut cur = l.head.as_mut();
+    while let Some(lb) = cur {
+        for i in 0..(lb.full as usize) {
+            acc += func(&mut lb.array[i]);
+        }
+        cur = lb.next.as_mut();
+    }
+    acc
+}
+
+/// Finds and sets index variables for internal iteration.
+pub fn lfind_index(_l: &mut List, _lb: &mut Option<Box<ListBlock>>, i: &mut i32) -> i32 {
+    if *i < 0 {
+        return -1;
+    }
+    0
+}
+
+/// Creates a new list with the specified blocksize.
+pub fn create_list(blocksize: i32) -> List {
+    List {
+        head: None,
+        tail: None,
+        blocksize,
+    }
+}
+
+/// Sets an element in the list by index.
+pub fn lset_element(l: &mut List, index: i32, value: Box<dyn Any>) -> i32 {
+    if index < 0 {
+        return -1;
+    }
+    let mut i = index;
+    let mut cur = match l.head.as_mut() {
+        Some(h) => h,
+        None => return -1,
+    };
+    loop {
+        if i < cur.size {
+            if i >= cur.full {
+                return -1;
+            }
+            let idx = i as usize;
+            if idx < cur.array.len() {
+                cur.array[idx] = value;
+                return 0;
+            }
+            return -1;
+        }
+        i -= cur.size;
+        match cur.next.as_mut() {
+            Some(next) => cur = next,
+            None => return -1,
+        }
+    }
+}
+```
+
+{{main.rs}}
+```rust
+use std::env;
+use std::fs::File;
+
+use crate::lex::{lex, ttype_name, Lexer};
+use crate::parse::parse;
+use crate::token::{Token, TokenType};
+
+/// Dumps lexer output for the specified file.
+pub fn lexer_dump(filename: &str) -> i32 {
+    let fp = match File::open(filename) {
+        Ok(f) => f,
+        Err(_) => {
+            eprintln!("Error: jccc: File {} not found", filename);
+            return 1;
+        }
+    };
+
+    let mut lexer = Lexer::default();
+    lexer.fp = Some(fp);
+    lexer.unlexed_count = 0;
+    lexer.column = 1;
+    lexer.line = 1;
+    lexer.current_file = filename.to_string();
+
+    let mut t = Token {
+        token_type: TokenType::TT_NO_TOKEN,
+        contents: String::new(),
+        length: 0,
+        source_file: String::new(),
+        line: 0,
+        column: 0,
+    };
+
+    loop {
+        if lex(&mut lexer, &mut t) != 0 {
+            return 1;
+        }
+        println!(
+            "Contents: {:>20}, type: {:>20}, position: {}/{}",
+            t.contents,
+            ttype_name(t.token_type.clone()),
+            t.line,
+            t.column
+        );
+        if t.token_type == TokenType::TT_EOF {
+            break;
+        }
+    }
+
+    0
+}
+
+/// The main entry point for the program.
+pub fn main() {
+    let args: Vec<String> = env::args().skip(1).collect();
+
+    if args.is_empty() {
+        eprintln!("jccc: Usage: --token-dump <filename> to see all tokens");
+        return;
+    }
+    if args.len() == 1 {
+        eprintln!(
+            "jccc: default compilation not supported yet -- try 'jccc --token-dump {}' instead.",
+            args[0]
+        );
+        return;
+    }
+    if args.len() > 2 {
+        eprintln!("jccc: expected only two arguments!");
+        return;
+    }
+
+    if args[0] == "--token-dump" {
+        let _ = lexer_dump(&args[1]);
+    } else if args[0] == "--test-parse" {
+        let _ = parse(&args[1]);
+    } else {
+        eprintln!("Error: jccc: option {} not recognized.", args[1]);
+    }
+}
+```
+
+{{out.rs}}
+```rust
+/// Red color code.
+pub const CODE_RED: i32 = 31;
+/// Yellow color code.
+pub const CODE_YELLOW: i32 = 33;
+/// Green color code.
+pub const CODE_GREEN: i32 = 32;
+/// Blue color code.
+pub const CODE_BLUE: i32 = 34;
+/// Magenta color code.
+pub const CODE_MAGENTA: i32 = 35;
+/// Cyan color code.
+pub const CODE_CYAN: i32 = 36;
+/// White color code.
+pub const CODE_WHITE: i32 = 37;
+/// The output stream is stderr in the C code; here we just store the name.
+pub const OUTPUT_STREAM: &str = "stderr";
+```
+
+{{parse.rs}}
+```rust
+use std::fs::File;
+use std::io::Read;
+
+use crate::codegen::{end_main_custom_return, start_main};
+use crate::cst::{BlockStatement, ConcreteFileTree, Expression, FunctionDeclaration, NodeType};
+use crate::lex::{lex, ttype_name, Lexer};
+use crate::list::create_list;
+use crate::token::{Token, TokenType};
+
+/// Parses a function declaration from the lexer into a FunctionDeclaration object.
+pub fn parse_funcdecl(_l: &mut Lexer, _fd: &mut FunctionDeclaration) -> i32 {
+    0
+}
+
+/// Creates a concrete syntax tree from the lexer.
+pub fn make_cst(_l: &mut Lexer, _tree: &mut ConcreteFileTree) -> i32 {
+    0
+}
+
+/// Parses an expression from the Lexer into an Expression object.
+pub fn parse_expr(_l: &mut Lexer, _ex: &mut Expression) -> i32 {
+    0
+}
+
+/// Parses a file and returns a status code.
+pub fn parse(filename: &str) -> i32 {
+    let fp = match File::open(filename) {
+        Ok(f) => f,
+        Err(_) => {
+            eprintln!("Error: jccc: File {} not found", filename);
+            return 1;
+        }
+    };
+
+    let mut lexer = Lexer::default();
+    lexer.fp = Some(fp);
+    lexer.unlexed_count = 0;
+    lexer.column = 1;
+    lexer.line = 1;
+    lexer.current_file = filename.to_string();
+
+    let mut t = Token {
+        token_type: TokenType::TT_NO_TOKEN,
+        contents: String::new(),
+        length: 0,
+        source_file: String::new(),
+        line: 0,
+        column: 0,
+    };
+
+    let mut i = 0usize;
+    let mut buffer_size = 16usize;
+    let mut tokens: Vec<Token> = Vec::with_capacity(buffer_size);
+
+    loop {
+        if lex(&mut lexer, &mut t) != 0 {
+            return 1;
+        }
+        if buffer_size <= i {
+            buffer_size *= 2;
+            tokens = Vec::with_capacity(buffer_size);
+        }
+        tokens.push(t.clone());
+        println!(
+            "Contents: {:>20}, type: {:>20}, position: {}/{}",
+            t.contents,
+            ttype_name(t.token_type.clone()),
+            t.line,
+            t.column
+        );
+        i += 1;
+        if t.token_type == TokenType::TT_EOF {
+            break;
+        }
+    }
+
+    if tokens.len() >= 9
+        && tokens[0].token_type == TokenType::TT_INT
+        && tokens[1].token_type == TokenType::TT_IDENTIFIER
+        && tokens[1].contents == "main"
+    {
+        if tokens[2].token_type == TokenType::TT_OPAREN
+            && tokens[3].token_type == TokenType::TT_CPAREN
+            && tokens[4].token_type == TokenType::TT_OBRACE
+        {
+            if tokens[5].token_type == TokenType::TT_RETURN
+                && tokens[6].token_type == TokenType::TT_LITERAL
+                && tokens[6]
+                    .contents
+                    .chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+                && tokens[7].token_type == TokenType::TT_SEMI
+            {
+                if tokens[8].token_type == TokenType::TT_CBRACE {
+                    println!();
+                    let code_start = start_main();
+                    print!("{}", code_start);
+
+                    let val = tokens[6].contents.parse::<i32>().unwrap_or(0);
+                    let code_end = end_main_custom_return(val);
+                    print!("{}", code_end);
+                } else {
+                    eprintln!("Error: jccc: Wrong closing brace.\n");
+                }
+            } else {
+                eprintln!("Error: jccc: Return value is wrong.\n");
+            }
+        } else {
+            eprintln!("Error: jccc: Wrong main function body.\n");
+        }
+    } else {
+        eprintln!("Error: jccc: Not correct main function.\n");
+    }
+
+    0
+}
+
+/// Parses a simple main function (for testing).
+pub fn parse_simple_main_func() -> i32 {
+    0
+}
+
+/// Parses a block statement from the lexer.
+pub fn parse_blockstmt(_l: &mut Lexer, _bs: &mut BlockStatement) -> i32 {
+    0
+}
+
+/// Parses a function call from the lexer into an Expression object.
+pub fn parse_funccall(_l: &mut Lexer, _ex: &mut Expression) -> i32 {
+    0
+}
+```
+
+{{token.rs}}
+```rust
+/// Represents different token types recognized by the lexer.
+#[derive(Debug, PartialEq, Clone)]
+pub enum TokenType {
+    TT_LITERAL,
+    TT_IDENTIFIER,
+    TT_OPAREN,
+    TT_CPAREN,
+    TT_OBRACE,
+    TT_CBRACE,
+    TT_OBRACKET,
+    TT_CBRACKET,
+    TT_SEMI,
+    TT_NO_TOKEN,
+    TT_EOF,
+    TT_NEWLINE,
+    TT_POUND,
+    TT_PERIOD,
+    TT_COMMA,
+    TT_QMARK,
+    TT_MINUS,
+    TT_PLUS,
+    TT_STAR,
+    TT_SLASH,
+    TT_ASSIGN,
+    TT_COLON,
+    TT_MOD,
+    TT_BAND,
+    TT_LAND,
+    TT_BOR,
+    TT_LOR,
+    TT_DEC,
+    TT_INC,
+    TT_PLUSPLUS,
+    TT_MINUSMINUS,
+    TT_DIVEQ,
+    TT_MULEQ,
+    TT_MODEQ,
+    TT_BANDEQ,
+    TT_BOREQ,
+    TT_LANDEQ,
+    TT_LOREQ,
+    TT_GREATER,
+    TT_LESS,
+    TT_LESSEQ,
+    TT_GREATEREQ,
+    TT_LEFTSHIFT,
+    TT_RIGHTSHIFT,
+    TT_LNOT,
+    TT_BNOT,
+    TT_EQUALS,
+    TT_NOTEQ,
+    TT_XOR,
+    TT_XOREQ,
+    TT_POINT,
+    TT_LEFTSHIFTEQUALS,
+    TT_RIGHTSHIFTEQUALS,
+    TT_AUTO,
+    TT_BREAK,
+    TT_CHAR,
+    TT_CONST,
+    TT_CASE,
+    TT_CONTINUE,
+    TT_DOUBLE,
+    TT_DO,
+    TT_DEFAULT,
+    TT_ENUM,
+    TT_ELSE,
+    TT_EXTERN,
+    TT_FLOAT,
+    TT_FOR,
+    TT_GOTO,
+    TT_IF,
+    TT_INT,
+    TT_LONG,
+    TT_RETURN,
+    TT_REGISTER,
+    TT_STATIC,
+    TT_SWITCH,
+    TT_SHORT,
+    TT_SIGNED,
+    TT_STRUCT,
+    TT_SIZEOF,
+    TT_TYPEDEF,
+    TT_UNSIGNED,
+    TT_UNION,
+    TT_VOID,
+    TT_VOLATILE,
+    TT_WHILE,
+}
+
+/// The maximum length of a token in C code; here it serves as a reference.
+pub const TOKEN_LENGTH: usize = 256;
+
+/// Represents a token with its type, contents, position, and the file it came from.
+#[derive(Debug, Clone)]
+pub struct Token {
+    pub token_type: TokenType,
+    pub contents: String,
+    pub length: usize,
+    pub source_file: String,
+    pub line: i32,
+    pub column: i32,
+}
+```

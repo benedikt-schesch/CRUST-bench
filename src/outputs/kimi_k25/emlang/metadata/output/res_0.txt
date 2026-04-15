@@ -1,0 +1,87 @@
+ {{lib.rs}}
+```rust
+pub mod data;
+pub mod em;
+pub mod env;
+pub mod parser;
+pub mod stack;
+pub mod utils;
+
+pub fn parse(path: &str) -> em::Program {
+    unimplemented!()
+}
+
+pub fn usage(path: &str) {
+    unimplemented!()
+}
+```
+
+{{data.rs}}
+```rust
+// Data module - placeholder for data structures used by the emulator
+```
+
+{{em.rs}}
+```rust
+// EM module - core emulator types
+
+pub struct Program;
+```
+
+{{env.rs}}
+```rust
+// Environment module for runtime state management
+
+use std::collections::HashMap;
+
+/// Runtime environment holding variables and state
+pub struct Env {
+    variables: HashMap<String, i64>,
+}
+
+impl Env {
+    pub fn new() -> Self {
+        Env {
+            variables: HashMap::new(),
+        }
+    }
+}
+
+/// Result type for runtime operations
+pub type RuntimeResult<T> = Result<T, String>;
+```
+
+{{parser.rs}}
+```rust
+// Parser module for parsing source code
+
+/// Parser structure for processing input
+pub struct Parser {
+    source: String,
+}
+
+impl Parser {
+    /// Create a new parser with the given source
+    pub fn new(source: &str) -> Self {
+        Parser {
+            source: source.to_string(),
+        }
+    }
+}
+```
+
+{{stack.rs}}
+```rust
+// Stack module with default capacity constants
+
+/// Default capacity for the main stack
+pub const DEFAULT_STACK_CAP: usize = 1024;
+
+/// Default capacity for popped elements buffer
+pub const DEFAULT_POPPED_CAP: usize = 256;
+```
+
+{{utils.rs}}
+```rust
+// Utility functions module
+```

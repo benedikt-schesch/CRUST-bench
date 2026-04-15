@@ -1,0 +1,7 @@
+```rust
+// Generated Rust Code
+pub mod xopt;
+pub mod snprintf;
+
+pub use crate::xopt as XOpt;
+```

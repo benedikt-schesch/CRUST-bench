@@ -1,0 +1,5 @@
+```rust
+// Generated Rust Code
+pub mod bitset;
+pub use crate::bitset::*;
+```

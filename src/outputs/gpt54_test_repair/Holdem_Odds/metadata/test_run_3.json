@@ -1,0 +1,61 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_bucket ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 8 tests
+test test_card_compare ... ok
+test test_card_is_valid ... ok
+test test_card_swap ... ok
+test test_char_to_rank ... ok
+test test_char_to_suit ... ok
+test test_new_card ... ok
+test test_new_card_from_chars ... ok
+test test_new_card_from_string ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test test_new_deck ... ok
+test test_deck_shuffle ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 13 tests
+test test_hand_classify_flush ... ok
+test test_hand_classify_full_house ... ok
+test test_hand_classify_high_card ... ok
+test test_hand_classify_pair ... ok
+test test_hand_classify_straight ... ok
+test test_hand_classify_straight_flush ... ok
+test test_hand_classify_quads ... ok
+test test_hand_classify_wheel ... ok
+test test_hand_classify_two_pair ... ok
+test test_hand_classify_wheel_flush ... ok
+test test_hand_compare ... FAILED
+test test_hand_classify_trips ... ok
+test test_hand_sort ... ok
+
+failures:
+
+---- test_hand_compare stdout ----
+
+thread 'test_hand_compare' (288362) panicked at Holdem_Odds/src/bin/test_hands.rs:418:9:
+[Card { rank: Ace, suit: Club }, Card { rank: King, suit: Club }, Card { rank: Queen, suit: Club }, Card { rank: Jack, suit: Club }, Card { rank: Ten, suit: Club }] should be greater than [Card { rank: Ace, suit: Club }, Card { rank: Five, suit: Club }, Card { rank: Four, suit: Club }, Card { rank: Trey, suit: Club }, Card { rank: Deuce, suit: Club }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_hand_compare
+
+test result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

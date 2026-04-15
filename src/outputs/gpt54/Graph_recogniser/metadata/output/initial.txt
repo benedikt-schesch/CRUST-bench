@@ -1,0 +1,478 @@
+{{check.rs}}
+```rust
+#[cfg(debug_assertions)]
+macro_rules! check {
+    ($x:expr) => {
+        assert!($x);
+    };
+}
+#[cfg(not(debug_assertions))]
+macro_rules! check {
+    ($x:expr) => {
+        (); // No-op in release mode
+    };
+}
+#[cfg(debug_assertions)]
+macro_rules! debugin {
+    ($stm:stmt) => {
+        $stm
+    };
+}
+#[cfg(not(debug_assertions))]
+macro_rules! debugin {
+    ($stm:stmt) => {
+        (); // No-op in release mode
+    };
+}
+```
+
+{{hash.rs}}
+```rust
+pub type Hash = u32;
+pub type Key = &'static str;
+pub const EMPTY_KEY: Option<Key> = None;
+pub type Data = &'static str;
+pub const EMPTY_DATA: Option<Data> = None;
+pub const POWER: Hash = 131;
+pub const ALTERNATIVE_POWER: Hash = 171;
+pub const REHASHER: Hash = 718841;
+
+/// Computes a hash using the given power value.
+pub fn hash_by_power(key: Key, power: Hash) -> Hash {
+    let mut res: Hash = 0;
+    for b in key.bytes() {
+        res = res.wrapping_mul(power).wrapping_add(b as Hash);
+    }
+    res
+}
+
+/// Computes the default hash using `POWER`.
+pub fn hash(key: Key) -> Hash {
+    hash_by_power(key, POWER)
+}
+
+/// Computes an alternative hash using `ALTERNATIVE_POWER`.
+pub fn alternative_hash(key: Key) -> Hash {
+    hash_by_power(key, ALTERNATIVE_POWER)
+}
+
+/// Compares two keys lexicographically.
+pub fn compare_keys(k1: Key, k2: Key) -> std::cmp::Ordering {
+    k1.cmp(k2)
+}
+
+/// Rehashes an existing hash value.
+pub fn rehash(h: Hash) -> Hash {
+    h.wrapping_add(REHASHER)
+}
+```
+
+{{log.rs}}
+```rust
+use std::collections::HashMap;
+use std::fmt;
+use std::sync::{Arc, RwLock};
+use crate::check;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LogType {
+    Log = 0,
+    UnitTest = 1,
+    OpenHash = 2,
+    CuckooHash = 3,
+}
+
+#[derive(Clone)]
+pub struct LogInfo {
+    priority: u8,
+    prefix: &'static str,
+    suffix: &'static str,
+}
+
+pub struct Logger {
+    log_info_table: RwLock<HashMap<LogType, LogInfo>>,
+}
+
+impl Logger {
+    pub fn new() -> Arc<Self> {
+        let mut table = HashMap::new();
+        table.insert(
+            LogType::Log,
+            LogInfo {
+                priority: 0,
+                prefix: "log log:\t",
+                suffix: "\n",
+            },
+        );
+        table.insert(
+            LogType::UnitTest,
+            LogInfo {
+                priority: 0,
+                prefix: "unit testing:\t",
+                suffix: "\n",
+            },
+        );
+        table.insert(
+            LogType::OpenHash,
+            LogInfo {
+                priority: 0,
+                prefix: "open hash table:\t",
+                suffix: "\n",
+            },
+        );
+        table.insert(
+            LogType::CuckooHash,
+            LogInfo {
+                priority: 0,
+                prefix: "cuckoo hash table:\t",
+                suffix: "\n",
+            },
+        );
+        Arc::new(Self {
+            log_info_table: RwLock::new(table),
+        })
+    }
+
+    pub fn insert_log(&self, log_type: LogType, priority: u8, format: fmt::Arguments) {
+        check!((log_type as u8) < 4 && priority <= 10);
+        let table = self.log_info_table.read().expect("logger read lock poisoned");
+        if let Some(info) = table.get(&log_type) {
+            if info.priority <= priority {
+                print!("{}{}{}", info.prefix, format, info.suffix);
+            }
+        }
+    }
+
+    pub fn change_log_priority(&self, log_type: LogType, new_priority: u8) -> u8 {
+        let mut table = self.log_info_table.write().expect("logger write lock poisoned");
+        let entry = table.get_mut(&log_type).expect("invalid log type");
+        let old = entry.priority;
+        entry.priority = new_priority;
+        old
+    }
+}
+```
+
+{{openhash.rs}}
+```rust
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use crate::log::{LogType, Logger};
+use crate::check;
+use crate::hash::hash;
+use crate::hash::{compare_keys, rehash, POWER, REHASHER};
+
+const LOAD_FACTOR: f32 = 0.6;
+#[cfg(debug_assertions)]
+const EPS: f32 = 1e-3;
+
+#[derive(Clone)]
+pub struct OpenEntry {
+    key: Option<&'static str>,
+    data: Option<&'static str>,
+}
+
+pub struct OpenHashTable {
+    cur_size: usize,
+    max_size: usize,
+    arr: Vec<OpenEntry>,
+}
+
+impl OpenHashTable {
+    pub fn new(initial_size: usize) -> Arc<RwLock<Self>> {
+        let _phantom_use: Option<(HashMap<(), ()>, Arc<Logger>, LogType)> = None;
+        check!(initial_size != 0);
+        check!(initial_size as u32 != POWER && initial_size as u32 != REHASHER);
+
+        let arr = vec![
+            OpenEntry {
+                key: None,
+                data: None,
+            };
+            initial_size
+        ];
+
+        Arc::new(RwLock::new(Self {
+            cur_size: 0,
+            max_size: initial_size,
+            arr,
+        }))
+    }
+
+    fn query(&self, key: &str) -> usize {
+        check!(!key.is_empty());
+        let mut h = hash(key);
+        loop {
+            let idx = (h as usize) % self.max_size;
+            let entry = &self.arr[idx];
+            match entry.key {
+                None => return idx,
+                Some(cur_key) if compare_keys(cur_key, key) == std::cmp::Ordering::Equal => {
+                    return idx;
+                }
+                _ => {
+                    h = rehash(h);
+                }
+            }
+        }
+    }
+
+    pub fn insert(&mut self, key: &'static str, data: &'static str) {
+        #[cfg(debug_assertions)]
+        check!((self.cur_size as f32 / self.max_size as f32) < LOAD_FACTOR + EPS);
+
+        self.cur_size += 1;
+
+        if (self.cur_size as f32 / self.max_size as f32) > LOAD_FACTOR {
+            self.max_size *= 2;
+            let old_arr = self.arr.clone();
+            self.arr = vec![
+                OpenEntry {
+                    key: None,
+                    data: None,
+                };
+                self.max_size
+            ];
+
+            for entry in old_arr.into_iter() {
+                if let Some(cur_key) = entry.key {
+                    let idx = self.query(cur_key);
+                    self.arr[idx] = entry;
+                }
+            }
+        }
+
+        let cell_idx = self.query(key);
+        check!(self.arr[cell_idx].key.is_none());
+        self.arr[cell_idx].key = Some(key);
+        self.arr[cell_idx].data = Some(data);
+    }
+
+    pub fn find(&self, key: &str) -> Option<&'static str> {
+        let cell_idx = self.query(key);
+        check!(self.arr[cell_idx].key.is_some());
+        self.arr[cell_idx].data
+    }
+
+    pub fn free_open_hash_table(&mut self) {
+        self.arr.clear();
+        self.cur_size = 0;
+        self.max_size = 0;
+    }
+}
+```
+
+{{cuckoohash.rs}}
+```rust
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use crate::log::{LogType, Logger};
+use crate::check;
+use crate::hash::hash;
+use crate::hash::{compare_keys, ALTERNATIVE_POWER, POWER};
+
+const LOAD_FACTOR: f32 = 1.0;
+#[cfg(debug_assertions)]
+const EPS: f32 = 1e-3;
+
+#[derive(Clone)]
+pub struct CuckooEntry {
+    key: Option<&'static str>,
+    data: Option<&'static str>,
+    marker: u32,
+}
+
+pub struct CuckooHashTable {
+    cur_size: u32,
+    cur_marker: u32,
+    max_size: u32,
+    first_arr: Vec<CuckooEntry>,
+    second_arr: Vec<CuckooEntry>,
+}
+
+impl CuckooHashTable {
+    pub fn new(initial_size: usize) -> Arc<RwLock<Self>> {
+        let _phantom_use: Option<(HashMap<(), ()>, Arc<Logger>, LogType)> = None;
+        check!(initial_size >= 2);
+        check!(initial_size as u32 != POWER && initial_size as u32 != ALTERNATIVE_POWER);
+
+        let size = initial_size / 2;
+        let empty = CuckooEntry {
+            key: None,
+            data: None,
+            marker: 0,
+        };
+
+        Arc::new(RwLock::new(Self {
+            cur_size: 0,
+            cur_marker: 0,
+            max_size: size as u32,
+            first_arr: vec![empty.clone(); size],
+            second_arr: vec![empty; size],
+        }))
+    }
+
+    pub fn insert(&mut self, mut key: &'static str, mut data: &'static str) {
+        self.cur_marker = self.cur_marker.wrapping_add(1);
+
+        if 1.0 + self.cur_size as f32 > self.max_size as f32 * LOAD_FACTOR {
+            self.resize();
+        }
+
+        self.cur_size += 1;
+
+        let first_idx = (hash(key) % self.max_size) as usize;
+        if self.first_arr[first_idx].key.is_none() {
+            self.first_arr[first_idx].key = Some(key);
+            self.first_arr[first_idx].data = Some(data);
+            return;
+        } else {
+            check!(compare_keys(self.first_arr[first_idx].key.unwrap(), key) != std::cmp::Ordering::Equal);
+        }
+
+        let second_idx = (hash(key) % self.max_size) as usize;
+        if self.second_arr[second_idx].key.is_none() {
+            self.second_arr[second_idx].key = Some(key);
+            self.second_arr[second_idx].data = Some(data);
+            return;
+        } else {
+            check!(compare_keys(self.second_arr[second_idx].key.unwrap(), key) != std::cmp::Ordering::Equal);
+        }
+
+        loop {
+            {
+                let entry = &mut self.first_arr[first_idx];
+                let old_key = entry.key.replace(key).expect("occupied entry expected");
+                let old_data = entry.data.replace(data).expect("occupied entry expected");
+                key = old_key;
+                data = old_data;
+                entry.marker = self.cur_marker;
+            }
+
+            let second_idx = (hash(key) % self.max_size) as usize;
+            if self.second_arr[second_idx].marker == self.cur_marker {
+                self.refill();
+                self.insert(key, data);
+                break;
+            }
+            if self.second_arr[second_idx].key.is_none() {
+                self.second_arr[second_idx].key = Some(key);
+                self.second_arr[second_idx].data = Some(data);
+                break;
+            } else {
+                check!(compare_keys(self.second_arr[second_idx].key.unwrap(), key) != std::cmp::Ordering::Equal);
+            }
+
+            {
+                let entry = &mut self.second_arr[second_idx];
+                let old_key = entry.key.replace(key).expect("occupied entry expected");
+                let old_data = entry.data.replace(data).expect("occupied entry expected");
+                key = old_key;
+                data = old_data;
+                entry.marker = self.cur_marker;
+            }
+
+            let first_idx = (hash(key) % self.max_size) as usize;
+            if self.first_arr[first_idx].marker == self.cur_marker {
+                self.refill();
+                self.insert(key, data);
+                break;
+            }
+            if self.first_arr[first_idx].key.is_none() {
+                self.first_arr[first_idx].key = Some(key);
+                self.first_arr[first_idx].data = Some(data);
+                break;
+            } else {
+                check!(compare_keys(self.first_arr[first_idx].key.unwrap(), key) != std::cmp::Ordering::Equal);
+            }
+        }
+    }
+
+    pub fn find(&self, key: &str) -> Option<&'static str> {
+        let first_idx = (hash(key) % self.max_size) as usize;
+        let first = &self.first_arr[first_idx];
+        if let Some(k) = first.key {
+            if compare_keys(k, key) == std::cmp::Ordering::Equal {
+                return first.data;
+            }
+        }
+
+        let second_idx = (hash(key) % self.max_size) as usize;
+        let second = &self.second_arr[second_idx];
+        check!(second.key.is_some() && compare_keys(second.key.unwrap(), key) == std::cmp::Ordering::Equal);
+        second.data
+    }
+
+    fn resize(&mut self) {
+        self.recreate(self.max_size * 2);
+    }
+
+    fn refill(&mut self) {
+        self.recreate(self.max_size + 1);
+    }
+
+    fn recreate(&mut self, new_size: u32) {
+        check!(new_size > 0);
+        #[cfg(debug_assertions)]
+        check!(new_size as f32 * LOAD_FACTOR + EPS > self.cur_size as f32);
+
+        let old_first = self.first_arr.clone();
+        let old_second = self.second_arr.clone();
+
+        let empty = CuckooEntry {
+            key: None,
+            data: None,
+            marker: 0,
+        };
+
+        self.cur_size = 0;
+        self.cur_marker = 0;
+        self.max_size = new_size;
+        self.first_arr = vec![empty.clone(); new_size as usize];
+        self.second_arr = vec![empty; new_size as usize];
+
+        for entry in old_first.into_iter() {
+            if let (Some(k), Some(d)) = (entry.key, entry.data) {
+                self.insert(k, d);
+            }
+        }
+        for entry in old_second.into_iter() {
+            if let (Some(k), Some(d)) = (entry.key, entry.data) {
+                self.insert(k, d);
+            }
+        }
+    }
+
+    fn get_first_entry(&self, _key: &str) -> &mut CuckooEntry {
+        panic!("get_first_entry is not used in this safe Rust implementation")
+    }
+
+    fn get_second_entry(&self, _key: &str) -> &mut CuckooEntry {
+        panic!("get_second_entry is not used in this safe Rust implementation")
+    }
+
+    fn try_to_store(&mut self, _key: &'static str, _data: &'static str, _entry: &mut CuckooEntry) -> bool {
+        panic!("try_to_store is not used in this safe Rust implementation")
+    }
+
+    fn swap_key_data_entry(&mut self, _key: &mut &'static str, _data: &mut &'static str, _entry: &mut CuckooEntry) {
+        panic!("swap_key_data_entry is not used in this safe Rust implementation")
+    }
+
+    fn free_cukoo_hash_table(self) {
+        drop(self);
+    }
+}
+```
+
+{{defs.rs}}
+```rust
+/// Returns the number of elements in an array.
+/// This is a Rust equivalent of the COUNTOF macro in C.
+#[macro_export]
+macro_rules! countof {
+    ($array:expr) => {
+        $array.len()
+    };
+}
+```

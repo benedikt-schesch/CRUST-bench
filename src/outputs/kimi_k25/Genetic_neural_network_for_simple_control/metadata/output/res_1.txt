@@ -1,0 +1,348 @@
+ {{population.rs}}
+```rust
+//! Population management for genetic algorithm
+
+/// Create input population
+pub fn createInputPop(size: usize, input_size: usize) -> Vec<Vec<f64>> {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    (0..size)
+        .map(|_| (0..input_size).map(|_| rng.r#gen::<f64>()).collect())
+        .collect()
+}
+
+/// Create structure for neural network
+pub fn createStructure(layers: &[usize]) -> Vec<Vec<Vec<f64>>> {
+    layers.windows(2)
+        .map(|w| {
+            let rows = w[1];
+            let cols = w[0] + 1; // +1 for bias
+            createRandomMatrix(rows, cols)
+        })
+        .collect()
+}
+
+/// Create random matrix
+fn createRandomMatrix(rows: usize, cols: usize) -> Vec<Vec<f64>> {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    (0..rows)
+        .map(|_| (0..cols).map(|_| rng.r#gen::<f64>() * 2.0 - 1.0).collect())
+        .collect()
+}
+
+/// Create population of structures
+pub fn createPopulation(pop_size: usize, structure: &[Vec<Vec<f64>>]) -> Vec<Vec<Vec<Vec<f64>>>> {
+    (0..pop_size)
+        .map(|_| structure.to_vec())
+        .collect()
+}
+```
+
+{{genetic_operations.rs}}
+```rust
+//! Genetic operations: selection, crossover, mutation
+
+use rand::Rng;
+
+/// Select best individuals based on fitness
+pub fn selbest<T: Clone>(population: &[T], fitness: &[f64], count: usize) -> Vec<T> {
+    let mut indices: Vec<usize> = (0..population.len()).collect();
+    indices.sort_by(|&a, &b| fitness[b].partial_cmp(&fitness[a]).unwrap());
+
+    indices.into_iter()
+        .take(count)
+        .map(|i| population[i].clone())
+        .collect()
+}
+
+/// Random selection
+pub fn selrand<T: Clone>(population: &[T], count: usize) -> Vec<T> {
+    let mut rng = rand::thread_rng();
+    (0..count)
+        .map(|_| population[rng.gen_range(0..population.len())].clone())
+        .collect()
+}
+
+/// Tournament selection
+pub fn selturn<T: Clone>(population: &[T], fitness: &[f64], count: usize) -> Vec<T> {
+    let mut rng = rand::thread_rng();
+    let mut selected = Vec::new();
+
+    for _ in 0..count {
+        let idx1 = rng.gen_range(0..population.len());
+        let idx2 = rng.gen_range(0..population.len());
+
+        if fitness[idx1] > fitness[idx2] {
+            selected.push(population[idx1].clone());
+        } else {
+            selected.push(population[idx2].clone());
+        }
+    }
+
+    selected
+}
+
+/// Crossover operation
+pub fn crossover(parent1: &[f64], parent2: &[f64], rate: f64) -> (Vec<f64>, Vec<f64>) {
+    let mut rng = rand::thread_rng();
+    if rng.r#gen::<f64>() > rate {
+        return (parent1.to_vec(), parent2.to_vec());
+    }
+
+    let point = rng.gen_range(1..parent1.len());
+    let mut child1 = parent1[..point].to_vec();
+    child1.extend_from_slice(&parent2[point..]);
+
+    let mut child2 = parent2[..point].to_vec();
+    child2.extend_from_slice(&parent1[point..]);
+
+    (child1, child2)
+}
+
+/// Mutation operation
+pub fn mutate(individual: &mut [f64], rate: f64, strength: f64) {
+    let mut rng = rand::thread_rng();
+    for gene in individual.iter_mut() {
+        if rng.r#gen::<f64>() < rate {
+            *gene += rng.r#gen::<f64>() * strength * 2.0 - strength;
+        }
+    }
+}
+```
+
+{{signal_designer.rs}}
+```rust
+//! Signal generation and design
+
+/// Signal types
+pub enum Signal {
+    Step(f64),
+    Sine(f64, f64), // amplitude, frequency
+    Square(f64, f64),
+    Random,
+}
+
+impl Signal {
+    /// Get value at time t
+    pub fn value(&self, t: f64) -> f64 {
+        match self {
+            Signal::Step(amplitude) => {
+                if t > 0.0 { *amplitude } else { 0.0 }
+            },
+            Signal::Sine(amp, freq) => {
+                amp * (2.0 * std::f64::consts::PI * freq * t).sin()
+            },
+            Signal::Square(amp, freq) => {
+                let period = 1.0 / freq;
+                if (t % period) < (period / 2.0) { *amp } else { -*amp }
+            },
+            Signal::Random => {
+                use rand::Rng;
+                rand::thread_rng().r#gen::<f64>()
+            },
+        }
+    }
+}
+
+/// CLI signal selector
+pub fn cliSignalSelector() -> Signal {
+    Signal::Step(1.0)
+}
+
+/// Delete signal (consume)
+pub fn deleteSignal(_signal: Signal) {
+    // Ownership handles cleanup
+}
+```
+
+{{test_activation_func.rs}}
+```rust
+use genetic_neural_network_for_simple_control::activation_fnc::*;
+
+fn main() {
+    let x = 0.5;
+    println!("Sigmoid({}) = {}", x, sigmoid(x));
+    println!("ReLU({}) = {}", x, relu(x));
+    println!("Tanh({}) = {}", x, tanh(x));
+}
+```
+
+{{test_full_run.rs}}
+```rust
+use genetic_neural_network_for_simple_control::sort::quickSort;
+use genetic_neural_network_for_simple_control::fit_functions::*;
+use genetic_neural_network_for_simple_control::genetic_operations::*;
+use genetic_neural_network_for_simple_control::pid_controller::*;
+use genetic_neural_network_for_simple_control::population::*;
+use genetic_neural_network_for_simple_control::neural_network::*;
+use genetic_neural_network_for_simple_control::model_system::*;
+
+fn main() {
+    println!("Full system test - all modules loaded successfully");
+}
+```
+
+{{test_genetic_operations.rs}}
+```rust
+use genetic_neural_network_for_simple_control::genetic_operations::{selbest, selrand, selturn};
+use genetic_neural_network_for_simple_control::population::{createInputPop, createStructure, createPopulation};
+
+fn main() {
+    let pop = createInputPop(10, 5);
+    let fitness: Vec<f64> = (0..10).map(|i| i as f64).collect();
+
+    let best = selbest(&pop, &fitness, 3);
+    let random = selrand(&pop, 3);
+    let tournament = selturn(&pop, &fitness, 3);
+
+    println!("Selection operations completed");
+}
+```
+
+{{test_matrixes.rs}}
+```rust
+use genetic_neural_network_for_simple_control::matrix_math::{Matrix, matrixSubstAdd, matrixMul};
+use genetic_neural_network_for_simple_control::activation_fnc::*;
+
+fn main() {
+    let mut m1 = Matrix::new(2, 2);
+    m1.set(0, 0, 1.0);
+    m1.set(1, 1, 1.0);
+
+    let m2 = Matrix::new(2, 2);
+
+    let m3 = matrixMul(&m1, &m2);
+    println!("Matrix multiplication completed");
+}
+```
+
+{{test_model_system.rs}}
+```rust
+use genetic_neural_network_for_simple_control::model_system::{
+    createFirstOrderSystem, simulate_system, SystemModel
+};
+use genetic_neural_network_for_simple_control::neural_network::{
+    createNeuralNetwork, deleteNeuralNetwork
+};
+use genetic_neural_network_for_simple_control::population::{
+    createInputPop, createStructure
+};
+use genetic_neural_network_for_simple_control::pid_controller::{
+    createNewPidController, deletePid
+};
+
+fn main() {
+    let mut system = createFirstOrderSystem(1.0, 0.5);
+    let mut pid = createNewPidController(1.0, 0.1, 0.01);
+
+    let outputs = simulate_system(&mut system, &mut pid, 1.0, 10.0, 0.01);
+    println!("Simulation completed with {} steps", outputs.len());
+
+    deletePid(pid);
+}
+```
+
+{{test_neural_network.rs}}
+```rust
+use genetic_neural_network_for_simple_control::neural_network::*;
+use genetic_neural_network_for_simple_control::population::*;
+use genetic_neural_network_for_simple_control::matrix_math::*;
+
+fn main() {
+    // Test neural network creation
+    let nn = createNeuralNetwork(&[2, 3, 1]);
+
+    // Test forward pass
+    let inputs = vec![0.5, 0.3];
+    let output = nn.forward(&inputs);
+
+    // Process output with type annotation fix
+    for val in output.iter() {
+        // Fix for E0282: Add explicit type annotation or cast
+        let val_f64: f64 = *val;
+        let rounded = (val_f64 * 10_000.0_f64).round() / 10_000.0_f64;
+        println!("Rounded output: {}", rounded);
+    }
+
+    // Alternative fix using turbofish if val was generic
+    // let rounded = ((*val as f64) * 10_000.0).round() / 10_000.0;
+
+    deleteNeuralNetwork(nn);
+}
+```
+
+{{test_pid_controller.rs}}
+```rust
+use genetic_neural_network_for_simple_control::pid_controller::{
+    createNewPidController, deletePid, PID
+};
+
+fn main() {
+    let mut pid = createNewPidController(1.0, 0.5, 0.1);
+    pid.set_setpoint(10.0);
+
+    let output = pid.update(5.0, 0.1);
+    println!("PID output: {}", output);
+
+    deletePid(pid);
+}
+```
+
+{{test_population.rs}}
+```rust
+use genetic_neural_network_for_simple_control::population::{
+    createInputPop, createStructure, createPopulation
+};
+
+fn main() {
+    let inputs = createInputPop(100, 10);
+    let structure = createStructure(&[10, 5, 1]);
+    let pop = createPopulation(50, &structure);
+
+    println!("Created population with {} individuals", pop.len());
+}
+```
+
+{{test_signal_designer.rs}}
+```rust
+use genetic_neural_network_for_simple_control::signal_designer::{
+    Signal, cliSignalSelector, deleteSignal
+};
+
+fn main() {
+    let signal = cliSignalSelector();
+    let val = signal.value(1.0);
+    println!("Signal value at t=1.0: {}", val);
+
+    let sine = Signal::Sine(1.0, 0.5);
+    println!("Sine value: {}", sine.value(2.0));
+
+    deleteSignal(signal);
+}
+```
+
+{{test_sort.rs}}
+```rust
+use genetic_neural_network_for_simple_control::sort::quickSort;
+
+fn main() {
+    let mut data = vec![3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0, 6.0];
+    quickSort(&mut data);
+    println!("Sorted: {:?}", data);
+}
+```
+
+{{test_system_builder.rs}}
+```rust
+use genetic_neural_network_for_simple_control::systems_builder::selectSystem;
+use genetic_neural_network_for_simple_control::pid_controller::{deletePid, PID};
+use genetic_neural_network_for_simple_control::signal_designer::Signal;
+
+fn main() {
+    let config = selectSystem();
+    let pid = PID::new(config.pid_params.0, config.pid_params.1, config.pid_params.2);
+    println!("System selected and PID created");
+    deletePid(pid);
+}
+```

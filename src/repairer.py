@@ -70,7 +70,7 @@ class Repairer:
                     "w",
                     encoding="utf-8",
                 ) as f:
-                    f.write(response)
+                    f.write(response or "")
                 print(
                     f"Written to {output_metadata_path / f'res_{self.iteration}.txt'}"
                 )

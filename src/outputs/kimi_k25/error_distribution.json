@@ -1,0 +1,15 @@
+{
+    "missing": 4,
+    "No errors": 54,
+    "A struct's or struct-like enum variant's field was not provided.": 4,
+    "unresolved import": 7,
+    "expected one of `;` or `{`, found `/`": 15,
+    "type": 23,
+    "args": 4,
+    "An unknown field was specified into a structure.  ": 1,
+    "trait": 5,
+    "access nonexistent field.": 3,
+    "E0631": 2,
+    "E0659": 1,
+    "unsafe": 0
+}

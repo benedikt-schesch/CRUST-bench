@@ -1,0 +1,867 @@
+ {{worsp.rs}}
+```rust
+use std::io::{self, BufRead};
+
+pub const OBJECT_NUMBER: usize = 50;
+pub const BLOCK_SIZE: usize = std::mem::size_of::<Object>();
+pub const MEMORY_SIZE: usize = BLOCK_SIZE * OBJECT_NUMBER;
+pub const FREE_BITMAP_SIZE: usize = MEMORY_SIZE / BLOCK_SIZE;
+pub const MAX_BINDINGS: usize = 10;
+pub const MAX_SYMBOL_NAME_LENGTH: usize = 20;
+
+#[derive(Debug, Clone, Copy)]
+pub enum ConsCellType {
+    Cell,
+    Nil,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenKind {
+    Digit,
+    LParen,
+    RParen,
+    Symbol,
+    String,
+    True,
+    False,
+    Eof,
+    Quote,
+}
+
+#[derive(Debug)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub next: Option<Box<Token>>,
+    pub val: i32,
+    pub str: String,
+}
+
+#[derive(Debug)]
+pub struct ParseState {
+    pub token: Option<Box<Token>>,
+    pub pos: i32,
+}
+
+#[derive(Debug)]
+pub struct ProgramNode {
+    pub expressions: Option<Box<ExpressionList>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ExpressionType {
+    Literal,
+    Symbol,
+    List,
+    SymbolicExp,
+}
+
+#[derive(Debug)]
+pub struct ExpressionList {
+    pub expression: Option<Box<ExpressionNode>>,
+    pub next: Option<Box<ExpressionList>>,
+}
+
+#[derive(Debug)]
+pub struct ExpressionNode {
+    pub type_: ExpressionType,
+    pub data: ExpressionData,
+}
+
+#[derive(Debug)]
+pub enum ExpressionData {
+    SymbolicExp(Option<Box<SymbolicExpNode>>),
+    List(Option<Box<ListNode>>),
+    Literal(Option<Box<LiteralNode>>),
+    Symbol(Option<Box<SymbolNode>>),
+}
+
+#[derive(Debug)]
+pub struct SymbolicExpNode {
+    pub expressions: Option<Box<ExpressionList>>,
+}
+
+#[derive(Debug)]
+pub struct ListNode {
+    pub expressions: Option<Box<ExpressionList>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum LiteralType {
+    Integer,
+    String,
+    Boolean,
+}
+
+#[derive(Debug)]
+pub struct LiteralNode {
+    pub type_: LiteralType,
+    pub value: LiteralValue,
+}
+
+#[derive(Debug)]
+pub enum LiteralValue {
+    IntValue(i32),
+    BooleanValue(bool),
+    StringValue(String),
+}
+
+#[derive(Debug)]
+pub struct SymbolNode {
+    pub symbol_name: String,
+}
+
+#[derive(Debug)]
+pub struct ParseResult {
+    pub program: Option<Box<ProgramNode>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ObjectType {
+    Integer,
+    String,
+    Bool,
+    List,
+    Nil,
+    Function,
+}
+
+#[derive(Debug)]
+pub struct ConsCell {
+    pub type_: ConsCellType,
+    pub car: Option<Box<Object>>,
+    pub cdr: Option<Box<Object>>,
+}
+
+#[derive(Debug)]
+pub struct Function {
+    pub param_symbol_names: Vec<String>,
+    pub body: Option<Box<ExpressionNode>>,
+}
+
+#[derive(Debug)]
+pub struct Object {
+    pub marked: bool,
+    pub type_: ObjectType,
+    pub value: ObjectValue,
+}
+
+#[derive(Debug)]
+pub enum ObjectValue {
+    IntValue(i32),
+    StringValue(String),
+    BoolValue(i32),
+    ListValue(Option<Box<ConsCell>>),
+    FunctionValue(Option<Box<Function>>),
+}
+
+#[derive(Debug)]
+pub struct Binding {
+    pub symbol_name: String,
+    pub value: Option<Box<Object>>,
+}
+
+#[derive(Debug)]
+pub struct Env {
+    pub bindings: [Binding; MAX_BINDINGS],
+    pub parent: Option<Box<Env>>,
+}
+
+#[derive(Debug)]
+pub struct ObjectStack {
+    pub objects: [Option<Box<Object>>; OBJECT_NUMBER],
+    pub top: i32,
+}
+
+#[derive(Debug)]
+pub struct AllocatorContext {
+    pub gc_less_mode: i32,
+    pub stack: Option<Box<ObjectStack>>,
+    pub memory_pool: Option<Box<Object>>,
+    pub free_bitmap: [u8; FREE_BITMAP_SIZE],
+}
+
+fn isop(ch: char) -> bool {
+    ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '%' ||
+    ch == '|' || ch == '&' || ch == '=' || ch == '<' || ch == '>'
+}
+
+pub fn match_token(state: &mut ParseState, kind: TokenKind) -> i32 {
+    if let Some(ref token) = state.token {
+        if token.kind == kind {
+            return 1;
+        }
+    }
+    0
+}
+
+fn append_token(state: &mut ParseState, new_token: Token) {
+    let new_box = Some(Box::new(new_token));
+    if state.token.is_none() {
+        state.token = new_box;
+    } else {
+        let mut current = state.token.as_mut().unwrap();
+        while current.next.is_some() {
+            current = current.next.as_mut().unwrap();
+        }
+        current.next = new_box;
+    }
+}
+
+pub fn next(source: &str, state: &mut ParseState) {
+    let bytes = source.as_bytes();
+    let mut pos = state.pos as usize;
+    
+    while pos < bytes.len() {
+        let ch = bytes[pos] as char;
+        if ch.is_whitespace() {
+            pos += 1;
+        } else {
+            break;
+        }
+    }
+    
+    state.pos = pos as i32;
+    
+    if pos >= bytes.len() {
+        append_token(state, Token {
+            kind: TokenKind::Eof,
+            next: None,
+            val: 0,
+            str: String::new(),
+        });
+        return;
+    }
+    
+    let ch = bytes[pos] as char;
+    
+    if ch == '(' {
+        state.pos += 1;
+        append_token(state, Token {
+            kind: TokenKind::LParen,
+            next: None,
+            val: 0,
+            str: "(".to_string(),
+        });
+    } else if ch == ')' {
+        state.pos += 1;
+        append_token(state, Token {
+            kind: TokenKind::RParen,
+            next: None,
+            val: 0,
+            str: ")".to_string(),
+        });
+    } else if ch == '\'' {
+        state.pos += 1;
+        append_token(state, Token {
+            kind: TokenKind::Quote,
+            next: None,
+            val: 0,
+            str: "'".to_string(),
+        });
+    } else if ch.is_alphabetic() || isop(ch) {
+        let start = pos;
+        while pos < bytes.len() {
+            let c = bytes[pos] as char;
+            if c.is_alphanumeric() || isop(c) {
+                pos += 1;
+            } else {
+                break;
+            }
+        }
+        let s = &source[start..pos];
+        state.pos = pos as i32;
+        
+        if s == "true" {
+            append_token(state, Token {
+                kind: TokenKind::True,
+                next: None,
+                val: 0,
+                str: String::new(),
+            });
+        } else if s == "false" {
+            append_token(state, Token {
+                kind: TokenKind::False,
+                next: None,
+                val: 0,
+                str: String::new(),
+            });
+        } else {
+            append_token(state, Token {
+                kind: TokenKind::Symbol,
+                next: None,
+                val: 0,
+                str: s.to_string(),
+            });
+        }
+    } else if ch.is_digit(10) {
+        let start = pos;
+        while pos < bytes.len() && (bytes[pos] as char).is_digit(10) {
+            pos += 1;
+        }
+        let s = &source[start..pos];
+        state.pos = pos as i32;
+        let val = s.parse::<i32>().unwrap_or(0);
+        append_token(state, Token {
+            kind: TokenKind::Digit,
+            next: None,
+            val: val,
+            str: String::new(),
+        });
+    } else if ch == '"' {
+        pos += 1;
+        let start = pos;
+        while pos < bytes.len() && bytes[pos] as char != '"' {
+            pos += 1;
+        }
+        let s = &source[start..pos];
+        if pos < bytes.len() && bytes[pos] as char == '"' {
+            pos += 1;
+        }
+        state.pos = pos as i32;
+        append_token(state, Token {
+            kind: TokenKind::String,
+            next: None,
+            val: 0,
+            str: s.to_string(),
+        });
+    } else if ch == ';' {
+        while pos < bytes.len() && bytes[pos] as char != '\n' {
+            pos += 1;
+        }
+        state.pos = pos as i32;
+        next(source, state);
+    } else {
+        panic!("Unexpected token: {}", ch);
+    }
+}
+
+fn append_expression_to_list(list_node: &mut ListNode, expression: ExpressionNode) {
+    let new_expr = Some(Box::new(expression));
+    let new_list = Some(Box::new(ExpressionList {
+        expression: new_expr,
+        next: None,
+    }));
+    
+    if list_node.expressions.is_none() {
+        list_node.expressions = new_list;
+    } else {
+        let mut current = list_node.expressions.as_mut().unwrap();
+        while current.next.is_some() {
+            current = current.next.as_mut().unwrap();
+        }
+        current.next = new_list;
+    }
+}
+
+fn append_expression_to_symbolic(symbolic_node: &mut SymbolicExpNode, expression: ExpressionNode) {
+    let new_expr = Some(Box::new(expression));
+    let new_list = Some(Box::new(ExpressionList {
+        expression: new_expr,
+        next: None,
+    }));
+    
+    if symbolic_node.expressions.is_none() {
+        symbolic_node.expressions = new_list;
+    } else {
+        let mut current = symbolic_node.expressions.as_mut().unwrap();
+        while current.next.is_some() {
+            current = current.next.as_mut().unwrap();
+        }
+        current.next = new_list;
+    }
+}
+
+fn parse_expression(source: &str, state: &mut ParseState, expression: &mut ExpressionNode);
+
+fn parse_symbolic_expression(source: &str, state: &mut ParseState, expression: &mut ExpressionNode) {
+    let mut symbolic_exp = SymbolicExpNode {
+        expressions: None,
+    };
+    
+    next(source, state);
+    
+    while match_token(state, TokenKind::RParen) == 0 {
+        let mut expr_item = ExpressionNode {
+            type_: ExpressionType::Literal,
+            data: ExpressionData::Literal(None),
+        };
+        parse_expression(source, state, &mut expr_item);
+        append_expression_to_symbolic(&mut symbolic_exp, expr_item);
+    }
+    
+    next(source, state);
+    
+    expression.type_ = ExpressionType::SymbolicExp;
+    expression.data = ExpressionData::SymbolicExp(Some(Box::new(symbolic_exp)));
+}
+
+fn parse_list_expression(source: &str, state: &mut ParseState, expression: &mut ExpressionNode) {
+    let mut list = ListNode {
+        expressions: None,
+    };
+    
+    next(source, state);
+    next(source, state);
+    
+    while match_token(state, TokenKind::RParen) == 0 {
+        let mut expr_item = ExpressionNode {
+            type_: ExpressionType::Literal,
+            data: ExpressionData::Literal(None),
+        };
+        parse_expression(source, state, &mut expr_item);
+        append_expression_to_list(&mut list, expr_item);
+    }
+    
+    next(source, state);
+    
+    expression.type_ = ExpressionType::List;
+    expression.data = ExpressionData::List(Some(Box::new(list)));
+}
+
+fn parse_symbol_expression(source: &str, state: &mut ParseState, expression: &mut ExpressionNode) {
+    if let Some(ref token) = state.token {
+        let symbol_name = token.str.clone();
+        expression.type_ = ExpressionType::Symbol;
+        expression.data = ExpressionData::Symbol(Some(Box::new(SymbolNode {
+            symbol_name: symbol_name,
+        })));
+    }
+    next(source, state);
+}
+
+fn parse_literal_expression(source: &str, state: &mut ParseState, expression: &mut ExpressionNode) {
+    if match_token(state, TokenKind::Digit) == 1 {
+        if let Some(ref token) = state.token {
+            let val = token.val;
+            expression.type_ = ExpressionType::Literal;
+            expression.data = ExpressionData::Literal(Some(Box::new(LiteralNode {
+                type_: LiteralType::Integer,
+                value: LiteralValue::IntValue(val),
+            })));
+        }
+        next(source, state);
+    } else if match_token(state, TokenKind::String) == 1 {
+        if let Some(ref token) = state.token {
+            let s = token.str.clone();
+            expression.type_ = ExpressionType::Literal;
+            expression.data = ExpressionData::Literal(Some(Box::new(LiteralNode {
+                type_: LiteralType::String,
+                value: LiteralValue::StringValue(s),
+            })));
+        }
+        next(source, state);
+    } else if match_token(state, TokenKind::True) == 1 {
+        expression.type_ = ExpressionType::Literal;
+        expression.data = ExpressionData::Literal(Some(Box::new(LiteralNode {
+            type_: LiteralType::Boolean,
+            value: LiteralValue::BooleanValue(true),
+        })));
+        next(source, state);
+    } else if match_token(state, TokenKind::False) == 1 {
+        expression.type_ = ExpressionType::Literal;
+        expression.data = ExpressionData::Literal(Some(Box::new(LiteralNode {
+            type_: LiteralType::Boolean,
+            value: LiteralValue::BooleanValue(false),
+        })));
+        next(source, state);
+    } else {
+        panic!("Unexpected token in literal");
+    }
+}
+
+fn parse_expression(source: &str, state: &mut ParseState, expression: &mut ExpressionNode) {
+    if match_token(state, TokenKind::LParen) == 1 {
+        parse_symbolic_expression(source, state, expression);
+    } else if match_token(state, TokenKind::Quote) == 1 {
+        parse_list_expression(source, state, expression);
+    } else if match_token(state, TokenKind::Symbol) == 1 {
+        parse_symbol_expression(source, state, expression);
+    } else if match_token(state, TokenKind::Digit) == 1 || 
+              match_token(state, TokenKind::String) == 1 ||
+              match_token(state, TokenKind::True) == 1 || 
+              match_token(state, TokenKind::False) == 1 {
+        parse_literal_expression(source, state, expression);
+    } else {
+        panic!("Unexpected token in expression");
+    }
+}
+
+fn append_expression_to_program(program: &mut ProgramNode, expression: ExpressionNode) {
+    let new_expr = Some(Box::new(expression));
+    let new_list = Some(Box::new(ExpressionList {
+        expression: new_expr,
+        next: None,
+    }));
+    
+    if program.expressions.is_none() {
+        program.expressions = new_list;
+    } else {
+        let mut current = program.expressions.as_mut().unwrap();
+        while current.next.is_some() {
+            current = current.next.as_mut().unwrap();
+        }
+        current.next = new_list;
+    }
+}
+
+fn parse_program(source: &str, state: &mut ParseState, result: &mut ParseResult) {
+    next(source, state);
+    let mut program = ProgramNode {
+        expressions: None,
+    };
+    
+    while match_token(state, TokenKind::Eof) == 0 {
+        let mut expression = ExpressionNode {
+            type_: ExpressionType::Literal,
+            data: ExpressionData::Literal(None),
+        };
+        parse_expression(source, state, &mut expression);
+        append_expression_to_program(&mut program, expression);
+    }
+    
+    result.program = Some(Box::new(program));
+}
+
+pub fn parse(source: &str, state: &mut ParseState, result: &mut ParseResult) {
+    parse_program(source, state, result);
+}
+
+fn initialize_object_stack(stack: &mut ObjectStack) {
+    stack.top = -1;
+}
+
+fn is_full_object_stack(stack: &ObjectStack) -> bool {
+    stack.top == OBJECT_NUMBER as i32
+}
+
+fn is_empty_object_stack(stack: &ObjectStack) -> bool {
+    stack.top == -1
+}
+
+fn push_object_stack(stack: &mut ObjectStack, obj: Option<Box<Object>>) {
+    if is_full_object_stack(stack) {
+        panic!("Object stack is full");
+    }
+    stack.top += 1;
+    stack.objects[stack.top as usize] = obj;
+}
+
+fn pop_object_stack(stack: &mut ObjectStack) -> Option<Box<Object>> {
+    if is_empty_object_stack(stack) {
+        panic!("Object stack is empty");
+    }
+    let obj = stack.objects[stack.top as usize].take();
+    stack.top -= 1;
+    obj
+}
+
+pub fn init_allocator() -> AllocatorContext {
+    let mut stack = Box::new(ObjectStack {
+        objects: std::array::from_fn(|_| None),
+        top: -1,
+    });
+    initialize_object_stack(&mut stack);
+    
+    AllocatorContext {
+        gc_less_mode: 1,
+        stack: Some(stack),
+        memory_pool: None,
+        free_bitmap: [0; FREE_BITMAP_SIZE],
+    }
+}
+
+pub fn allocate(context: &mut AllocatorContext, _env: &mut Env) -> Option<Box<Object>> {
+    if context.gc_less_mode != 0 {
+        Some(Box::new(Object {
+            marked: false,
+            type_: ObjectType::Nil,
+            value: ObjectValue::IntValue(0),
+        }))
+    } else {
+        Some(Box::new(Object {
+            marked: false,
+            type_: ObjectType::Nil,
+            value: ObjectValue::IntValue(0),
+        }))
+    }
+}
+
+fn bool_val(obj: &Object) -> bool {
+    match obj.type_ {
+        ObjectType::Bool => {
+            if let ObjectValue::BoolValue(b) = obj.value {
+                b != 0
+            } else {
+                false
+            }
+        }
+        ObjectType::Nil => false,
+        _ => true,
+    }
+}
+
+fn eq(op1: &Object, op2: &Object) -> bool {
+    if op1.type_ != op2.type_ {
+        return false;
+    }
+    
+    match op1.type_ {
+        ObjectType::Integer => {
+            if let (ObjectValue::IntValue(v1), ObjectValue::IntValue(v2)) = (&op1.value, &op2.value) {
+                v1 == v2
+            } else {
+                false
+            }
+        }
+        ObjectType::String => {
+            if let (ObjectValue::StringValue(s1), ObjectValue::StringValue(s2)) = (&op1.value, &op2.value) {
+                s1 == s2
+            } else {
+                false
+            }
+        }
+        ObjectType::Bool => {
+            if let (ObjectValue::BoolValue(b1), ObjectValue::BoolValue(b2)) = (&op1.value, &op2.value) {
+                b1 == b2
+            } else {
+                false
+            }
+        }
+        ObjectType::List => {
+            if let (ObjectValue::ListValue(l1), ObjectValue::ListValue(l2)) = (&op1.value, &op2.value) {
+                l1.is_some() == l2.is_some() && 
+                if l1.is_some() && l2.is_some() {
+                    std::ptr::eq(l1.as_ref().unwrap().as_ref(), l2.as_ref().unwrap().as_ref())
+                } else {
+                    true
+                }
+            } else {
+                false
+            }
+        }
+        ObjectType::Nil => true,
+        _ => false,
+    }
+}
+
+pub fn stringify_object(obj: &Object) -> String {
+    match obj.type_ {
+        ObjectType::Integer => {
+            if let ObjectValue::IntValue(v) = obj.value {
+                v.to_string()
+            } else {
+                "0".to_string()
+            }
+        }
+        ObjectType::String => {
+            if let ObjectValue::StringValue(ref s) = obj.value {
+                s.clone()
+            } else {
+                String::new()
+            }
+        }
+        ObjectType::Bool => {
+            if let ObjectValue::BoolValue(b) = obj.value {
+                if b != 0 { "T".to_string() } else { "F".to_string() }
+            } else {
+                "F".to_string()
+            }
+        }
+        ObjectType::List => {
+            if let ObjectValue::ListValue(ref cons) = obj.value {
+                let mut result = "(".to_string();
+                let mut current = cons;
+                let mut first = true;
+                
+                while let Some(ref cell) = current {
+                    if !first {
+                        result.push(' ');
+                    }
+                    first = false;
+                    
+                    if let Some(ref car) = cell.car {
+                        result.push_str(&stringify_object(car));
+                    }
+                    
+                    if let Some(ref cdr) = cell.cdr {
+                        if cdr.type_ == ObjectType::Nil {
+                            break;
+                        }
+                        if let ObjectValue::ListValue(ref next_cons) = cdr.value {
+                            current = next_cons;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                result.push(')');
+                result
+            } else {
+                "()".to_string()
+            }
+        }
+        ObjectType::Nil => "nil".to_string(),
+        ObjectType::Function => "<function>".to_string(),
+    }
+}
+
+fn defined_function_add(op1: &Object, op2: &Object) -> Object {
+    if let (ObjectType::Integer, ObjectType::Integer) = (op1.type_, op2.type_) {
+        if let (ObjectValue::IntValue(v1), ObjectValue::IntValue(v2)) = (&op1.value, &op2.value) {
+            return Object {
+                marked: false,
+                type_: ObjectType::Integer,
+                value: ObjectValue::IntValue(v1 + v2),
+            };
+        }
+    } else if let (ObjectType::String, ObjectType::String) = (op1.type_, op2.type_) {
+        if let (ObjectValue::StringValue(s1), ObjectValue::StringValue(s2)) = (&op1.value, &op2.value) {
+            return Object {
+                marked: false,
+                type_: ObjectType::String,
+                value: ObjectValue::StringValue(format!("{}{}", s1, s2)),
+            };
+        }
+    }
+    panic!("Type error: operands for + must be integers or strings");
+}
+
+fn defined_function_sub(op1: &Object, op2: &Object) -> Object {
+    if let (ObjectType::Integer, ObjectType::Integer) = (op1.type_, op2.type_) {
+        if let (ObjectValue::IntValue(v1), ObjectValue::IntValue(v2)) = (&op1.value, &op2.value) {
+            return Object {
+                marked: false,
+                type_: ObjectType::Integer,
+                value: ObjectValue::IntValue(v1 - v2),
+            };
+        }
+    }
+    panic!("Type error: operands for - must be integers");
+}
+
+fn defined_function_mul(op1: &Object, op2: &Object) -> Object {
+    if let (ObjectType::Integer, ObjectType::Integer) = (op1.type_, op2.type_) {
+        if let (ObjectValue::IntValue(v1), ObjectValue::IntValue(v2)) = (&op1.value, &op2.value) {
+            return Object {
+                marked: false,
+                type_: ObjectType::Integer,
+                value: ObjectValue::IntValue(v1 * v2),
+            };
+        }
+    }
+    panic!("Type error: operands for * must be integers");
+}
+
+fn defined_function_div(op1: &Object, op2: &Object) -> Object {
+    if let (ObjectType::Integer, ObjectType::Integer) = (op1.type_, op2.type_) {
+        if let (ObjectValue::IntValue(v1), ObjectValue::IntValue(v2)) = (&op1.value, &op2.value) {
+            if *v2 == 0 {
+                panic!("Division by zero");
+            }
+            return Object {
+                marked: false,
+                type_: ObjectType::Integer,
+                value: ObjectValue::IntValue(v1 / v2),
+            };
+        }
+    }
+    panic!("Type error: operands for / must be integers");
+}
+
+fn defined_function_mod(op1: &Object, op2: &Object) -> Object {
+    if let (ObjectType::Integer, ObjectType::Integer) = (op1.type_, op2.type_) {
+        if let (ObjectValue::IntValue(v1), ObjectValue::IntValue(v2)) = (&op1.value, &op2.value) {
+            if *v2 == 0 {
+                panic!("Modulo by zero");
+            }
+            return Object {
+                marked: false,
+                type_: ObjectType::Integer,
+                value: ObjectValue::IntValue(v1 % v2),
+            };
+        }
+    }
+    panic!("Type error: operands for % must be integers");
+}
+
+fn defined_function_or(op1: &Object, op2: &Object) -> Object {
+    Object {
+        marked: false,
+        type_: ObjectType::Bool,
+        value: ObjectValue::BoolValue(if bool_val(op1) || bool_val(op2) { 1 } else { 0 }),
+    }
+}
+
+fn defined_function_and(op1: &Object, op2: &Object) -> Object {
+    Object {
+        marked: false,
+        type_: ObjectType::Bool,
+        value: ObjectValue::BoolValue(if bool_val(op1) && bool_val(op2) { 1 } else { 0 }),
+    }
+}
+
+fn defined_function_lt(op1: &Object, op2: &Object) -> Object {
+    if let (ObjectType::Integer, ObjectType::Integer) = (op1.type_, op2.type_) {
+        if let (ObjectValue::IntValue(v1), ObjectValue::IntValue(v2)) = (&op1.value, &op2.value) {
+            return Object {
+                marked: false,
+                type_: ObjectType::Bool,
+                value: ObjectValue::BoolValue(if v1 < v2 { 1 } else { 0 }),
+            };
+        }
+    }
+    panic!("Type error: operands for < must be integers");
+}
+
+fn defined_function_gt(op1: &Object, op2: &Object) -> Object {
+    if let (ObjectType::Integer, ObjectType::Integer) = (op1.type_, op2.type_) {
+        if let (ObjectValue::IntValue(v1), ObjectValue::IntValue(v2)) = (&op1.value, &op2.value) {
+            return Object {
+                marked: false,
+                type_: ObjectType::Bool,
+                value: ObjectValue::BoolValue(if v1 > v2 { 1 } else { 0 }),
+            };
+        }
+    }
+    panic!("Type error: operands for > must be integers");
+}
+
+fn defined_function_eq(op1: &Object, op2: &Object) -> Object {
+    Object {
+        marked: false,
+        type_: ObjectType::Bool,
+        value: ObjectValue::BoolValue(if eq(op1, op2) { 1 } else { 0 }),
+    }
+}
+
+fn defined_function_car(op: &Object) -> Object {
+    if op.type_ != ObjectType::List {
+        panic!("Type error: car operand must be list");
+    }
+    if let ObjectValue::ListValue(ref cons) = op.value {
+        if let Some(ref cell) = cons {
+            if let Some(ref car) = cell.car {
+                return Object {
+                    marked: car.marked,
+                    type_: car.type_,
+                    value: match &car.value {
+                        ObjectValue::IntValue(v) => ObjectValue::IntValue(*v),
+                        ObjectValue::StringValue(s) => ObjectValue::StringValue(s.clone()),
+                        ObjectValue::BoolValue(b) => ObjectValue::BoolValue(*b),
+                        ObjectValue::ListValue(l) => ObjectValue::ListValue(l.clone()),
+                        ObjectValue::FunctionValue(f) => ObjectValue::FunctionValue(f.clone()),
+                    }
+                };
+            }
+        }
+    }
+    Object {
+        marked: false,
+        type_: ObjectType::Nil,
+        value: ObjectValue::IntValue(0),
+    }
+}
+
+fn defined_function_cdr(op:

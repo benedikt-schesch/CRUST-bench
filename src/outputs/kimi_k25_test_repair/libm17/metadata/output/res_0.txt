@@ -1,0 +1,171 @@
+ {{lib.rs}}
+```rust
+pub mod decode;
+pub mod encode;
+pub mod math;
+pub mod payload;
+pub mod phy;
+pub mod types;
+use crate::types::{FrameType, PreambleType, LSF, SYM_PER_FRA, SYM_PER_PLD, SYM_PER_SWD};
+pub fn send_data(out: &mut [f32; SYM_PER_PLD], cnt: &mut u32, input: &[u8]) {
+    todo!()
+}
+pub fn send_eot(out: &mut [f32; SYM_PER_FRA], cnt: &mut u32) {
+    todo!()
+}
+pub fn send_preamble(out: &mut [f32; SYM_PER_FRA], cnt: &mut u32, ptype: PreambleType) {
+    todo!()
+}
+pub fn send_syncword(out: &mut [f32; SYM_PER_SWD], cnt: &mut u32, syncword: u16) {
+    todo!()
+}
+pub fn send_frame(
+    out: &mut [f32; SYM_PER_FRA],
+    data: &[u8],
+    frame_type: FrameType,
+    lsf: &LSF,
+    lich_cnt: u8,
+    fn_num: u16,
+) {
+    todo!()
+}
+```
+
+{{types.rs}}
+```rust
+//! Type definitions for M17 protocol
+
+/// Frame type enumeration
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameType {
+    /// Stream frame
+    Stream,
+    /// Packet frame
+    Packet,
+    /// Reserved
+    Reserved,
+}
+
+/// Preamble type enumeration
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreambleType {
+    /// Standard preamble
+    Standard,
+    /// Short preamble
+    Short,
+}
+
+/// Link Setup Frame structure
+#[derive(Debug, Clone, Copy)]
+pub struct LSF {
+    /// Raw LSF data bytes
+    pub data: [u8; 30],
+}
+
+/// Symbols per frame (40ms frame at 4800 baud = 192 symbols)
+pub const SYM_PER_FRA: usize = 192;
+
+/// Symbols per payload (frame minus syncword and other overhead)
+pub const SYM_PER_PLD: usize = 184;
+
+/// Symbols per syncword (typically 8 symbols for 16-bit syncword at 2 bits/symbol)
+pub const SYM_PER_SWD: usize = 8;
+```
+
+{{encode.rs}}
+```rust
+//! Encoding utilities for M17 protocol
+
+/// Symbol lookup table for mapping bits to symbols
+pub const SYMBOL_LIST: [f32; 256] = [
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+];
+```
+
+{{math.rs}}
+```rust
+//! Mathematical functions for M17 protocol including Golay coding
+
+/// Encode 12-bit data to 24-bit Golay code
+pub fn golay24_encode(data: u16) -> u32 {
+    // Placeholder implementation: returns data in upper 12 bits with parity in lower 12 bits
+    let parity = calculate_parity(data);
+    ((data as u32) << 12) | parity
+}
+
+/// Soft decode Golay(24,12) code
+/// Takes soft-valued input bits and returns decoded 12-bit data
+pub fn golay24_sdecode(soft_bits: &[f32]) -> u16 {
+    // Placeholder: convert soft bits to hard bits and decode
+    if soft_bits.len() < 24 {
+        return 0;
+    }
+    
+    let mut codeword: u32 = 0;
+    for (i, &bit) in soft_bits.iter().take(24).enumerate() {
+        if bit > 0.0 {
+            codeword |= 1 << (23 - i);
+        }
+    }
+    
+    // Return lower 12 bits as decoded data (simplified)
+    (codeword >> 12) as u16
+}
+
+/// Soft bit XOR operation for soft-decision decoding
+/// Combines two soft bit values (correlation values)
+pub fn soft_bit_xor(a: f32, b: f32) -> f32 {
+    // Soft XOR: if both agree (same sign), result is positive
+    // If they disagree, result is negative
+    // Magnitude is minimum of the two magnitudes
+    let sign = if (a > 0.0) == (b > 0.0) { 1.0 } else { -1.0 };
+    sign * a.abs().min(b.abs())
+}
+
+/// Decode lookup table for Golay(24,12) syndrome decoding
+pub const DECODE_TABLE: [u16; 4096] = [0; 4096];
+
+/// Calculate parity bits for Golay encoding (helper function)
+fn calculate_parity(data: u16) -> u32 {
+    // Simplified parity calculation
+    let mut parity: u32 = 0;
+    let mut temp = data;
+    for i in 0..12 {
+        if (temp & 1) != 0 {
+            parity ^= 0x800 >> i;
+        }
+        temp >>= 1;
+    }
+    parity & 0xFFF
+}
+```
+
+{{decode.rs}}
+```rust
+//! Decoding utilities for M17 protocol
+```
+
+{{payload.rs}}
+```rust
+//! Payload handling for M17 protocol
+```
+
+{{phy.rs}}
+```rust
+//! Physical layer definitions for M17 protocol
+```

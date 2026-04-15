@@ -1,0 +1,120 @@
+ {{rbtree.rs}}
+```rust
+use std::cell::RefCell;
+use std::rc::Rc;
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Color {
+    Red,
+    Black,
+}
+
+pub type Key = i32;
+pub type NodeRef = Rc<RefCell<Node>>;
+
+#[derive(Debug, Clone)]
+pub struct Node {
+    pub key: Key,
+    pub color: Color,
+    pub left: Option<NodeRef>,   // None == NIL
+    pub right: Option<NodeRef>,  // None == NIL
+    pub parent: Option<NodeRef>, // None == NIL / root parent
+}
+
+#[derive(Debug, Clone)]
+pub struct RBTree {
+    /// Root of the tree. `None` means the tree is empty (NIL).
+    pub root: Option<NodeRef>,
+}
+
+impl RBTree {
+    pub fn new() -> Self {
+        Self { root: None }
+    }
+
+    /// Performs a right rotation around non-NIL node `x`.
+    pub fn right_rotate(&mut self, x: NodeRef) {
+        let y = x.borrow().left.clone().expect("right_rotate: x.left should not be None");
+        
+        // x.left = y.right
+        let y_right = y.borrow().right.clone();
+        x.borrow_mut().left = y_right.clone();
+        
+        // if y.right != nil, y.right.parent = x
+        if let Some(ref right) = y_right {
+            right.borrow_mut().parent = Some(x.clone());
+        }
+        
+        // y.parent = x.parent
+        let x_parent = x.borrow().parent.clone();
+        y.borrow_mut().parent = x_parent.clone();
+        
+        // if x.parent == nil, root = y
+        // else if x == x.parent.left, x.parent.left = y
+        // else x.parent.right = y
+        if let Some(ref x_parent_ref) = x_parent {
+            let x_is_left = {
+                let parent = x_parent_ref.borrow();
+                parent.left.as_ref().map(|l| Rc::ptr_eq(l, &x)).unwrap_or(false)
+            };
+            
+            if x_is_left {
+                x_parent_ref.borrow_mut().left = Some(y.clone());
+            } else {
+                x_parent_ref.borrow_mut().right = Some(y.clone());
+            }
+        } else {
+            self.root = Some(y.clone());
+        }
+        
+        // y.right = x
+        y.borrow_mut().right = Some(x.clone());
+        
+        // x.parent = y
+        x.borrow_mut().parent = Some(y);
+    }
+
+    /// Performs a left rotation around non-NIL node `x`.
+    pub fn left_rotate(&mut self, x: NodeRef) {
+        let y = x.borrow().right.clone().expect("left_rotate: x.right should not be None");
+        
+        // x.right = y.left
+        let y_left = y.borrow().left.clone();
+        x.borrow_mut().right = y_left.clone();
+        
+        // if y.left != nil, y.left.parent = x
+        if let Some(ref left) = y_left {
+            left.borrow_mut().parent = Some(x.clone());
+        }
+        
+        // y.parent = x.parent
+        let x_parent = x.borrow().parent.clone();
+        y.borrow_mut().parent = x_parent.clone();
+        
+        // if x.parent == nil
+        if x_parent.is_none() {
+            self.root = Some(y.clone());
+        } else {
+            let x_is_left = {
+                let parent = x_parent.as_ref().unwrap().borrow();
+                parent.left.as_ref().map(|l| Rc::ptr_eq(l, &x)).unwrap_or(false)
+            };
+            
+            if x_is_left {
+                x_parent.as_ref().unwrap().borrow_mut().left = Some(y.clone());
+            } else {
+                x_parent.as_ref().unwrap().borrow_mut().right = Some(y.clone());
+            }
+        }
+        
+        // y.left = x
+        y.borrow_mut().left = Some(x.clone());
+        
+        // x.parent = y
+        x.borrow_mut().parent = Some(y);
+    }
+
+    /// Recursively drops a subtree. `None` is treated as NIL.
+    pub fn free_node(node: Option<NodeRef>) {
+        if let Some(n) = node {
+           

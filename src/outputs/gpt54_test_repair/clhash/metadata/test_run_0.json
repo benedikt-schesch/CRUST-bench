@@ -1,0 +1,47 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test clhash_avalanche_test ... FAILED
+test demo ... ok
+test clhash_collision_test ... FAILED
+test clhash_test ... FAILED
+
+failures:
+
+---- clhash_avalanche_test stdout ----
+[clhashavalanchetest] Testing CLHASH avalanche effect.
+
+thread 'clhash_avalanche_test' (208969) panicked at clhash/src/clhash.rs:366:1:
+assertion failed: random.len() >= RANDOM_BYTES_NEEDED_FOR_CLHASH
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- clhash_collision_test stdout ----
+[clhashcollisiontest] Testing whether we can induce collisions by hacking the right bytes (Eik List's test).
+
+thread 'clhash_collision_test' (208970) panicked at clhash/src/clhash.rs:366:1:
+assertion failed: random.len() >= RANDOM_BYTES_NEEDED_FOR_CLHASH
+
+---- clhash_test stdout ----
+[clhashtest] checking that flipping a bit changes hash value with clhash
+
+thread 'clhash_test' (208971) panicked at clhash/src/clhash.rs:366:1:
+assertion failed: random.len() >= RANDOM_BYTES_NEEDED_FOR_CLHASH
+
+
+failures:
+    clhash_avalanche_test
+    clhash_collision_test
+    clhash_test
+
+test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,27 @@
+ {{lib.rs}}
+```rust
+pub mod ltre;
+```
+
+{{ltre.rs}}
+```rust
+//! The ltre module
+//! 
+//! This module contains the LTRE implementation.
+
+// Example function to demonstrate the module is properly exposed
+pub fn example_function() -> &'static str {
+    "LTRE module loaded successfully"
+}
+```
+
+{{test.rs}}
+```rust
+// Fixed import: use crate::ltre instead of LTRE::ltre
+// Binaries in src/bin/ should use crate:: to access the library
+use crate::ltre::*;
+
+fn main() {
+    println!("{}", example_function());
+}
+```

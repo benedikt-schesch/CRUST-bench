@@ -1,0 +1,7 @@
+```rust
+// Generated Rust Code
+{{lib.rs}}
+```rust
+pub mod forLib;
+pub mod for_gen;
+```

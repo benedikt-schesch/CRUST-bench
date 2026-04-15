@@ -1,0 +1,46 @@
+ {{lib.rs}}
+```rust
+pub mod circ_array;
+pub mod carrays;
+```
+
+{{carrays.rs}}
+```rust
+// Circular array module implementation
+// This module provides circular array functionality
+
+/// Circular array type
+pub struct CircularArray<T> {
+    data: Vec<T>,
+    capacity: usize,
+    start: usize,
+    len: usize,
+}
+
+impl<T> CircularArray<T> {
+    /// Creates a new circular array with the given capacity
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            data: Vec::with_capacity(capacity),
+            capacity,
+            start: 0,
+            len: 0,
+        }
+    }
+    
+    /// Returns the capacity of the circular array
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+    
+    /// Returns the number of elements in the array
+    pub fn len(&self) -> usize {
+        self.len
+    }
+    
+    /// Returns true if the array is empty
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
+```

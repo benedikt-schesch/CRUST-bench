@@ -3,6 +3,8 @@ import re
 
 def prompt_format_parser(response):
     results = []
+    if response is None:
+        return results
     # remove trailing whitespaces from the response
     response = "\n".join([r.strip() for r in response.split("\n")])
     raw_result_file_names_regex = re.compile(r"\{\{(.+?)\}\}\n*```")
@@ -31,6 +33,8 @@ def prompt_format_parser(response):
 
 def markdown_parser(response):
     results = []
+    if response is None:
+        return results
     raw_result_file_names_regex = re.compile(r"[\#]+\s*[`]?(.+\.rs)[`]?\n+```rust")
     raw_result_file_names = raw_result_file_names_regex.findall(response)
     rust_file_name_regex = re.compile(r"([^\s]+\.rs)")

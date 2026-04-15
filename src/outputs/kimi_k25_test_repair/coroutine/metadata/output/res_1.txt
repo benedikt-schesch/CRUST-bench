@@ -1,0 +1,169 @@
+ {{coroutine.rs}}
+```rust
+use std::any::Any;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::thread::{self, Thread, park};
+
+pub const COROUTINE_DEAD: i32 = 0;
+pub const COROUTINE_READY: i32 = 1;
+pub const COROUTINE_RUNNING: i32 = 2;
+pub const COROUTINE_SUSPEND: i32 = 3;
+pub const STACK_SIZE: usize = 1024 * 1024;
+pub const DEFAULT_COROUTINE: usize = 16;
+
+pub type CoroutineFunc = fn(schedule: &mut Schedule, data: &mut dyn Any);
+
+pub struct Coroutine {
+    pub func: CoroutineFunc,
+    pub data: Arc<Mutex<Box<dyn Any>>>,
+    pub cap: isize,
+    pub size: isize,
+    pub status: i32,
+    pub stack: Option<Box<[u8]>>,
+}
+
+pub struct ScheduleData {
+    pub stack: Box<[u8]>,
+    pub nco: usize,
+    pub cap: usize,
+    pub running: i32,
+    pub co: Vec<Option<Box<Coroutine>>>,
+}
+
+pub struct Schedule {
+    inner: Arc<Mutex<ScheduleData>>,
+}
+
+// Global state to store thread handles since we cannot add fields to the structs
+lazy_static::lazy_static! {
+    static ref COROUTINE_THREADS: Mutex<HashMap<usize, Thread>> = Mutex::new(HashMap::new());
+    static ref MAIN_THREAD: Mutex<Option<Thread>> = Mutex::new(None);
+}
+
+pub fn coroutine_open() -> Box<Schedule> {
+    *MAIN_THREAD.lock().unwrap() = Some(thread::current());
+    let data = ScheduleData {
+        stack: vec![0u8; STACK_SIZE].into_boxed_slice(),
+        nco: 0,
+        cap: DEFAULT_COROUTINE,
+        running: -1,
+        co: (0..DEFAULT_COROUTINE).map(|_| None).collect(),
+    };
+    Box::new(Schedule {
+        inner: Arc::new(Mutex::new(data)),
+    })
+}
+
+pub fn coroutine_close(schedule: Box<Schedule>) {
+    // Clean up any remaining threads
+    let mut threads = COROUTINE_THREADS.lock().unwrap();
+    for (_id, thread) in threads.drain() {
+        let _ = thread;
+    }
+    drop(threads);
+    // Drop the schedule
+    drop(schedule);
+    *MAIN_THREAD.lock().unwrap() = None;
+}
+
+pub fn coroutine_new(schedule: &mut Schedule, func: CoroutineFunc, data: Box<dyn Any>) -> i32 {
+    let co = Box::new(Coroutine {
+        func,
+        data: Arc::new(Mutex::new(data)),
+        cap: 0,
+        size: 0,
+        status: COROUTINE_READY,
+        stack: None,
+    });
+
+    let mut guard = schedule.inner.lock().unwrap();
+    
+    let id: i32;
+    if guard.nco >= guard.cap {
+        // Expand capacity
+        id = guard.cap as i32;
+        let new_cap = guard.cap * 2;
+        // Extend the vector with None values instead of using resize
+        let current_len = guard.co.len();
+        guard.co.extend((0..(new_cap - current_len)).map(|_| None));
+        guard.co[id as usize] = Some(co);
+        guard.cap = new_cap;
+    } else {
+        // Find empty slot
+        let mut found = false;
+        for i in 0..guard.cap {
+            let idx = (i + guard.nco) % guard.cap;
+            if guard.co[idx].is_none() {
+                id = idx as i32;
+                guard.co[idx] = Some(co);
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            panic!("Failed to find empty slot for coroutine");
+        }
+        id = (guard.nco % guard.cap) as i32;
+    }
+
+    guard.nco += 1;
+    let id_usize = id as usize;
+    drop(guard);
+
+    // Create thread for this coroutine
+    let inner_clone = schedule.inner.clone();
+    let handle = thread::spawn(move || {
+        // Wait until first resume
+        park();
+
+        // Get the function and data Arc while holding the lock
+        let (func, data_arc) = {
+            let mut guard = inner_clone.lock().unwrap();
+            if let Some(ref mut co) = guard.co[id_usize] {
+                if co.status == COROUTINE_READY {
+                    co.status = COROUTINE_RUNNING;
+                    guard.running = id_usize as i32;
+                    (co.func, co.data.clone())
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            }
+        };
+
+        // Lock the data and call the function
+        let mut data_guard = data_arc.lock().unwrap();
+        let data_ref: &mut dyn Any = &mut **data_guard;
+        let mut temp_schedule = Schedule { inner: inner_clone.clone() };
+        func(&mut temp_schedule, data_ref);
+        drop(data_guard);
+
+        // Update status after function returns
+        let mut guard = inner_clone.lock().unwrap();
+        if let Some(ref mut co) = guard.co[id_usize] {
+            co.status = COROUTINE_DEAD;
+        }
+        guard.nco -= 1;
+        guard.running = -1;
+        
+        // Unpark main thread
+        if let Some(ref main) = *MAIN_THREAD.lock().unwrap() {
+            main.unpark();
+        }
+    });
+
+    COROUTINE_THREADS.lock().unwrap().insert(id as usize, handle.thread().clone());
+
+    id
+}
+
+pub fn coroutine_resume(schedule: &mut Schedule, id: i32) {
+    let (running, cap) = {
+        let guard = schedule.inner.lock().unwrap();
+        (guard.running, guard.cap)
+    };
+    
+    assert!(running == -1);
+    assert!(id >= 0 && id < cap as i

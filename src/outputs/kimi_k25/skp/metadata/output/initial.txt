@@ -1,0 +1,414 @@
+ {{skp.rs}}
+```rust
+/// SKP version information.
+pub const SKP_VER: u32 = 0x0003001C;
+pub const SKP_VER_STR: &str = "0.3.1rc";
+
+/// A loop state used for scanning.
+#[derive(Debug, Default, Clone)]
+pub struct SkpLoop {
+    pub start: String,
+    pub to: Option<String>,
+    pub end: Option<String>,
+    pub alt: i32,
+}
+
+/// Returns the "length" from start to to. (This mimics the inline function `skp_loop_len`.)
+pub fn skp_loop_len(start: &str, to: &str) -> i32 {
+    let ret = to.as_ptr() as usize - start.as_ptr() as usize;
+    if ret <= (1 << 16) {
+        ret as i32
+    } else {
+        0
+    }
+}
+
+/// Global variable used in the C code.
+pub static mut SKP_ZERO: i32 = 0;
+
+/// Trace function (corresponds to the C macro skptrace).
+pub fn skptrace(args: std::fmt::Arguments) {
+    eprintln!("TRCE: {}", args);
+}
+
+/// The core scanning function from the C header.
+pub fn skp_<'a>(src: &'a str, pat: &'a str) -> (i32, &'a str, &'a str) {
+    let start = src;
+    let mut s = src;
+    let mut p = pat;
+    let mut skp_to = false;
+    let mut flg: i32 = 0;
+    let mut goal: Option<&'a str> = None;
+    let mut goalnot: Option<&'a str> = None;
+    let mut matched: i32 = 0;
+    
+    if pat.is_empty() || src.is_empty() {
+        return (0, src, src);
+    }
+    
+    // Check for '>' prefix
+    if let Some(first) = p.chars().next() {
+        if first == '>' {
+            skp_to = true;
+            p = &p[1..];
+        }
+    }
+    
+    // Skip spaces in pattern
+    while !p.is_empty() {
+        let (c, rest) = skp_next(p, 0);
+        if !is_space(c) {
+            break;
+        }
+        p = rest;
+    }
+    
+    while !p.is_empty() && p.as_bytes()[0] > 0x07 {
+        let (m, new_p, new_s) = match_pat(p, s, &mut flg);
+        if m != MATCHED_FAIL {
+            matched = m;
+            p = new_p;
+            s = new_s;
+            if matched == MATCHED_GOAL && goalnot.is_none() {
+                goal = Some(s);
+            } else if matched == MATCHED_GOALNOT {
+                goalnot = Some(s);
+            }
+        } else {
+            // Skip to next alternative in pattern (separated by low chars)
+            while !p.is_empty() && p.as_bytes()[0] > 0x07 {
+                p = &p[1..];
+            }
+            if !p.is_empty() && p.len() > 1 {
+                s = start;
+                // Advance by one byte in pattern
+                p = &p[1..];
+            } else if skp_to {
+                goal = None;
+                goalnot = None;
+                p = pat;
+                // Advance start by one byte
+                if !start.is_empty() {
+                    let new_start = &start[1..];
+                    // This is tricky with lifetimes, but we assume byte advance
+                    // For simplicity, we treat as byte slice advance
+                    return skp_(new_start, pat);
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        // Skip spaces
+        while !p.is_empty() {
+            let (c, rest) = skp_next(p, 0);
+            if !is_space(c) {
+                break;
+            }
+            p = rest;
+        }
+    }
+    
+    if matched == 0 && goalnot.is_some() {
+        goal = goalnot;
+        matched = MATCHED;
+        p = "";
+    }
+    
+    let final_s = if let Some(g) = goal { g } else { s };
+    
+    if matched != 0 && (!p.is_empty() && p.as_bytes()[0] <= 0x07) {
+        let ret = if p.as_bytes()[0] > 0 { p.as_bytes()[0] as i32 } else { 1 };
+        let to_val = if skp_to { start } else { final_s };
+        return (ret, to_val, final_s);
+    }
+    
+    (0, src, src)
+}
+
+pub fn skp_4(src: &str, pat: &str, to: Option<&mut &str>, end: Option<&mut &str>) -> i32 {
+    let (ret, to_val, end_val) = skp_(src, pat);
+    if let Some(t) = to {
+        *t = to_val;
+    }
+    if let Some(e) = end {
+        *e = end_val;
+    }
+    ret
+}
+
+pub fn skp_3(src: &str, pat: &str, end: Option<&mut &str>) -> i32 {
+    skp_4(src, pat, None, end)
+}
+
+pub fn skp_2(src: &str, pat: &str) -> i32 {
+    let (ret, _, _) = skp_(src, pat);
+    ret
+}
+
+/// Returns the next Unicode code point from the string `s` (similar to `skp_next` in C).
+/// Returns a tuple `(code_point, rest_of_string)`.
+/// The C code packs UTF-8 bytes into a u32 rather than decoding to scalar value.
+pub fn skp_next(s: &str, iso: i32) -> (u32, &str) {
+    if s.is_empty() {
+        return (0, s);
+    }
+    
+    if iso != 0 {
+        // ISO mode: single byte
+        let c = s.as_bytes()[0] as u32;
+        let rest = &s[1..];
+        // Check for CRLF
+        if c == 0x0D && rest.starts_with('\n') {
+            return (0x0D0A, &rest[1..]);
+        }
+        return (c, rest);
+    }
+    
+    // UTF-8 byte packing mode (not decoding to scalar)
+    let bytes = s.as_bytes();
+    let first = bytes[0];
+    let mut c = first as u32;
+    let mut len = 1;
+    
+    // Check for continuation bytes (0x80-0xBF)
+    if bytes.len() > 1 && (bytes[1] & 0xC0) == 0x80 {
+        c = (c << 8) | bytes[1] as u32;
+        len = 2;
+        if bytes.len() > 2 && (bytes[2] & 0xC0) == 0x80 {
+            c = (c << 8) | bytes[2] as u32;
+            len = 3;
+            if bytes.len() > 3 && (bytes[3] & 0xC0) == 0x80 {
+                c = (c << 8) | bytes[3] as u32;
+                len = 4;
+            }
+        }
+    }
+    
+    let rest = &s[len..];
+    
+    // Check for CRLF
+    if c == 0x0D && rest.starts_with('\n') {
+        return (0x0D0A, &rest[1..]);
+    }
+    
+    (c, rest)
+}
+
+/// Compares two code points. If `fold` is nonzero, performs case‑insensitive comparison.
+pub fn chr_cmp(a: u32, b: u32, fold: i32) -> bool {
+    if fold != 0 && a <= 0x7F && b <= 0x7F {
+        let a_lower = (a as u8).to_ascii_lowercase() as u32;
+        let b_lower = (b as u8).to_ascii_lowercase() as u32;
+        a_lower == b_lower
+    } else {
+        a == b
+    }
+}
+
+/// Returns true if `c` is a blank character.
+pub fn is_blank(c: u32) -> bool {
+    if c < 0xFF {
+        return c == 0x20 || c == 0x09;
+    }
+    match c & 0xFFFFFF00 {
+        0x00000000 => c == 0xA0,
+        0x0000C200 => c == 0xC2A0,
+        0x00E19A00 => c == 0xE19A80,
+        0x00E28000 => (0xE28080 <= c && c <= 0xE2808A) || c == 0xE280AF,
+        0x00E38080 => c == 0xE38080,
+        _ => false,
+    }
+}
+
+/// Returns true if `c` is a line-break character.
+pub fn is_break(c: u32) -> bool {
+    if c < 0x0F {
+        return c == 0x0A || c == 0x0C || c == 0x0D;
+    }
+    if c < 0xFF {
+        return c == 0x85;
+    }
+    c == 0x0D0A || c == 0xC285 || c == 0xE280A8 || c == 0xE280A9
+}
+
+/// Returns true if `c` is a space (blank or break).
+pub fn is_space(c: u32) -> bool {
+    is_blank(c) || is_break(c)
+}
+
+/// Returns true if `c` is a digit.
+pub fn is_digit(c: u32) -> bool {
+    c >= b'0' as u32 && c <= b'9' as u32
+}
+
+/// Returns true if `c` is a hexadecimal digit.
+pub fn is_xdigit(c: u32) -> bool {
+    (c >= b'0' as u32 && c <= b'9' as u32) ||
+    (c >= b'A' as u32 && c <= b'F' as u32) ||
+    (c >= b'a' as u32 && c <= b'f' as u32)
+}
+
+/// Returns true if `c` is an uppercase letter.
+pub fn is_upper(c: u32) -> bool {
+    c >= b'A' as u32 && c <= b'Z' as u32
+}
+
+/// Returns true if `c` is a lowercase letter.
+pub fn is_lower(c: u32) -> bool {
+    c >= b'a' as u32 && c <= b'z' as u32
+}
+
+/// Returns true if `c` is an alphabetic character.
+pub fn is_alpha(c: u32) -> bool {
+    is_upper(c) || is_lower(c)
+}
+
+/// Returns true if `c` is a valid identifier character.
+pub fn is_idchr(c: u32) -> bool {
+    is_alpha(c) || is_digit(c) || c == b'_' as u32
+}
+
+/// Returns true if `c` is alphanumeric.
+pub fn is_alnum(c: u32) -> bool {
+    is_alpha(c) || is_digit(c)
+}
+
+/// Returns true if `c` is a control character.
+pub fn is_ctrl(c: u32) -> bool {
+    c < 0x20 || (0xC280 <= c && c < 0xC2A0) || (0x7F <= c && c < 0xA0)
+}
+
+/// Returns true if `ch` is one of the characters in `set`. The `iso` flag is used for encoding.
+pub fn is_oneof(ch: u32, set: &str, iso: i32) -> bool {
+    if ch == 0 {
+        return false;
+    }
+    
+    let mut s = set;
+    let (mut p_ch, mut rest) = skp_next(s, iso);
+    s = rest;
+    
+    if p_ch == b']' as u32 {
+        if ch == b']' as u32 {
+            return true;
+        } else {
+            let (next_ch, next_rest) = skp_next(s, iso);
+            p_ch = next_ch;
+            s = next_rest;
+        }
+    }
+    
+    while p_ch != b']' as u32 && !s.is_empty() {
+        if p_ch == ch {
+            return true;
+        }
+        let q_ch = p_ch;
+        let (next_ch, next_rest) = skp_next(s, iso);
+        p_ch = next_ch;
+        s = next_rest;
+        
+        if p_ch == b'-' as u32 && !s.is_empty() && !s.starts_with(']') {
+            let (range_end, range_rest) = skp_next(s, iso);
+            p_ch = range_end;
+            s = range_rest;
+            if q_ch < ch && ch <= p_ch {
+                return true;
+            }
+            let (next_ch2, next_rest2) = skp_next(s, iso);
+            p_ch = next_ch2;
+            s = next_rest2;
+        }
+    }
+    false
+}
+
+/// Checks if the string `s` starts with the pattern `p` for `len` characters, using flag `flg`.
+pub fn is_string(s: &str, p: &str, len: i32, flg: i32) -> i32 {
+    let start = s;
+    let mut mlen: i32 = 0;
+    let mut len_remaining = len;
+    let mut p_ptr = p;
+    let mut s_ptr = s;
+    
+    while len_remaining > 0 {
+        if p_ptr.starts_with('\x0E') {
+            return mlen;
+        }
+        let (p_chr, p_end) = skp_next(p_ptr, flg & 2);
+        let (s_chr, s_end) = skp_next(s_ptr, flg & 2);
+        
+        if chr_cmp(s_chr, p_chr, flg & 1) {
+            let s_bytes = s_ptr.len() - s_end.len();
+            let p_bytes = p_ptr.len() - p_end.len();
+            mlen += s_bytes as i32;
+            len_remaining -= p_bytes as i32;
+            p_ptr = p_end;
+            s_ptr = s_end;
+        } else {
+            // Skip to next alternative (marked by \x0E)
+            while len_remaining > 0 && !p_ptr.is_empty() && !p_ptr.starts_with('\x0E') {
+                p_ptr = &p_ptr[1..];
+                len_remaining -= 1;
+            }
+            if len_remaining <= 0 {
+                return 0;
+            }
+            if !p_ptr.is_empty() {
+                p_ptr = &p_ptr[1..]; // skip \x0E
+            }
+            len_remaining -= 1;
+            s_ptr = start;
+            mlen = 0;
+        }
+    }
+    mlen
+}
+
+/// Given an opening parenthesis code point, returns the corresponding closing code point.
+pub fn get_close(open: u32) -> u32 {
+    match open {
+        b'(' => b')',
+        b'[' => b']',
+        b'{' => b'}',
+        b'<' => b'>',
+        _ => 0,
+    }
+}
+
+/// Given a quote character, returns the corresponding closing quote.
+pub fn get_qclose(open: u32) -> u32 {
+    match open {
+        b'\'' | b'"' | b'`' => open,
+        _ => 0,
+    }
+}
+
+/// Constants for match results.
+pub const MATCHED_FAIL: i32 = 0;
+pub const MATCHED: i32 = 1;
+pub const MATCHED_GOAL: i32 = 2;
+pub const MATCHED_GOALNOT: i32 = 3;
+
+/// Matches the pattern `pat` against source `src` and returns a tuple:
+/// `(match_result, src_end, pat_end)`. The flag parameter is passed by mutable reference.
+pub fn match_pat<'a>(pat: &'a str, src: &'a str, flg: &mut i32) -> (i32, &'a str, &'a str) {
+    let mut s_end = src;
+    let mut s_tmp = src;
+    let (s_chr, next_s) = skp_next(s_end, *flg & 2);
+    s_tmp = next_s;
+    
+    let mut p = pat;
+    let mut ret = MATCHED_FAIL;
+    let mut match_min: u32 = 1;
+    let mut match_max: u32 = 1;
+    let mut match_cnt: u32 = 0;
+    let mut match_not: u32 = 0;
+    
+    // Check quantifiers
+    if let Some(first) = p.chars().next() {
+        if first == '*' {
+            match_min = 0;
+            match_max = u32::MAX;
+            p = &p

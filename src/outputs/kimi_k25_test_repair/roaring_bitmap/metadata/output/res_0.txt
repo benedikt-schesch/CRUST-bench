@@ -1,0 +1,12 @@
+ {{lib.rs}}
+```rust
+pub mod rset {
+    pub struct RSet;
+    
+    impl RSet {
+        pub fn new() -> Self {
+            RSet
+        }
+    }
+}
+```

@@ -1,0 +1,161 @@
+use std::cmp;
+
+/// Encodes the input buffer using Hamming ECC encoding.
+pub fn hecc_encode(input: &[u8]) -> Vec<u8> {
+let mut output = Vec::with_capacity(input.len() + (input.len() + 14) / 15);
+
+let mut offset = 0usize;
+while input.len().saturating_sub(offset) >= 15 {
+let mut block = [0u8; 15];
+block.copy_from_slice(&input[offset..offset + 15]);
+hecc_encode_impl(&block, &mut output);
+offset += 15;
+}
+
+let rem = input.len() - offset;
+if rem > 0 {
+let mut block = [0u8; 15];
+block[..rem].copy_from_slice(&input[offset..]);
+let before = output.len();
+hecc_encode_impl(&block, &mut output);
+output.truncate(before + rem + 1);
+}
+
+output
+}
+
+fn hecc_encode_impl(input: &[u8; 15], output: &mut Vec<u8>) {
+let mut p1: u8 = 0;
+let mut p2: u8 = 0;
+let mut power2: usize = 4;
+let mut data: u8 = 0;
+let insize_bits = 15usize * 8;
+
+let mut in_index = 0usize;
+let mut j = 0usize;
+let mut i = 3usize;
+
+while j < insize_bits {
+if power2 == i {
+power2 *= 2;
+i += 1;
+continue;
+}
+if j.is_multiple_of(8) {
+data = input[in_index];
+in_index += 1;
+p2 ^= (data.count_ones() as u8) & 1;
+output.push(data);
+}
+if (data & 1) != 0 {
+p1 ^= i as u8;
+}
+data >>= 1;
+j += 1;
+i += 1;
+}
+
+p2 ^= ((p1.count_ones() as u8) & 1) as u8;
+output.push(p1.wrapping_add(p2 << 7));
+}
+
+/// Decodes the input buffer using Hamming ECC decoding.
+pub fn hecc_decode(input: &[u8]) -> Option<Vec<u8>> {
+if input.len() % 16 == 1 {
+return None;
+}
+
+let reqsize = input.len() - (input.len() / 16 + usize::from(!input.len().is_multiple_of(16)));
+let mut output = Vec::with_capacity(reqsize);
+
+let mut offset = 0usize;
+while input.len().saturating_sub(offset) >= 16 {
+let mut block = [0u8; 16];
+block.copy_from_slice(&input[offset..offset + 16]);
+if !hecc_decode_impl(&block, &mut output) {
+return None;
+}
+offset += 16;
+}
+
+let rem = input.len() - offset;
+if rem > 0 {
+let mut block = [0u8; 16];
+block[..rem].copy_from_slice(&input[offset..]);
+let mut tmp = Vec::with_capacity(15);
+if !hecc_decode_impl(&block, &mut tmp) {
+return None;
+}
+output.extend_from_slice(&tmp[..rem - 1]);
+}
+
+Some(output)
+}
+
+fn hecc_decode_impl(input: &[u8; 16], output: &mut Vec<u8>) -> bool {
+let mut actual_insize = input.len();
+if actual_insize < 2 {
+return false;
+}
+
+let mut p1: u8 = 0;
+let mut p2: u8 = 0;
+let mut power2: usize = 4;
+let mut data: u8 = 0;
+
+actual_insize -= 1;
+let check = input[actual_insize];
+
+let start = output.len();
+output.extend_from_slice(&input[..actual_insize]);
+
+let insize_bits = actual_insize * 8;
+let mut in_index = 0usize;
+let mut j = 0usize;
+let mut i = 3usize;
+
+while j < insize_bits {
+if power2 == i {
+power2 *= 2;
+i += 1;
+continue;
+}
+if j.is_multiple_of(8) {
+data = input[in_index];
+in_index += 1;
+p2 ^= (data.count_ones() as u8) & 1;
+}
+if (data & 1) != 0 {
+p1 ^= i as u8;
+}
+data >>= 1;
+j += 1;
+i += 1;
+}
+
+p1 ^= check & 0x7f;
+if p1 != 0 {
+let pm = check;
+p2 ^= (pm.count_ones() as u8) & 1;
+
+if p2 == 0 {
+output.truncate(start);
+return false;
+}
+
+if (p1 & p1.wrapping_sub(1)) != 0 {
+let mut bit_pos = p1.wrapping_sub(log2uint8(p1)).wrapping_sub(2);
+let byte_index = (bit_pos / 8) as usize;
+bit_pos %= 8;
+if byte_index < actual_insize {
+output[start + byte_index] ^= 1u8 << bit_pos;
+}
+}
+}
+
+true
+}
+
+pub fn log2uint8(x: u8) -> u8 {
+31u8 - (x.leading_zeros() as u8)
+}

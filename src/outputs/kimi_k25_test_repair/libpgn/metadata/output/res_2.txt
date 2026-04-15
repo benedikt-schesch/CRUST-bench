@@ -1,0 +1,47 @@
+ {{moves.rs}}
+```rust
+use crate::annotation::PgnAnnotation;
+use crate::check::PgnCheck;
+use crate::coordinate::PgnCoordinate;
+use crate::piece::PgnPiece;
+use crate::comments::PgnCommentPosition;
+
+pub const PGN_CASTLING_KINGSIDE: &str = "O-O";
+pub const PGN_CASTLING_QUEENSIDE: &str = "O-O-O";
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PgnComments {
+    pub values: Vec<PgnComment>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PgnAlternatives {
+    pub values: Vec<PgnMoves>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PgnComment {
+    pub value: String,
+    pub position: PgnCommentPosition,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PgnMove {
+    pub from: PgnCoordinate,
+    pub to: PgnCoordinate,
+    pub dest: PgnCoordinate,
+    pub piece: PgnPiece,
+    pub promotion: Option<PgnPiece>,
+    pub promoted_to: PgnPiece,
+    pub check: PgnCheck,
+    pub annotation: PgnAnnotation,
+    pub notation: String,
+    pub captures: bool,
+    pub castles: &'static str,
+    pub en_passant: bool,
+    pub comments: Option<PgnComments>,
+    pub alternatives: Option<PgnAlternatives>,
+}
+
+impl PgnMove {
+    pub fn new()

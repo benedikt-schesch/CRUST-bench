@@ -1,0 +1,263 @@
+ {{common.rs}}
+```rust
+use std::fmt;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static VERBOSE_MODE: AtomicBool = AtomicBool::new(false);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum tokens_t {
+    L_PAREN,
+    R_PAREN,
+    LAMBDA,
+    DOT,
+    VARIABLE,
+    ERROR,
+    WHITESPACE,
+    NEWLINE,
+    EQ,
+    QUOTE,
+    COLON,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum AstNodeType {
+    LAMBDA_EXPR,
+    APPLICATION,
+    VAR,
+    DEFINITION,
+}
+
+#[derive(Debug, Clone)]
+pub struct LambdaExpression {
+    pub parameter: String,
+    pub type_: String,
+    pub body: Option<Box<AstNode>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Application {
+    pub function: Option<Box<AstNode>>,
+    pub argument: Option<Box<AstNode>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Variable {
+    pub name: String,
+    pub type_: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum AstNodeUnion {
+    LambdaExpr(LambdaExpression),
+    Application(Application),
+    Variable(Variable),
+}
+
+#[derive(Debug, Clone)]
+pub struct AstNode {
+    pub type_: AstNodeType,
+    pub node: AstNodeUnion,
+}
+
+impl Default for AstNode {
+    fn default() -> Self {
+        AstNode {
+            type_: AstNodeType::VAR,
+            node: AstNodeUnion::Variable(Variable {
+                name: String::new(),
+                type_: String::new(),
+            }),
+        }
+    }
+}
+
+pub fn set_verbose(verbose: bool) {
+    VERBOSE_MODE.store(verbose, Ordering::Relaxed);
+}
+
+pub fn print_ast_verbose(n: &AstNode) {
+    if !VERBOSE_MODE.load(Ordering::Relaxed) {
+        return;
+    }
+    let s = ast_to_string(n);
+    println!("{}", s);
+}
+
+pub fn print_verbose(_format: &str, args: fmt::Arguments) {
+    if VERBOSE_MODE.load(Ordering::Relaxed) {
+        println!();
+        println!("{}", args);
+    }
+}
+
+pub fn error(msg: &str, file: &str, line: i32, func: &str) {
+    eprintln!("ERROR: {} at {}:{} in {}()", msg, file, line, func);
+    std::process::exit(1);
+}
+
+pub fn format(_fmt: &str, args: fmt::Arguments) -> String {
+    std::fmt::format(args)
+}
+
+pub fn append_to_buffer(buffer: &mut String, str: &str) {
+    buffer.push_str(str);
+}
+
+pub fn append_ast_to_buffer(buffer: &mut String, node: &AstNode) {
+    match &node.node {
+        AstNodeUnion::LambdaExpr(lambda) => {
+            buffer.push_str("(@");
+            buffer.push_str(&lambda.parameter);
+            buffer.push_str(" : ");
+            buffer.push_str(&lambda.type_);
+            buffer.push_str(" .");
+            if let Some(body) = &lambda.body {
+                append_ast_to_buffer(buffer, body);
+            }
+            buffer.push_str(") ");
+        }
+        AstNodeUnion::Application(app) => {
+            buffer.push_str("(");
+            if let Some(func) = &app.function {
+                append_ast_to_buffer(buffer, func);
+            }
+            if let Some(arg) = &app.argument {
+                append_ast_to_buffer(buffer, arg);
+            }
+            buffer.push_str(") ");
+        }
+        AstNodeUnion::Variable(var) => {
+            buffer.push_str("(");
+            buffer.push_str(&var.name);
+            if !var.type_.is_empty() {
+                buffer.push_str(" : ");
+                buffer.push_str(&var.type_);
+            }
+            buffer.push_str(") ");
+        }
+    }
+}
+
+pub fn ast_to_string(node: &AstNode) -> String {
+    let mut buffer = String::with_capacity(1024);
+    append_ast_to_buffer(&mut buffer, node);
+    buffer
+}
+```
+
+{{config.rs}}
+```rust
+use crate::common;
+use crate::io;
+use std::fs::File;
+use std::io::{BufRead, Seek};
+
+pub const CONFIG_PATH: &str = "config";
+
+#[derive(Debug, Clone, Copy)]
+pub enum reduction_order_t {
+    APPLICATIVE,
+    NORMAL,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum option_type_t {
+    FILENAME,
+    STEP_REDUCTION,
+    REDUCTION_ORDER,
+    CONFIG_ERROR,
+}
+
+pub struct Options {
+    pub file: File,
+    pub step_by_step_reduction: bool,
+    pub reduction_order: reduction_order_t,
+}
+
+pub fn trim(s: &mut String) {
+    let trimmed = s.trim().to_string();
+    *s = trimmed;
+}
+
+pub fn get_config_type(key: &str) -> option_type_t {
+    match key {
+        "file" => option_type_t::FILENAME,
+        "step_by_step_reduction" => option_type_t::STEP_REDUCTION,
+        "reduction_order" => option_type_t::REDUCTION_ORDER,
+        _ => {
+            let msg = format!("ERROR: Invalid key '{}' at config file.", key);
+            common::error(&msg, file!(), line!() as i32, "get_config_type");
+            option_type_t::CONFIG_ERROR
+        }
+    }
+}
+
+pub fn parse_config(line: &str, key: &mut String, value: &mut String) {
+    if let Some(eq_pos) = line.find('=') {
+        *key = line[..eq_pos].trim().to_string();
+        *value = line[eq_pos + 1..].trim().to_string();
+    } else {
+        let msg = format!("Malformed config file at line: {} . Expected = sign.\n", line);
+        common::error(&msg, file!(), line!() as i32, "parse_config");
+    }
+}
+
+pub fn get_config_from_file() -> Options {
+    let config_file = io::get_file(CONFIG_PATH, "r").unwrap_or_else(|_| {
+        common::error("Could not open config file", file!(), line!() as i32, "get_config_from_file");
+        panic!();
+    });
+
+    let mut options = Options {
+        file: File::open("/dev/null").unwrap(), // placeholder
+        step_by_step_reduction: false,
+        reduction_order: reduction_order_t::APPLICATIVE,
+    };
+
+    let reader = std::io::BufReader::new(&config_file);
+    let mut file_path: Option<String> = None;
+
+    for line_result in reader.lines() {
+        let line = line_result.unwrap();
+        if line.trim().is_empty() {
+            continue;
+        }
+        let mut key = String::new();
+        let mut value = String::new();
+        parse_config(&line, &mut key, &mut value);
+
+        match get_config_type(&key) {
+            option_type_t::FILENAME => {
+                file_path = Some(value);
+            }
+            option_type_t::STEP_REDUCTION => {
+                options.step_by_step_reduction = value == "true";
+            }
+            option_type_t::REDUCTION_ORDER => {
+                options.reduction_order = match value.as_str() {
+                    "applicative" => reduction_order_t::APPLICATIVE,
+                    "normal" => reduction_order_t::NORMAL,
+                    _ => {
+                        common::error(
+                            "ERROR: reduction order in cfg file should be 'normal' or 'applicative'.",
+                            file!(),
+                            line!() as i32,
+                            "get_config_from_file",
+                        );
+                        reduction_order_t::APPLICATIVE
+                    }
+                };
+            }
+            option_type_t::CONFIG_ERROR => {}
+        }
+    }
+
+    if let Some(path) = file_path {
+        options.file = io::get_file(&path, "r").unwrap_or_else(|_| {
+            common::error("ERROR: File cannot be null in cfg file.\n", file!(), line!() as i32, "get_config_from_file");
+            panic!();
+        });
+    } else {
+        common::error("ERROR: File cannot be null in cfg file.\n", file!(), line!() as i32, "get_config_from_file");
+   

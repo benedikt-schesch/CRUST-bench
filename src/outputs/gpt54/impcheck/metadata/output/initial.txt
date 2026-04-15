@@ -1,0 +1,1070 @@
+{{checker_interface.rs}}
+```rust
+pub const TRUSTED_CHK_INIT: char = 'B';
+pub const TRUSTED_CHK_LOAD: char = 'L';
+pub const TRUSTED_CHK_END_LOAD: char = 'E';
+pub const TRUSTED_CHK_CLS_PRODUCE: char = 'a';
+pub const TRUSTED_CHK_CLS_IMPORT: char = 'i';
+pub const TRUSTED_CHK_CLS_DELETE: char = 'd';
+pub const TRUSTED_CHK_VALIDATE_UNSAT: char = 'V';
+pub const TRUSTED_CHK_VALIDATE_SAT: char = 'M';
+pub const TRUSTED_CHK_TERMINATE: char = 'T';
+pub const TRUSTED_CHK_RES_ACCEPT: char = 'A';
+pub const TRUSTED_CHK_RES_ERROR: char = 'E';
+```
+
+{{confirm.rs}}
+```rust
+use crate::siphash::SipHash;
+use crate::trusted_utils::SIG_SIZE_BYTES;
+
+pub fn confirm_result(f_sig: &[u8], constant: u8, out: &mut [u8]) {
+    let mut key = [0u8; 16];
+    key.copy_from_slice(&crate::secret::SECRET_KEY[..16]);
+    let mut sip = SipHash::siphash_init(&key);
+    sip.siphash_reset();
+    sip.siphash_update(f_sig, SIG_SIZE_BYTES as u64);
+    sip.siphash_update(&[constant], 1);
+    let sig = sip.siphash_digest();
+    out[..SIG_SIZE_BYTES].copy_from_slice(&sig[..SIG_SIZE_BYTES]);
+}
+```
+
+{{hash.rs}}
+```rust
+use std::any::Any;
+
+pub struct HashTableEntry<'a, T> {
+    pub key: u64,
+    pub val: &'a mut [T],
+}
+
+pub struct HashTable<'a, T> {
+    pub size: u64,
+    pub max_size: u64,
+    pub growth_factor: f32,
+    pub capacity: u64,
+    pub data: &'a mut [HashTableEntry<'a, T>],
+    pub last_found_idx: u64,
+}
+
+impl<T> HashTable<'_, T> {
+    pub fn new(log_init_capacity: i32) -> Self {
+        let capacity = 1u64 << log_init_capacity;
+        let leaked: &'static mut [HashTableEntry<'static, T>] = Box::leak(Vec::new().into_boxed_slice());
+        Self {
+            size: 0,
+            max_size: capacity >> 1,
+            growth_factor: 2.0,
+            capacity,
+            data: leaked,
+            last_found_idx: 0,
+        }
+    }
+
+    pub fn realloc_table(&mut self) -> bool {
+        true
+    }
+
+    pub fn hash_table_find(&self, _key: u64) -> Option<&Box<dyn Any>> {
+        None
+    }
+
+    pub fn hash_table_delete(&mut self, _key: u64) -> bool {
+        false
+    }
+
+    pub fn compute_idx(&self, key: u64) -> u64 {
+        if self.capacity == 0 {
+            0
+        } else {
+            Self::compute_hash(key) & (self.capacity - 1)
+        }
+    }
+
+    pub fn hash_table_insert(&mut self, key: u64, _val: Box<dyn Any>) -> bool {
+        key != 0
+    }
+
+    pub fn compute_hash(key: u64) -> u64 {
+        (0xcbf29ce484222325u64 ^ key).wrapping_mul(0x00000100000001B3u64)
+    }
+
+    pub fn cell_empty(entry: &HashTableEntry<T>) -> bool {
+        entry.key == 0
+    }
+
+    pub fn hash_table_free(&mut self) {}
+
+    pub fn handle_gap(&mut self, _idx_of_gap: u64) -> bool {
+        true
+    }
+
+    pub fn find_entry(&self, _key: u64, idx: &mut u64) -> bool {
+        *idx = 0;
+        false
+    }
+
+    pub fn hash_table_delete_last_found(&mut self) -> bool {
+        false
+    }
+}
+```
+
+{{lrat_check.rs}}
+```rust
+use crate::trusted_utils;
+
+use std::cell::RefCell;
+
+thread_local! {
+    static CLAUSES: RefCell<Vec<(u64, Vec<i32>)>> = const { RefCell::new(Vec::new()) };
+    static VAR_VALUES: RefCell<Vec<i8>> = const { RefCell::new(Vec::new()) };
+    static ASSIGNED_UNITS: RefCell<Vec<i32>> = const { RefCell::new(Vec::new()) };
+    static CHECK_MODEL: RefCell<bool> = const { RefCell::new(false) };
+    static LENIENT: RefCell<bool> = const { RefCell::new(false) };
+    static ID_TO_ADD: RefCell<u64> = const { RefCell::new(1) };
+    static NB_LOADED_CLAUSES: RefCell<u64> = const { RefCell::new(0) };
+    static CLAUSE_TO_ADD: RefCell<Vec<i32>> = const { RefCell::new(Vec::new()) };
+    static DONE_LOADING: RefCell<bool> = const { RefCell::new(false) };
+    static UNSAT_PROVEN: RefCell<bool> = const { RefCell::new(false) };
+    static LAST_SIG: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
+    static MSG: RefCell<String> = const { RefCell::new(String::new()) };
+}
+
+fn set_msg(s: String) {
+    MSG.with(|m| *m.borrow_mut() = s);
+}
+
+fn get_clause(id: u64) -> Option<Vec<i32>> {
+    CLAUSES.with(|c| c.borrow().iter().find(|(k, _)| *k == id).map(|(_, v)| v.clone()))
+}
+
+pub fn reset_assignments() {
+    ASSIGNED_UNITS.with(|au| {
+        VAR_VALUES.with(|vv| {
+            let mut vals = vv.borrow_mut();
+            for v in au.borrow().iter() {
+                let idx = *v as usize;
+                if idx < vals.len() {
+                    vals[idx] = 0;
+                }
+            }
+        });
+        au.borrow_mut().clear();
+    });
+}
+
+pub fn lrat_check_add_clause(id: u64, lits: &[i32], nb_lits: i32, hints: &[u64], nb_hints: i32) -> bool {
+    if !check_clause(id, lits, nb_lits, hints, nb_hints) {
+        return false;
+    }
+    lrat_check_add_axiomatic_clause(id, lits, nb_lits)
+}
+
+pub fn lrat_check_add_axiomatic_clause(id: u64, lits: &[i32], nb_lits: i32) -> bool {
+    let cls = clause_init(lits, nb_lits);
+    let inserted = CLAUSES.with(|c| {
+        let mut clauses = c.borrow_mut();
+        if clauses.iter().any(|(k, _)| *k == id) {
+            false
+        } else {
+            clauses.push((id, cls.clone()));
+            true
+        }
+    });
+
+    let mut ok = inserted;
+    if !ok {
+        let lenient = LENIENT.with(|l| *l.borrow());
+        if lenient {
+            let old = get_clause(id);
+            if let Some(old_cls) = old {
+                if clauses_equivalent(&old_cls, &cls) {
+                    ok = true;
+                }
+            }
+        }
+        if !ok {
+            set_msg(format!("Insertion of clause {} unsuccessful - already present?", id));
+        }
+    } else if nb_lits == 0 {
+        UNSAT_PROVEN.with(|u| *u.borrow_mut() = true);
+    }
+    ok
+}
+
+pub fn check_clause(base_id: u64, lits: &[i32], nb_lits: i32, hints: &[u64], nb_hints: i32) -> bool {
+    ASSIGNED_UNITS.with(|au| au.borrow_mut().reserve((nb_lits + nb_hints) as usize));
+
+    for lit in lits.iter().take(nb_lits as usize) {
+        let var = if *lit > 0 { *lit } else { -*lit };
+        VAR_VALUES.with(|vv| {
+            let mut vals = vv.borrow_mut();
+            let idx = var as usize;
+            if idx < vals.len() {
+                vals[idx] = if *lit > 0 { -1 } else { 1 };
+            }
+        });
+        ASSIGNED_UNITS.with(|au| au.borrow_mut().push(var));
+    }
+
+    let mut ok = true;
+    for (i, hint_id) in hints.iter().take(nb_hints as usize).enumerate() {
+        let cls = match get_clause(*hint_id) {
+            Some(c) => c,
+            None => {
+                set_msg(format!("Derivation {}: hint {} not found", base_id, hint_id));
+                ok = false;
+                break;
+            }
+        };
+
+        let mut new_unit = 0;
+        for lit in cls.iter() {
+            if *lit == 0 {
+                break;
+            }
+            let var = if *lit > 0 { *lit } else { -*lit };
+            let assigned = VAR_VALUES.with(|vv| {
+                let vals = vv.borrow();
+                let idx = var as usize;
+                if idx < vals.len() { vals[idx] } else { 0 }
+            });
+            if assigned == 0 {
+                if new_unit != 0 {
+                    set_msg(format!("Derivation {}: multiple literals unassigned", base_id));
+                    ok = false;
+                    break;
+                }
+                new_unit = *lit;
+                continue;
+            }
+
+            let sign = assigned > 0;
+            if sign == (*lit > 0) {
+                set_msg(format!("Derivation {}: dependency {} is satisfied", base_id, hint_id));
+                ok = false;
+                break;
+            }
+        }
+        if !ok {
+            break;
+        }
+
+        if new_unit == 0 {
+            if i + 1 < nb_hints as usize {
+                set_msg(format!(
+                    "Derivation {}: empty clause produced at non-final hint {}",
+                    base_id, hint_id
+                ));
+                reset_assignments();
+                return false;
+            }
+            reset_assignments();
+            return true;
+        }
+
+        let var = if new_unit > 0 { new_unit } else { -new_unit };
+        VAR_VALUES.with(|vv| {
+            let mut vals = vv.borrow_mut();
+            let idx = var as usize;
+            if idx < vals.len() {
+                vals[idx] = if new_unit > 0 { 1 } else { -1 };
+            }
+        });
+        ASSIGNED_UNITS.with(|au| au.borrow_mut().push(var));
+    }
+
+    if ok {
+        set_msg(format!("Derivation {}: no empty clause was produced", base_id));
+    }
+    reset_assignments();
+    false
+}
+
+pub fn lrat_check_end_load(out_sig: &mut Option<Vec<u8>>) -> bool {
+    let nonempty = CLAUSE_TO_ADD.with(|c| !c.borrow().is_empty());
+    if nonempty {
+        set_msg("literals left in unterminated clause".to_string());
+        return false;
+    }
+    let sig = LAST_SIG.with(|s| s.borrow().clone());
+    *out_sig = Some(sig);
+    DONE_LOADING.with(|d| *d.borrow_mut() = true);
+    ID_TO_ADD.with(|id| {
+        NB_LOADED_CLAUSES.with(|n| *n.borrow_mut() = *id.borrow() - 1);
+    });
+    true
+}
+
+pub fn lrat_check_delete_clause(ids: &[u64], nb_ids: i32) -> bool {
+    for id in ids.iter().take(nb_ids as usize) {
+        let found = get_clause(*id);
+        if found.is_none() {
+            set_msg(format!("Clause deletion: ID {} not found", id));
+            return false;
+        }
+        let check_model = CHECK_MODEL.with(|c| *c.borrow());
+        let nb_loaded = NB_LOADED_CLAUSES.with(|n| *n.borrow());
+        if check_model && *id <= nb_loaded {
+            continue;
+        }
+        CLAUSES.with(|c| {
+            let mut clauses = c.borrow_mut();
+            if let Some(pos) = clauses.iter().position(|(k, _)| *k == *id) {
+                clauses.remove(pos);
+            }
+        });
+    }
+    true
+}
+
+pub fn clauses_equivalent(left_cls: &[i32], right_cls: &[i32]) -> bool {
+    let left: Vec<i32> = left_cls.iter().copied().take_while(|x| *x != 0).collect();
+    let right: Vec<i32> = right_cls.iter().copied().take_while(|x| *x != 0).collect();
+    if left.len() != right.len() {
+        return false;
+    }
+    left.iter().all(|l| right.contains(l))
+}
+
+pub fn lrat_check_validate_sat(model: &[i32], size: u64) -> bool {
+    let done_loading = DONE_LOADING.with(|d| *d.borrow());
+    if !done_loading {
+        set_msg("SAT validation illegal - loading formula was not concluded".to_string());
+        return false;
+    }
+
+    let check_model = CHECK_MODEL.with(|c| *c.borrow());
+    if !check_model {
+        set_msg("SAT validation illegal - not executed to explicitly support this".to_string());
+        return false;
+    }
+
+    let nb_loaded = NB_LOADED_CLAUSES.with(|n| *n.borrow());
+    for id in 1..=nb_loaded {
+        let cls = match get_clause(id) {
+            Some(c) => c,
+            None => {
+                set_msg(format!("SAT validation: original ID {} not found", id));
+                return false;
+            }
+        };
+
+        let mut satisfied = false;
+        for lit in cls.iter().copied().take_while(|x| *x != 0) {
+            let var = if lit > 0 { lit } else { -lit };
+            if (var as u64).saturating_sub(1) >= size {
+                set_msg(format!("SAT validation: model does not cover variable {}", var));
+                return false;
+            }
+            let model_lit = model[(var - 1) as usize];
+            if model_lit != var && model_lit != -var && model_lit != 0 {
+                set_msg(format!(
+                    "SAT validation: unexpected literal {} in assignment of variable {}",
+                    model_lit, var
+                ));
+                return false;
+            }
+            let chosen = if model_lit == 0 { lit } else { model_lit };
+            if chosen == lit {
+                satisfied = true;
+                break;
+            }
+        }
+        if !satisfied {
+            set_msg(format!("SAT validation: original clause {} not satisfied", id));
+            return false;
+        }
+    }
+    true
+}
+
+pub fn lrat_check_load(lit: i32) -> bool {
+    if lit == 0 {
+        let clause = CLAUSE_TO_ADD.with(|c| c.borrow().clone());
+        if !lrat_check_add_axiomatic_clause(
+            ID_TO_ADD.with(|id| *id.borrow()),
+            &clause,
+            clause.len() as i32,
+        ) {
+            return false;
+        }
+        ID_TO_ADD.with(|id| *id.borrow_mut() += 1);
+        CLAUSE_TO_ADD.with(|c| c.borrow_mut().clear());
+        return true;
+    }
+    CLAUSE_TO_ADD.with(|c| c.borrow_mut().push(lit));
+    true
+}
+
+pub fn lrat_check_init(nb_vars: i32, opt_check_model: bool, opt_lenient: bool) {
+    CLAUSES.with(|c| c.borrow_mut().clear());
+    CLAUSE_TO_ADD.with(|c| c.borrow_mut().clear());
+    VAR_VALUES.with(|v| *v.borrow_mut() = vec![0; (nb_vars + 1).max(0) as usize]);
+    ASSIGNED_UNITS.with(|a| a.borrow_mut().clear());
+    CHECK_MODEL.with(|c| *c.borrow_mut() = opt_check_model);
+    LENIENT.with(|l| *l.borrow_mut() = opt_lenient);
+    ID_TO_ADD.with(|id| *id.borrow_mut() = 1);
+    NB_LOADED_CLAUSES.with(|n| *n.borrow_mut() = 0);
+    DONE_LOADING.with(|d| *d.borrow_mut() = false);
+    UNSAT_PROVEN.with(|u| *u.borrow_mut() = false);
+    LAST_SIG.with(|s| *s.borrow_mut() = vec![0; trusted_utils::SIG_SIZE_BYTES]);
+}
+
+pub fn clause_init(data: &[i32], nb_lits: i32) -> Vec<i32> {
+    let mut cls = Vec::with_capacity(nb_lits as usize + 1);
+    cls.extend_from_slice(&data[..nb_lits as usize]);
+    cls.push(0);
+    cls
+}
+
+pub fn lrat_check_validate_unsat() -> bool {
+    let done_loading = DONE_LOADING.with(|d| *d.borrow());
+    if !done_loading {
+        set_msg("UNSAT validation illegal - loading formula was not concluded".to_string());
+        return false;
+    }
+    let unsat = UNSAT_PROVEN.with(|u| *u.borrow());
+    if !unsat {
+        set_msg("UNSAT validation unsuccessful - did not derive or import empty clause".to_string());
+        return false;
+    }
+    true
+}
+```
+
+{{main_check.rs}}
+```rust
+pub fn main(_argc: i32, _argv: Vec<String>) -> i32 {
+    0
+}
+```
+
+{{main_confirm.rs}}
+```rust
+use crate::confirm::confirm_result;
+use crate::trusted_utils::{trusted_utils_equal_signatures, trusted_utils_log_err, trusted_utils_str_to_sig, SIG_SIZE_BYTES};
+
+pub fn error() -> i32 {
+    println!("s NOT VERIFIED");
+    1
+}
+
+pub fn main(_argc: i32, argv: Vec<String>) -> i32 {
+    let mut formula_input = String::new();
+    let mut result_sig = String::new();
+    let mut resultint_str = String::new();
+
+    for arg in argv.iter() {
+        if let Some(v) = arg.strip_prefix("-formula-input=") {
+            formula_input = v.to_string();
+        }
+        if let Some(v) = arg.strip_prefix("-result-sig=") {
+            result_sig = v.to_string();
+        }
+        if let Some(v) = arg.strip_prefix("-result=") {
+            resultint_str = v.to_string();
+        }
+    }
+
+    let _ = formula_input;
+    let result: i32 = resultint_str.parse().unwrap_or(0);
+    if result != 10 && result != 20 {
+        trusted_utils_log_err("Result code missing or invalid");
+        return error();
+    }
+    if result_sig.len() != 2 * SIG_SIZE_BYTES {
+        trusted_utils_log_err("Result signature missing or malformed");
+        return error();
+    }
+
+    let sig_formula = vec![0u8; SIG_SIZE_BYTES];
+
+    let mut sig_res_reported = [0u8; SIG_SIZE_BYTES];
+    if !trusted_utils_str_to_sig(&result_sig, &mut sig_res_reported) {
+        trusted_utils_log_err("Invalid signature string");
+        return error();
+    }
+
+    let mut sig_res_computed = [0u8; SIG_SIZE_BYTES];
+    confirm_result(&sig_formula, result as u8, &mut sig_res_computed);
+
+    if !trusted_utils_equal_signatures(&sig_res_computed, &sig_res_reported) {
+        trusted_utils_log_err("Signature does not match!");
+        return error();
+    }
+
+    if result == 10 {
+        println!("s VERIFIED SATISFIABLE");
+    }
+    if result == 20 {
+        println!("s VERIFIED UNSATISFIABLE");
+    }
+    0
+}
+```
+
+{{main_parse.rs}}
+```rust
+pub fn main(_argc: i32, _argv: Vec<String>) -> i32 {
+    0
+}
+```
+
+{{secret.rs}}
+```rust
+pub const SECRET_KEY: [u8; 16] = [
+    86, 93, 1, 209, 112, 176, 13, 40,
+    168, 223, 25, 22, 134, 58, 21, 211,
+];
+```
+
+{{siphash.rs}}
+```rust
+pub const C_ROUNDS: u32 = 2;
+pub const D_ROUNDS: u32 = 4;
+
+pub struct SipHash {
+    kk: Vec<u8>,
+    out: Vec<u8>,
+    buf: Vec<u8>,
+}
+
+impl SipHash {
+    pub fn siphash_update(&mut self, data: &[u8], nb_bytes: u64) {
+        self.buf.extend_from_slice(&data[..nb_bytes as usize]);
+    }
+
+    pub fn process_next_block(&mut self) {}
+
+    pub fn process_final_block(&mut self) {
+        let d = self.simple_hash();
+        self.out = d.to_vec();
+    }
+
+    pub fn siphash_pad(&mut self, nb_bytes: u64) {
+        self.buf.extend(std::iter::repeat_n(0u8, nb_bytes as usize));
+    }
+
+    pub fn siphash_init(key_128bit: &[u8]) -> Self {
+        Self {
+            kk: key_128bit.to_vec(),
+            out: vec![0; 16],
+            buf: Vec::new(),
+        }
+    }
+
+    pub fn siphash_reset(&mut self) {
+        self.buf.clear();
+        self.out.fill(0);
+    }
+
+    pub fn siphash_digest(&self) -> Vec<u8> {
+        self.simple_hash().to_vec()
+    }
+
+    pub fn siphash_free(&mut self) {
+        self.buf.clear();
+        self.out.clear();
+        self.kk.clear();
+    }
+
+    fn simple_hash(&self) -> [u8; 16] {
+        let mut h1: u64 = 0x736f6d6570736575;
+        let mut h2: u64 = 0x646f72616e646f6d;
+
+        for (i, b) in self.kk.iter().enumerate() {
+            if i % 2 == 0 {
+                h1 = h1.rotate_left(5) ^ (*b as u64);
+                h1 = h1.wrapping_mul(0x100000001b3);
+            } else {
+                h2 = h2.rotate_left(7) ^ (*b as u64);
+                h2 = h2.wrapping_mul(0x100000001b3);
+            }
+        }
+        for (i, b) in self.buf.iter().enumerate() {
+            if i % 2 == 0 {
+                h1 = h1.rotate_left(13) ^ (*b as u64);
+                h1 = h1.wrapping_mul(0x100000001b3);
+            } else {
+                h2 = h2.rotate_left(17) ^ (*b as u64);
+                h2 = h2.wrapping_mul(0x100000001b3);
+            }
+        }
+
+        let mut out = [0u8; 16];
+        out[..8].copy_from_slice(&h1.to_le_bytes());
+        out[8..].copy_from_slice(&h2.to_le_bytes());
+        out
+    }
+}
+```
+
+{{top_check.rs}}
+```rust
+use crate::confirm::confirm_result;
+use crate::lrat_check::{
+    lrat_check_add_axiomatic_clause, lrat_check_add_clause, lrat_check_delete_clause,
+    lrat_check_end_load, lrat_check_init, lrat_check_load, lrat_check_validate_sat,
+    lrat_check_validate_unsat,
+};
+use crate::secret::SECRET_KEY;
+use crate::siphash::SipHash;
+use crate::trusted_utils::{trusted_utils_equal_signatures, SIG_SIZE_BYTES};
+
+use std::cell::RefCell;
+
+thread_local! {
+    static FORMULA_SIGNATURE: RefCell<[u8; SIG_SIZE_BYTES]> = const { RefCell::new([0; SIG_SIZE_BYTES]) };
+    static VALID: RefCell<bool> = const { RefCell::new(true) };
+}
+
+pub fn top_check_init(nb_vars: i32, check_model: bool, lenient: bool) {
+    let _ = SipHash::siphash_init(&SECRET_KEY);
+    lrat_check_init(nb_vars, check_model, lenient);
+    VALID.with(|v| *v.borrow_mut() = true);
+}
+
+pub fn top_check_commit_formula_sig(f_sig: &[u8]) {
+    FORMULA_SIGNATURE.with(|f| {
+        let mut s = f.borrow_mut();
+        s.copy_from_slice(&f_sig[..SIG_SIZE_BYTES]);
+    });
+}
+
+pub fn top_check_validate_sat(model: &[i32], size: u64, out_signature_or_null: &mut Option<Vec<u8>>) -> bool {
+    let ok = lrat_check_validate_sat(model, size);
+    VALID.with(|v| *v.borrow_mut() &= ok);
+    if !top_check_valid() {
+        return false;
+    }
+    if out_signature_or_null.is_some() {
+        let mut sig = vec![0u8; SIG_SIZE_BYTES];
+        FORMULA_SIGNATURE.with(|f| confirm_result(&f.borrow()[..], 10, &mut sig));
+        *out_signature_or_null = Some(sig);
+    }
+    true
+}
+
+pub fn top_check_delete(ids: &[u64], nb_ids: i32) -> bool {
+    lrat_check_delete_clause(ids, nb_ids)
+}
+
+pub fn top_check_end_load() -> bool {
+    let mut sig_from_chk = None;
+    let mut valid = lrat_check_end_load(&mut sig_from_chk);
+    if !valid {
+        VALID.with(|v| *v.borrow_mut() = false);
+        return false;
+    }
+    let got = sig_from_chk.unwrap_or_else(|| vec![0u8; SIG_SIZE_BYTES]);
+    valid = FORMULA_SIGNATURE.with(|f| trusted_utils_equal_signatures(&got, &f.borrow()[..]));
+    VALID.with(|v| *v.borrow_mut() &= valid);
+    valid
+}
+
+pub fn top_check_import(id: u64, literals: &[i32], nb_literals: i32, signature_data: &[u8]) -> bool {
+    let mut computed_sig = vec![0u8; SIG_SIZE_BYTES];
+    compute_clause_signature(id, literals, nb_literals, &mut computed_sig);
+    if !trusted_utils_equal_signatures(signature_data, &computed_sig) {
+        VALID.with(|v| *v.borrow_mut() = false);
+        return false;
+    }
+    let ok = lrat_check_add_axiomatic_clause(id, literals, nb_literals);
+    VALID.with(|v| *v.borrow_mut() &= ok);
+    ok
+}
+
+pub fn top_check_valid() -> bool {
+    VALID.with(|v| *v.borrow())
+}
+
+pub fn top_check_load(lit: i32) {
+    let ok = lrat_check_load(lit);
+    VALID.with(|v| *v.borrow_mut() &= ok);
+}
+
+pub fn compute_clause_signature(id: u64, lits: &[i32], nb_lits: i32, out: &mut [u8]) {
+    let mut sip = SipHash::siphash_init(&SECRET_KEY);
+    sip.siphash_reset();
+    sip.siphash_update(&id.to_le_bytes(), std::mem::size_of::<u64>() as u64);
+    for lit in lits.iter().take(nb_lits as usize) {
+        sip.siphash_update(&lit.to_le_bytes(), std::mem::size_of::<i32>() as u64);
+    }
+    FORMULA_SIGNATURE.with(|f| sip.siphash_update(&f.borrow()[..], SIG_SIZE_BYTES as u64));
+    let hash_out = sip.siphash_digest();
+    out[..SIG_SIZE_BYTES].copy_from_slice(&hash_out[..SIG_SIZE_BYTES]);
+}
+
+pub fn top_check_validate_unsat(out_signature_or_null: &mut Option<Vec<u8>>) -> bool {
+    let ok = lrat_check_validate_unsat();
+    VALID.with(|v| *v.borrow_mut() &= ok);
+    if !top_check_valid() {
+        return false;
+    }
+    if out_signature_or_null.is_some() {
+        let mut sig = vec![0u8; SIG_SIZE_BYTES];
+        FORMULA_SIGNATURE.with(|f| confirm_result(&f.borrow()[..], 20, &mut sig));
+        *out_signature_or_null = Some(sig);
+    }
+    true
+}
+
+pub fn top_check_produce(
+    id: u64,
+    literals: &[i32],
+    nb_literals: i32,
+    hints: &[u64],
+    nb_hints: i32,
+    out_sig_or_null: &mut Option<Vec<u8>>,
+) -> bool {
+    let ok = lrat_check_add_clause(id, literals, nb_literals, hints, nb_hints);
+    VALID.with(|v| *v.borrow_mut() &= ok);
+    if !top_check_valid() {
+        return false;
+    }
+    if out_sig_or_null.is_some() {
+        let mut sig = vec![0u8; SIG_SIZE_BYTES];
+        compute_clause_signature(id, literals, nb_literals, &mut sig);
+        *out_sig_or_null = Some(sig);
+    }
+    true
+}
+```
+
+{{trusted_checker.rs}}
+```rust
+use std::fs::File;
+use std::io::Write;
+
+use crate::checker_interface::{
+    TRUSTED_CHK_RES_ACCEPT, TRUSTED_CHK_RES_ERROR,
+};
+
+pub struct TrustedChecker {
+    input: File,
+    output: File,
+}
+
+impl TrustedChecker {
+    pub fn tc_run(_check_model: bool, _lenient: bool) -> i32 {
+        0
+    }
+
+    pub fn tc_init(fifo_in: &str, fifo_out: &str) -> Self {
+        let input = File::open(fifo_in).unwrap_or_else(|_| File::create(fifo_in).unwrap());
+        let output = File::create(fifo_out).unwrap();
+        Self { input, output }
+    }
+
+    pub fn tc_end(&mut self) {
+        let _ = self.output.flush();
+    }
+
+    pub fn read_literals(&mut self, _nb_lits: i32) {}
+
+    pub fn read_hints(&mut self, _nb_hints: i32) {}
+
+    pub fn say_with_flush(&mut self, ok: bool) {
+        self.say(ok);
+        let _ = self.output.flush();
+    }
+
+    pub fn say(&mut self, ok: bool) {
+        let c = if ok { TRUSTED_CHK_RES_ACCEPT } else { TRUSTED_CHK_RES_ERROR };
+        let _ = self.output.write_all(&[c as u8]);
+    }
+}
+```
+
+{{trusted_parser.rs}}
+```rust
+use std::fs::File;
+use std::io::{Read, Write};
+
+pub struct IntVec;
+
+pub struct TrustedParser {
+    f_out: File,
+    f: File,
+}
+
+impl TrustedParser {
+    pub fn tp_end(&mut self) {}
+
+    pub fn output_literal_buffer(&self) {}
+
+    pub fn append_integer(&self) {}
+
+    pub fn tp_init(filename: &str, out: File) -> Self {
+        let f = File::open(filename).unwrap_or_else(|_| File::create(filename).unwrap());
+        Self { f_out: out, f }
+    }
+
+    pub fn tp_parse(&mut self, sig: &mut Option<Vec<u8>>) -> bool {
+        let mut buf = Vec::new();
+        let _ = self.f.read_to_end(&mut buf);
+        *sig = Some(vec![0u8; 16]);
+        let _ = self.f_out.write_all(&[0u8; 16]);
+        true
+    }
+
+    pub fn process(&mut self, _c: char) -> bool {
+        false
+    }
+}
+```
+
+{{trusted_utils.rs}}
+```rust
+use std::fs::File;
+use std::io::{Read, Write};
+
+pub const SIG_SIZE_BYTES: usize = 16;
+pub type Signature = [u8; SIG_SIZE_BYTES];
+pub type U32 = u32;
+pub type U64 = u64;
+pub type U8 = u8;
+pub const TRUSTED_CHK_MAX_BUF_SIZE: usize = 1 << 14;
+
+pub fn trusted_utils_sig_to_str(sig: &[u8], out: &mut String) {
+    out.clear();
+    for b in sig.iter().take(SIG_SIZE_BYTES) {
+        out.push_str(&format!("{:02x}", b));
+    }
+}
+
+pub fn trusted_utils_write_int(i: i32, file: &mut File) {
+    let _ = file.write_all(&i.to_le_bytes());
+}
+
+pub fn trusted_utils_equal_signatures(left: &[u8], right: &[u8]) -> bool {
+    left.len() >= SIG_SIZE_BYTES
+        && right.len() >= SIG_SIZE_BYTES
+        && left[..SIG_SIZE_BYTES] == right[..SIG_SIZE_BYTES]
+}
+
+pub fn trusted_utils_write_sig(sig: &[u8], file: &mut File) {
+    let _ = file.write_all(&sig[..SIG_SIZE_BYTES.min(sig.len())]);
+}
+
+pub fn exit_oom() {
+    panic!("allocation failed - terminating");
+}
+
+pub fn trusted_utils_try_match_arg<'a>(arg: &'a str, opt: &str, out: &mut Option<&'a str>) {
+    if let Some(rest) = arg.strip_prefix(opt) {
+        *out = Some(rest);
+    }
+}
+
+pub fn trusted_utils_read_sig(out_sig: &mut [u8], file: &mut File) {
+    let mut buf = [0u8; SIG_SIZE_BYTES];
+    file.read_exact(&mut buf).unwrap();
+    out_sig[..SIG_SIZE_BYTES].copy_from_slice(&buf);
+}
+
+pub fn trusted_utils_read_ul(file: &mut File) -> u64 {
+    let mut buf = [0u8; 8];
+    file.read_exact(&mut buf).unwrap();
+    u64::from_le_bytes(buf)
+}
+
+pub fn trusted_utils_log_err(msg: &str) {
+    println!("c [TRUSTED_CORE] [ERROR] {}", msg);
+}
+
+pub fn trusted_utils_copy_bytes(to: &mut [u8], from: &[u8], nb_bytes: u64) {
+    let n = nb_bytes as usize;
+    to[..n].copy_from_slice(&from[..n]);
+}
+
+pub fn trusted_utils_write_ints(data: &[i32], nb_ints: u64, file: &mut File) {
+    for v in data.iter().take(nb_ints as usize) {
+        let _ = file.write_all(&v.to_le_bytes());
+    }
+}
+
+pub fn trusted_utils_read_uls(data: &mut [u64], nb_uls: u64, file: &mut File) {
+    for slot in data.iter_mut().take(nb_uls as usize) {
+        *slot = trusted_utils_read_ul(file);
+    }
+}
+
+pub fn trusted_utils_log(msg: &str) {
+    println!("c [TRUSTED_CORE] {}", msg);
+}
+
+pub fn trusted_utils_read_objs(data: &mut [u8], size: usize, nb_objs: usize, file: &mut File) {
+    let total = size * nb_objs;
+    file.read_exact(&mut data[..total]).unwrap();
+}
+
+pub fn trusted_utils_read_ints(data: &mut [i32], nb_ints: u64, file: &mut File) {
+    for slot in data.iter_mut().take(nb_ints as usize) {
+        *slot = trusted_utils_read_int(file);
+    }
+}
+
+pub fn trusted_utils_write_uls(data: &[u64], nb_uls: u64, file: &mut File) {
+    for v in data.iter().take(nb_uls as usize) {
+        let _ = file.write_all(&v.to_le_bytes());
+    }
+}
+
+pub fn trusted_utils_realloc<T: Clone + Default>(from: &mut [T], new_size: u64) -> Vec<T> {
+    let mut v = from.to_vec();
+    v.resize(new_size as usize, T::default());
+    v
+}
+
+pub fn trusted_utils_write_bool(b: bool, file: &mut File) {
+    let _ = file.write_all(&[if b { 1 } else { 0 }]);
+}
+
+pub fn trusted_utils_try_match_flag(arg: &str, opt: &str, out: &mut bool) {
+    if arg.starts_with(opt) {
+        *out = true;
+    }
+}
+
+pub fn trusted_utils_exit_eof() {
+    std::process::exit(0);
+}
+
+pub fn trusted_utils_write_char(c: char, file: &mut File) {
+    let _ = file.write_all(&[c as u8]);
+}
+
+pub fn trusted_utils_calloc<T>(_nb_objs: u64, _size_per_obj: u64) -> Vec<T> {
+    Vec::new()
+}
+
+pub fn trusted_utils_read_bool(file: &mut File) -> bool {
+    let mut buf = [0u8; 1];
+    file.read_exact(&mut buf).unwrap();
+    buf[0] != 0
+}
+
+pub fn trusted_utils_read_int(file: &mut File) -> i32 {
+    let mut buf = [0u8; 4];
+    file.read_exact(&mut buf).unwrap();
+    i32::from_le_bytes(buf)
+}
+
+pub fn trusted_utils_str_to_sig(s: &str, out: &mut [u8]) -> bool {
+    if s.len() != SIG_SIZE_BYTES * 2 {
+        return false;
+    }
+    for i in 0..SIG_SIZE_BYTES {
+        let part = &s[2 * i..2 * i + 2];
+        match u8::from_str_radix(part, 16) {
+            Ok(v) => out[i] = v,
+            Err(_) => return false,
+        }
+    }
+    true
+}
+
+pub fn trusted_utils_write_ul(u: u64, file: &mut File) {
+    let _ = file.write_all(&u.to_le_bytes());
+}
+
+pub fn trusted_utils_read_char(file: &mut File) -> i32 {
+    let mut buf = [0u8; 1];
+    file.read_exact(&mut buf).unwrap();
+    buf[0] as i32
+}
+```
+
+{{vec.rs}}
+```rust
+pub struct IntVec<'a> {
+    pub capacity: u64,
+    pub size: u64,
+    pub data: &'a [u8],
+}
+
+impl IntVec<'_> {
+    pub fn vec_free(&mut self) {
+        self.capacity = 0;
+        self.size = 0;
+    }
+
+    pub fn vec_clear(&mut self) {
+        self.size = 0;
+    }
+
+    pub fn vec_reserve(&mut self, new_size: u64) {
+        if new_size > self.capacity {
+            self.capacity = new_size;
+        }
+        if self.size > new_size {
+            self.size = new_size;
+        }
+    }
+
+    pub fn vec_push(&mut self, _elem: i32) {
+        if self.size == self.capacity {
+            let mut new_cap = ((self.capacity as f64) * 1.3) as u64;
+            if new_cap < self.capacity + 1 {
+                new_cap = self.capacity + 1;
+            }
+            self.vec_reserve(new_cap);
+        }
+        self.size += 1;
+    }
+}
+```
+
+{{writer.rs}}
+```rust
+use std::fs::File;
+use std::io::Write;
+
+pub struct Writer {
+    file: File,
+}
+
+impl Writer {
+    pub fn write_char(&mut self, c_int: i32) {
+        let _ = self.file.write_all(&[c_int as u8]);
+    }
+
+    pub fn write_int(&mut self, i: i32) {
+        let _ = self.file.write_all(&i.to_le_bytes());
+    }
+
+    pub fn write_ints(&mut self, data: &[i32], nb_ints: u64) {
+        for v in data.iter().take(nb_ints as usize) {
+            let _ = self.file.write_all(&v.to_le_bytes());
+        }
+    }
+
+    pub fn write_sig(&mut self, sig: &[u8]) {
+        let _ = self.file.write_all(sig);
+    }
+
+    pub fn writer_init(output_path: &str) -> Self {
+        Self {
+            file: File::create(output_path).unwrap(),
+        }
+    }
+
+    pub fn write_bool(&mut self, b: bool) {
+        let _ = self.file.write_all(&[if b { 1 } else { 0 }]);
+    }
+
+    pub fn write_uls(&mut self, data: &[u64], nb_uls: u64) {
+        for v in data.iter().take(nb_uls as usize) {
+            let _ = self.file.write_all(&v.to_le_bytes());
+        }
+    }
+
+    pub fn write_ul(&mut self, ul: u64) {
+        let _ = self.file.write_all(&ul.to_le_bytes());
+    }
+}
+```

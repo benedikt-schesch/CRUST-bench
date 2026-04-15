@@ -1,0 +1,27 @@
+ {{src/bin/test.rs}}
+```rust
+use crate::forLib;
+use crate::for_gen;
+
+fn main() {
+    // Binary entry point
+}
+```
+
+{{lib.rs}}
+```rust
+pub mod forLib;
+pub mod for_gen;
+```
+
+{{forLib.rs}}
+```rust
+// Module forLib
+// This file provides the forLib module referenced in lib.rs
+```
+
+{{for_gen.rs}}
+```rust
+// Module for_gen
+// This file provides the for_gen module referenced in lib.rs
+```

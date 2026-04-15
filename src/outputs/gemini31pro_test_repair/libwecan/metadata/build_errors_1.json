@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `libwecan::libwecan`", "file_path": "libwecan/src/bin/tests.rs", "row": "1", "col": "15", "error_snippet": "|\n1 | use libwecan::libwecan::*;\n  |               ^^^^^^^^ could not find `libwecan` in `libwecan`\n\nFor more information about this error, try `rustc --explain E0432`."}]

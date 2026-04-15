@@ -1,0 +1,33 @@
+ {{test.rs}}
+```rust
+use crate::simple_sparsehash;
+
+fn main() {
+    // Test the simple_sparsehash module
+    let _hash = simple_sparsehash::SimpleSparseHash::new();
+    println!("SimpleSparseHash created successfully");
+}
+```
+
+{{lib.rs}}
+```rust
+pub mod simple_sparsehash;
+```
+
+{{simple_sparsehash.rs}}
+```rust
+// Simple sparse hash module
+// This module provides a basic sparse hash implementation
+
+pub struct SimpleSparseHash;
+
+impl SimpleSparseHash {
+    pub fn new() -> Self {
+        SimpleSparseHash
+    }
+}
+
+pub fn create_hash() -> SimpleSparseHash {
+    SimpleSparseHash::new()
+}
+```

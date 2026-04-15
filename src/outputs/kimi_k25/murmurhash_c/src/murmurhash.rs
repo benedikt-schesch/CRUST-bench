@@ -1,0 +1,73 @@
+pub const MURMURHASH_VERSION: &str = "0.2.0";
+pub const MURMURHASH_HAS_HTOLE32: usize = 1;
+
+pub fn htole32(v: u32) -> u32 {
+v.to_le()
+}
+
+pub fn murmurhash(key: &[u8], seed: u32) -> u32 {
+let len = key.len() as u32;
+let c1: u32 = 0xcc9e2d51;
+let c2: u32 = 0x1b873593;
+let r1: u32 = 15;
+let r2: u32 = 13;
+let m: u32 = 5;
+let n: u32 = 0xe6546b64;
+
+let mut h: u32 = seed;
+
+// Process 4-byte chunks
+let chunks = key.chunks_exact(4);
+let tail = chunks.remainder();
+
+for chunk in chunks {
+let mut k = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+
+k = k.wrapping_mul(c1);
+k = k.rotate_left(r1);
+k = k.wrapping_mul(c2);
+
+h ^= k;
+h = h.rotate_left(r2);
+h = h.wrapping_mul(m).wrapping_add(n);
+}
+
+// Process tail (fall-through switch)
+let mut k: u32 = 0;
+match tail.len() {
+3 => {
+k ^= (tail[2] as u32) << 16;
+k ^= (tail[1] as u32) << 8;
+k ^= tail[0] as u32;
+k = k.wrapping_mul(c1);
+k = k.rotate_left(r1);
+k = k.wrapping_mul(c2);
+h ^= k;
+}
+2 => {
+k ^= (tail[1] as u32) << 8;
+k ^= tail[0] as u32;
+k = k.wrapping_mul(c1);
+k = k.rotate_left(r1);
+k = k.wrapping_mul(c2);
+h ^= k;
+}
+1 => {
+k ^= tail[0] as u32;
+k = k.wrapping_mul(c1);
+k = k.rotate_left(r1);
+k = k.wrapping_mul(c2);
+h ^= k;
+}
+_ => {}
+}
+
+h ^= len;
+h ^= h >> 16;
+h = h.wrapping_mul(0x85ebca6b);
+h ^= h >> 13;
+h = h.wrapping_mul(0xc2b2ae35);
+h ^= h >> 16;
+
+h
+}

@@ -1,0 +1,1 @@
+[{"error_code": "E0425", "error_message": "cannot find function `all_bitset_indices` in this scope", "file_path": "LTRE/src/ltre.rs", "row": "580", "col": "11", "error_snippet": "|\n580 | for id in all_bitset_indices(bitset) {\n    |           ^^^^^^^^^^^^^^^^^^ not found in this scope"}]

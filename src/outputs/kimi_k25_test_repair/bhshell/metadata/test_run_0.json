@@ -1,0 +1,36 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test tests::test_dynamicarr ... ok
+test tests::test_parse ... FAILED
+
+failures:
+
+---- tests::test_parse stdout ----
+1
+2
+3
+4
+5
+6
+
+thread 'tests::test_parse' (561925) panicked at bhshell/src/bin/test.rs:158:1:
+assertion failed: cmd.args.is_empty() && cmd.pipe_args.is_empty() &&
+    cmd.redirect_file_name.is_none()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::test_parse
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

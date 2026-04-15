@@ -1,0 +1,59 @@
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod encoder_interface;
+pub mod file_output;
+pub mod lzma_header_encoder;
+pub mod lzma_packet;
+pub mod lzma_packet_encoder;
+pub mod lzma_state;
+pub mod max_heap;
+pub mod memory_mapper;
+pub mod output_interface;
+pub mod packet_enumerator;
+pub mod packet_slab;
+pub mod packet_slab_neighbour;
+pub mod packet_slab_undo_stack;
+pub mod perplexity_encoder;
+pub mod perplexity_table;
+pub mod probability;
+pub mod probability_model;
+pub mod range_encoder;
+pub mod substring_enumerator;
+pub mod top_k_packet_finder;
+```
+
+{{encoder_interface.rs}}
+```rust
+// Generated Rust Code
+pub trait EncoderInterface {
+    fn encode_bit(&mut self, _bit: bool, _prob: u16) {}
+
+    fn encode_direct_bits(&mut self, _bits: u32, _num_bits: u32) {}
+}
+```
+
+{{output_interface.rs}}
+```rust
+// Generated Rust Code
+use std::io;
+
+pub trait OutputInterface {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize>;
+}
+```
+
+{{probability.rs}}
+```rust
+// Generated Rust Code
+pub type Prob = u16;
+
+pub const NUM_BIT_MODEL_TOTAL_BITS: u32 = 11;
+pub const PROB_INIT_VAL: Prob = 1 << (NUM_BIT_MODEL_TOTAL_BITS - 1);
+```
+
+{{perplexity_table.rs}}
+```rust
+// Generated Rust Code
+pub fn perplexity_table_init() {}
+```

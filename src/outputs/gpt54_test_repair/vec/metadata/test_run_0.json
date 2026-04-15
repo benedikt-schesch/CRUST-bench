@@ -1,0 +1,54 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 22 tests
+test test_vec_clear ... ok
+test test_vec_compact ... ok
+test test_vec_extend ... ok
+test test_vec_find ... ok
+test test_vec_first ... ok
+test test_vec_foreach ... ok
+test test_vec_foreach_ptr ... ok
+test test_vec_foreach_ptr_rev ... ok
+test test_vec_foreach_rev ... ok
+test test_vec_last ... ok
+test test_vec_insert ... ok
+test test_vec_pop ... ok
+test test_vec_push ... ok
+test test_vec_pusharr ... ok
+test test_vec_remove ... ok
+test test_vec_reverse ... ok
+test test_vec_reserve ... FAILED
+test test_vec_sort ... ok
+test test_vec_splice ... ok
+test test_vec_swap ... ok
+test test_vec_truncate ... ok
+test test_vec_swapsplice ... FAILED
+
+failures:
+
+---- test_vec_reserve stdout ----
+
+thread 'test_vec_reserve' (227564) panicked at vec/src/bin/test_vec.rs:136:5:
+assertion `left == right` failed
+  left: 102
+ right: 200
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_vec_swapsplice stdout ----
+
+thread 'test_vec_swapsplice' (227569) panicked at vec/src/bin/test_vec.rs:48:5:
+assertion `left == right` failed
+  left: 8
+ right: 5
+
+
+failures:
+    test_vec_reserve
+    test_vec_swapsplice
+
+test result: FAILED. 20 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

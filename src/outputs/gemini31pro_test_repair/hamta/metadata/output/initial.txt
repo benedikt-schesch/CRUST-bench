@@ -1,0 +1,74 @@
+` is `u32`.
+In Rust, `hash << left` will panic if `left >= 32`.
+So `if left >= 32 { 0 } else { hash << left }` is correct.
+And `symbol >> (right + left)` will panic if `right + left >= 32`.
+So `if (right + left) >= 32 { 0 } else { symbol >> (right + left) }` is correct.
+This is perfectly safe and equivalent.
+
+Wait, what if `left_plus_chunk > 32`?
+Then `right = 0`.
+`right + left = left`.
+So `symbol >> left`.
+If `left = 30`, `left_plus_chunk = 36`.
+`right = 0`.
+`symbol = hash << 30`.
+`symbol >> 30`.
+This extracts the top 2 bits and shifts them to the bottom.
+This is correct.
+
+Let's check `hamt_fnv1_hash` again.
+```rust
+pub fn hamt_fnv1_hash(key: &[u8]) -> u32 {
+    let mut hash = FNV_BASE as u32;
+    for &b in key {
+        hash = hash.wrapping_mul(FNV_PRIME as u32);
+        hash ^= b as u32;
+    }
+    hash
+}
+```
+This is correct.
+
+Let's check `hamt_int_hash` again.
+```rust
+pub fn hamt_int_hash(key: &i32) -> u32 {
+    hamt_fnv1_hash(&key.to_ne_bytes())
+}
+```
+This is correct.
+
+Let's check `hamt_str_hash` again.
+```rust
+pub fn hamt_str_hash(key: &str) -> u32 {
+    let mut hash = FNV_BASE as u32;
+    for b in key.bytes() {
+        hash = hash.wrapping_mul(FNV_PRIME as u32);
+        hash ^= b as u32;
+    }
+    hash
+}
+```
+This is correct.
+
+Let's check `hamt_int_equals` again.
+```rust
+pub fn hamt_int_equals(a: &i32, b: &i32) -> bool {
+    a == b
+}
+```
+This is correct.
+
+Let's check `hamt_str_equals` again.
+```rust
+pub fn hamt_str_equals(a: &str, b: &str) -> bool {
+    a == b
+}
+```
+This is correct.
+
+Wait, the Rust interface has:
+```rust
+pub struct KeyValue<T, U> {
+    pub key: T,
+    pub value: U,
+}

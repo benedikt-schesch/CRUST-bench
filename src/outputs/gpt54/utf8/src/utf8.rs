@@ -1,0 +1,323 @@
+use crate::utf8;
+
+#[derive(Debug, Clone)]
+pub struct Utf8Validity {
+pub valid: bool,
+pub valid_upto: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct OwnedUtf8String {
+pub str: String,
+pub byte_len: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct Utf8Char {
+pub str: String,
+pub byte_len: u8,
+}
+
+#[derive(Debug, Clone)]
+pub struct Utf8CharValidity {
+pub valid: bool,
+pub next_offset: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct Utf8String {
+pub str: String,
+pub byte_len: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct Utf8CharIter {
+pub str: String,
+}
+
+pub fn slice_utf8_string(ustr: Utf8String, byte_index: usize, byte_len: usize) -> Utf8String {
+let mut start_byte_index = byte_index;
+if start_byte_index > ustr.byte_len {
+start_byte_index = ustr.byte_len;
+}
+
+let mut excl_end_byte_index = start_byte_index.saturating_add(byte_len);
+if excl_end_byte_index > ustr.byte_len {
+excl_end_byte_index = ustr.byte_len;
+}
+
+let bytes = ustr.str.as_bytes();
+if start_byte_index <= bytes.len()
+&& excl_end_byte_index <= bytes.len()
+&& is_utf8_char_boundary(&bytes[start_byte_index..])
+&& is_utf8_char_boundary(&bytes[excl_end_byte_index..])
+{
+match String::from_utf8(bytes[start_byte_index..excl_end_byte_index].to_vec()) {
+Ok(s) => Utf8String {
+str: s,
+byte_len: excl_end_byte_index - start_byte_index,
+},
+Err(_) => Utf8String {
+str: String::new(),
+byte_len: 0,
+},
+}
+} else {
+Utf8String {
+str: String::new(),
+byte_len: 0,
+}
+}
+}
+
+pub fn unicode_code_point(uchar: Utf8Char) -> u32 {
+let bytes = uchar.str.as_bytes();
+match uchar.byte_len {
+1 if !bytes.is_empty() => (bytes[0] & 0b0111_1111) as u32,
+2 if bytes.len() >= 2 => {
+(((bytes[0] & 0b0001_1111) as u32) << 6) | ((bytes[1] & 0b0011_1111) as u32)
+}
+3 if bytes.len() >= 3 => {
+(((bytes[0] & 0b0000_1111) as u32) << 12)
+| (((bytes[1] & 0b0011_1111) as u32) << 6)
+| ((bytes[2] & 0b0011_1111) as u32)
+}
+4 if bytes.len() >= 4 => {
+(((bytes[0] & 0b0000_0111) as u32) << 18)
+| (((bytes[1] & 0b0011_1111) as u32) << 12)
+| (((bytes[2] & 0b0011_1111) as u32) << 6)
+| ((bytes[3] & 0b0011_1111) as u32)
+}
+_ => 0,
+}
+}
+
+pub fn free_owned_utf8_string(owned_str: &mut OwnedUtf8String) {
+owned_str.str.clear();
+owned_str.byte_len = 0;
+}
+
+pub fn utf8_char_count(ustr: Utf8String) -> usize {
+let mut iter = make_utf8_char_iter(ustr);
+let mut count = 0usize;
+while next_utf8_char(&mut iter).byte_len > 0 {
+count += 1;
+}
+count
+}
+
+pub fn make_utf8_char_iter(ustr: Utf8String) -> Utf8CharIter {
+Utf8CharIter { str: ustr.str }
+}
+
+pub fn validate_utf8_char(bytes: &[u8], offset: usize) -> Utf8CharValidity {
+if offset >= bytes.len() {
+return Utf8CharValidity {
+valid: false,
+next_offset: offset,
+};
+}
+
+if (bytes[offset] & 0b1000_0000) == 0b0000_0000 {
+return Utf8CharValidity {
+valid: true,
+next_offset: offset + 1,
+};
+}
+
+if offset + 1 < bytes.len()
+&& (bytes[offset] & 0b1110_0000) == 0b1100_0000
+&& (bytes[offset + 1] & 0b1100_0000) == 0b1000_0000
+{
+if (bytes[offset] & 0b0001_1111) < 0b0000_0010 {
+return Utf8CharValidity {
+valid: false,
+next_offset: offset,
+};
+}
+return Utf8CharValidity {
+valid: true,
+next_offset: offset + 2,
+};
+}
+
+if offset + 2 < bytes.len()
+&& (bytes[offset] & 0b1111_0000) == 0b1110_0000
+&& (bytes[offset + 1] & 0b1100_0000) == 0b1000_0000
+&& (bytes[offset + 2] & 0b1100_0000) == 0b1000_0000
+{
+if (bytes[offset] & 0b0000_1111) == 0b0000_0000
+&& (bytes[offset + 1] & 0b0011_1111) < 0b0010_0000
+{
+return Utf8CharValidity {
+valid: false,
+next_offset: offset,
+};
+}
+
+if bytes[offset] == 0b1110_1101
+&& bytes[offset + 1] >= 0b1010_0000
+&& bytes[offset + 1] <= 0b1011_1111
+{
+return Utf8CharValidity {
+valid: false,
+next_offset: offset,
+};
+}
+
+return Utf8CharValidity {
+valid: true,
+next_offset: offset + 3,
+};
+}
+
+if offset + 3 < bytes.len()
+&& (bytes[offset] & 0b1111_1000) == 0b1111_0000
+&& (bytes[offset + 1] & 0b1100_0000) == 0b1000_0000
+&& (bytes[offset + 2] & 0b1100_0000) == 0b1000_0000
+&& (bytes[offset + 3] & 0b1100_0000) == 0b1000_0000
+{
+if (bytes[offset] & 0b0000_0111) == 0b0000_0000
+&& (bytes[offset + 1] & 0b0011_1111) < 0b0001_0000
+{
+return Utf8CharValidity {
+valid: false,
+next_offset: offset,
+};
+}
+
+return Utf8CharValidity {
+valid: true,
+next_offset: offset + 4,
+};
+}
+
+Utf8CharValidity {
+valid: false,
+next_offset: offset,
+}
+}
+
+pub fn make_utf8_string(bytes: &[u8]) -> Utf8String {
+let validity = validate_utf8(bytes);
+if validity.valid {
+match String::from_utf8(bytes[..validity.valid_upto].to_vec()) {
+Ok(s) => Utf8String {
+str: s,
+byte_len: validity.valid_upto,
+},
+Err(_) => Utf8String {
+str: String::new(),
+byte_len: 0,
+},
+}
+} else {
+Utf8String {
+str: String::new(),
+byte_len: 0,
+}
+}
+}
+
+pub fn validate_utf8(bytes: &[u8]) -> Utf8Validity {
+let mut offset = 0usize;
+while offset < bytes.len() {
+let char_validity = validate_utf8_char(bytes, offset);
+if char_validity.valid {
+offset = char_validity.next_offset;
+} else {
+return Utf8Validity {
+valid: false,
+valid_upto: offset,
+};
+}
+}
+
+Utf8Validity {
+valid: true,
+valid_upto: offset,
+}
+}
+
+pub fn is_utf8_char_boundary(bytes: &[u8]) -> bool {
+if bytes.is_empty() {
+return true;
+}
+bytes[0] <= 0b0111_1111 || bytes[0] >= 0b1100_0000
+}
+
+pub fn as_utf8_string(owned_str: &OwnedUtf8String) -> Utf8String {
+Utf8String {
+str: owned_str.str.clone(),
+byte_len: owned_str.byte_len,
+}
+}
+
+pub fn next_utf8_char(iter: &mut Utf8CharIter) -> Utf8Char {
+if iter.str.is_empty() {
+return Utf8Char {
+str: String::new(),
+byte_len: 0,
+};
+}
+
+let bytes = iter.str.as_bytes();
+let mut idx = 1usize;
+let mut byte_len = 1u8;
+
+while idx < bytes.len() && !is_utf8_char_boundary(&bytes[idx..]) {
+idx += 1;
+byte_len = byte_len.saturating_add(1);
+}
+
+let curr = iter.str[..idx].to_string();
+let rest = iter.str[idx..].to_string();
+iter.str = rest;
+
+Utf8Char {
+str: curr,
+byte_len,
+}
+}
+
+pub fn make_utf8_string_lossy(bytes: &[u8]) -> OwnedUtf8String {
+let len = bytes.len();
+let mut buffer: Vec<u8> = Vec::with_capacity(len.saturating_mul(3).saturating_add(1));
+let mut offset = 0usize;
+
+while offset < len {
+let char_validity = validate_utf8_char(bytes, offset);
+if char_validity.valid {
+let char_len = char_validity.next_offset - offset;
+buffer.extend_from_slice(&bytes[offset..offset + char_len]);
+offset = char_validity.next_offset;
+} else {
+buffer.extend_from_slice(&[0xEF, 0xBF, 0xBD]);
+offset += 1;
+}
+}
+
+let s = String::from_utf8(buffer).unwrap_or_default();
+let byte_len = s.len();
+
+OwnedUtf8String { str: s, byte_len }
+}
+
+pub fn nth_utf8_char(ustr: Utf8String, mut char_index: usize) -> Utf8Char {
+let mut iter = make_utf8_char_iter(ustr);
+let mut ch = next_utf8_char(&mut iter);
+
+while ch.byte_len != 0 && char_index != 0 {
+char_index -= 1;
+ch = next_utf8_char(&mut iter);
+}
+
+if ch.byte_len == 0 {
+Utf8Char {
+str: String::new(),
+byte_len: 0,
+}
+} else {
+ch
+}
+}

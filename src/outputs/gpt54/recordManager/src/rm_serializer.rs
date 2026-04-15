@@ -1,0 +1,210 @@
+use crate::dberror::RC;
+use crate::record_mgr::close_scan;
+use crate::record_mgr::get_num_tuples;
+use crate::record_mgr::next;
+use crate::record_mgr::start_scan;
+use crate::record_mgr::RM_ScanHandle;
+use crate::tables::DataType;
+use crate::tables::Record;
+use crate::tables::RM_TableData;
+use crate::tables::Schema;
+use crate::tables::Value;
+use crate::tables::ValueUnion;
+
+pub struct VarString {
+pub buf: String,
+pub size: usize,
+pub bufsize: usize,
+}
+
+pub fn attr_offset(schema: &Schema, attr_num: i32, result: &mut i32) -> RC {
+let mut offset = 0;
+for attr_pos in 0..attr_num as usize {
+match schema.data_types[attr_pos] {
+DataType::DtString => offset += schema.type_length[attr_pos],
+DataType::DtInt => offset += 4,
+DataType::DtFloat => offset += 4,
+DataType::DtBool => offset += 1,
+}
+}
+*result = offset;
+RC::Ok
+}
+
+pub fn serialize_table_info(rel: &RM_TableData) -> String {
+format!(
+"TABLE <{}> with <{}> tuples:\n{}",
+rel.name,
+get_num_tuples(rel),
+serialize_schema(&rel.schema)
+)
+}
+
+pub fn serialize_table_content(rel: &RM_TableData) -> String {
+let mut result = String::new();
+for i in 0..rel.schema.num_attr as usize {
+result.push_str(&format!(
+"{}{}",
+if i != 0 { ", " } else { "" },
+rel.schema.attr_names[i]
+));
+}
+
+let mut sc = RM_ScanHandle {
+rel: RM_TableData {
+name: rel.name.clone(),
+schema: rel.schema.clone(),
+mgmt_data: None,
+},
+mgmt_data: None,
+};
+let dummy = crate::expr::Expr {
+expr_type: crate::expr::ExprType::ExprConst,
+expr: crate::expr::ExprUnion::Cons(Value {
+dt: DataType::DtBool,
+v: ValueUnion::BoolV(true),
+}),
+};
+let _ = start_scan(rel, &mut sc, &dummy);
+let mut r = Record {
+id: crate::tables::RID { page: 0, slot: 0 },
+data: String::new(),
+};
+while next(&mut sc, &mut r) != RC::RmNoMoreTuples {
+result.push_str(&serialize_record(&r, &rel.schema));
+result.push('\n');
+}
+let _ = close_scan(&mut sc);
+result
+}
+
+pub fn serialize_schema(schema: &Schema) -> String {
+let mut result = format!("Schema with <{}> attributes (", schema.num_attr);
+for i in 0..schema.num_attr as usize {
+result.push_str(&format!(
+"{}{}: ",
+if i != 0 { ", " } else { "" },
+schema.attr_names[i]
+));
+match schema.data_types[i] {
+DataType::DtInt => result.push_str("INT"),
+DataType::DtFloat => result.push_str("FLOAT"),
+DataType::DtString => result.push_str(&format!("STRING[{}]", schema.type_length[i])),
+DataType::DtBool => result.push_str("BOOL"),
+}
+}
+result.push_str(") with keys: (");
+for i in 0..schema.key_size as usize {
+result.push_str(&format!(
+"{}{}",
+if i != 0 { ", " } else { "" },
+schema.attr_names[schema.key_attrs[i] as usize]
+));
+}
+result.push_str(")\n");
+result
+}
+
+pub fn serialize_record(record: &Record, schema: &Schema) -> String {
+let mut result = format!("[{}-{}] (", record.id.page, record.id.slot);
+for i in 0..schema.num_attr as usize {
+result.push_str(&serialize_attr(record, schema, i as i32));
+result.push_str(if i == 0 { "" } else { "," });
+}
+result.push(')');
+result
+}
+
+pub fn serialize_attr(record: &Record, schema: &Schema, attr_num: i32) -> String {
+let mut offset = 0;
+let _ = attr_offset(schema, attr_num, &mut offset);
+let pos = offset as usize;
+
+match schema.data_types[attr_num as usize] {
+DataType::DtInt => {
+let bytes = record.data.as_bytes();
+let mut arr = [0u8; 4];
+for i in 0..4 {
+if pos + i < bytes.len() {
+arr[i] = bytes[pos + i];
+}
+}
+format!(
+"{}:{}",
+schema.attr_names[attr_num as usize],
+i32::from_ne_bytes(arr)
+)
+}
+DataType::DtString => {
+let len = schema.type_length[attr_num as usize] as usize;
+let bytes = record.data.as_bytes();
+let end = (pos + len).min(bytes.len());
+let buf = String::from_utf8_lossy(&bytes[pos..end])
+.trim_end_matches('\0')
+.to_string();
+format!("{}:{}", schema.attr_names[attr_num as usize], buf)
+}
+DataType::DtFloat => {
+let bytes = record.data.as_bytes();
+let mut arr = [0u8; 4];
+for i in 0..4 {
+if pos + i < bytes.len() {
+arr[i] = bytes[pos + i];
+}
+}
+format!(
+"{}:{}",
+schema.attr_names[attr_num as usize],
+f32::from_ne_bytes(arr)
+)
+}
+DataType::DtBool => {
+let val = record.data.as_bytes().get(pos).copied().unwrap_or(0) != 0;
+format!(
+"{}:{}",
+schema.attr_names[attr_num as usize],
+if val { "TRUE" } else { "FALSE" }
+)
+}
+}
+}
+
+pub fn serialize_value(val: &Value) -> String {
+match &val.v {
+ValueUnion::IntV(v) => format!("{}", v),
+ValueUnion::FloatV(v) => format!("{}", v),
+ValueUnion::StringV(v) => v.clone(),
+ValueUnion::BoolV(v) => {
+if *v {
+"true".to_string()
+} else {
+"false".to_string()
+}
+}
+}
+}
+
+pub fn string_to_value(val: &str) -> Value {
+match val.chars().next().unwrap_or('i') {
+'i' => Value {
+dt: DataType::DtInt,
+v: ValueUnion::IntV(val[1..].parse().unwrap_or(-1)),
+},
+'f' => Value {
+dt: DataType::DtFloat,
+v: ValueUnion::FloatV(val[1..].parse().unwrap_or(0.0)),
+},
+'s' => Value {
+dt: DataType::DtString,
+v: ValueUnion::StringV(val[1..].to_string()),
+},
+'b' => Value {
+dt: DataType::DtBool,
+v: ValueUnion::BoolV(val.chars().nth(1) == Some('t')),
+},
+_ => Value {
+dt: DataType::DtInt,
+v: ValueUnion::IntV(-1),
+},
+}
+}

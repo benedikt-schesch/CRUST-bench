@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `Math_Library_in_C::castom_math`", "file_path": "Math_Library_in_C/src/bin/tests.rs", "row": "1", "col": "5", "error_snippet": "|\n1 | use Math_Library_in_C::castom_math;\n  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `castom_math` in the root\n\nFor more information about this error, try `rustc --explain E0432`."}]

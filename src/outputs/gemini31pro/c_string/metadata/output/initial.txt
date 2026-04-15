@@ -1,0 +1,87 @@
+```rust
+// Generated Rust Code
+// Import necessary modules
+use crate::{string_t};
+
+// Constants
+pub const STRING_T_INDEXES_BUFFER_SIZE: usize = 512;
+pub const STRING_T_SPACE_CHARS_ARR: &str = " \t\n\r";
+
+// Type Definitions
+pub type BoolT = bool;
+
+#[derive(Clone)]
+pub struct StringT {
+    pub bytes: Vec<u8>,
+    pub size: usize,
+}
+
+pub type StringTArray = Vec<StringT>;
+
+// Function Declarations
+pub fn new_string(size: usize) -> StringT {
+    StringT {
+        bytes: vec![0; size],
+        size,
+    }
+}
+
+pub fn new_string_from_bytes(bytes: &str) -> StringT {
+    StringT {
+        bytes: bytes.as_bytes().to_vec(),
+        size: bytes.len(),
+    }
+}
+
+pub fn string_free(_str: StringT) {
+    // Memory is automatically freed when _str goes out of scope
+}
+
+pub fn string_len(str: &StringT) -> usize {
+    str.size
+}
+
+pub fn string_bytes(str: &StringT) -> &str {
+    std::str::from_utf8(&str.bytes).unwrap_or("")
+}
+
+pub fn string_eq(left: &StringT, right: &StringT) -> BoolT {
+    if left.size != right.size {
+        return false;
+    }
+    left.bytes == right.bytes
+}
+
+pub fn string_copy(str: &StringT) -> StringT {
+    str.clone()
+}
+
+pub fn string_concat(first: &StringT, second: &StringT) -> StringT {
+    let mut bytes = first.bytes.clone();
+    bytes.extend_from_slice(&second.bytes);
+    StringT {
+        size: first.size + second.size,
+        bytes,
+    }
+}
+
+pub fn string_substr(str: &StringT, pos: usize, len: usize) -> StringT {
+    let mut bytes = vec![0; len];
+    for idx in 0..len {
+        if pos + idx < str.bytes.len() {
+            bytes[idx] = str.bytes[pos + idx];
+        }
+    }
+    StringT {
+        bytes,
+        size: len,
+    }
+}
+
+pub fn string_startswith(str: &StringT, prefix: &str) -> BoolT {
+    if str.size < prefix.len() {
+        return false;
+    }
+    let exp_suffix = new_string_from_bytes(prefix);
+    let str_suffix = string_substr(str, 0, exp_suffix.size);
+    string_eq(&str_suffix, &

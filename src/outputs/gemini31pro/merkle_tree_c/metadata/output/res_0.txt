@@ -1,0 +1,38 @@
+To resolve the `E0432: unresolved import` error, we need to understand why the compiler cannot find `merkle_tree` in `merkle_tree_c`. 
+
+The error occurs in `merkle_tree_c/src/bin/test_merkle_tree.rs` when it tries to import `merkle_tree_c::merkle_tree::*`. The `lib.rs` file currently declares `pub mod merkle_tree;`, which means the module is correctly exposed. However, if the crate name is `merkle_tree_c`, the compiler might be looking for the module `merkle_tree` inside the crate root.
+
+If the `lib.rs` file is the root of the `merkle_tree_c` crate, the module `merkle_tree` should be accessible. However, sometimes there are issues with how modules are resolved if they are not explicitly declared or if there are naming conflicts. 
+
+In this case, the issue is likely that the `merkle_tree` module is not properly exposed or there is a missing `pub use` statement. To ensure that `merkle_tree` is accessible from the crate root, we can explicitly re-export it using `pub use crate::merkle_tree::*;` or ensure the module is correctly declared.
+
+Wait, looking at the provided `lib.rs`:
+```rust
+pub mod blake2b;
+pub mod merkle_tree;
+```
+If the error is `could not find merkle_tree in merkle_tree_c`, it might be because the module `merkle_tree` is not correctly resolved. To fix this, we can explicitly re-export the contents of the `merkle_tree` module in `lib.rs` so that they are available at the crate root, or we can ensure the module is correctly declared.
+
+Let's update `lib.rs` to explicitly re-export the modules if needed, or just ensure the modules are correctly declared. Actually, the error might be resolved by adding `pub use` for the modules.
+
+```rust
+pub mod blake2b;
+pub mod merkle_tree;
+
+pub use crate::blake2b::*;
+pub use crate::merkle_tree::*;
+```
+
+This way, anything inside `merkle_tree` will be accessible directly from `merkle_tree_c::`, and `merkle_tree_c::merkle_tree` will also be accessible.
+
+Let's provide the updated `lib.rs`.
+
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod blake2b;
+pub mod merkle_tree;
+
+pub use crate::blake2b::*;
+pub use crate::merkle_tree::*;
+```

@@ -1,0 +1,60 @@
+```rust
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
+
+#[derive(Debug)]
+pub struct BOSTree {
+    /// The root node of the tree.
+    pub root_node: Option<Rc<RefCell<BOSNode>>>,
+    /// The key comparison function.
+    pub cmp_function: BOSTreeCmpFunction,
+    /// The optional free function for node data.
+    pub free_function: Option<BOSTreeFreeFunction>,
+}
+
+/// The node structure.
+#[derive(Debug)]
+pub struct BOSNode {
+    /// Number of nodes in the left subtree.
+    pub left_child_count: u32,
+    /// Number of nodes in the right subtree.
+    pub right_child_count: u32,
+    /// Cached depth of the node.
+    pub depth: u32,
+    /// Left child node.
+    pub left_child_node: Option<Rc<RefCell<BOSNode>>>,
+    /// Right child node.
+    pub right_child_node: Option<Rc<RefCell<BOSNode>>>,
+    /// Parent node (using a weak reference to avoid cycles).
+    pub parent_node: Option<Weak<RefCell<BOSNode>>>,
+    /// The key for this node.
+    pub key: String,
+    /// The associated data.
+    pub data: Option<String>,
+    /// Internal weak reference counter.
+    pub weak_ref_count: u8,
+    /// Validity flag for the weak reference.
+    pub weak_ref_node_valid: u8,
+}
+
+/// Type alias for a key comparison function.
+/// Should return a positive value if `b` is larger than `a`,
+/// a negative value if `a` is larger, and zero if equal.
+pub type BOSTreeCmpFunction = fn(&str, &str) -> i32;
+
+/// Type alias for a free function which will be called on nodes
+/// that are removed.
+pub type BOSTreeFreeFunction = fn(&Rc<RefCell<BOSNode>>);
+
+fn _bostree_balance(node: &Option<Rc<RefCell<BOSNode>>>) -> i32 {
+    if let Some(n) = node {
+        let n = n.borrow();
+        let left_depth = n.left_child_node.as_ref().map_or(0, |l| l.borrow().depth + 1);
+        let right_depth = n.right_child_node.as_ref().map_or(0, |r| r.borrow().depth + 1);
+        (right_depth as i32) - (left_depth as i32)
+    } else {
+        0
+    }
+}
+
+fn _bostree_rotate_right(tree: &mut BOSTree, p: Rc<RefCell<B

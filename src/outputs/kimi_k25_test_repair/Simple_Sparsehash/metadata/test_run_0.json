@@ -1,0 +1,44 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 12 tests
+test test_array_get ... ok
+test test_array_set_high_num ... ok
+test test_array_set_overwrites_old_values ... ok
+test test_cannot_get_outside_bounds ... ok
+test test_cannot_set_bigger_elements ... FAILED
+test test_array_set ... ok
+test test_cannot_set_outside_bounds ... FAILED
+test test_array_set_backwards ... ok
+test test_dict_get ... ok
+test test_dict_set ... ok
+test test_empty_array_does_not_blow_up ... ok
+test test_dict_lots_of_set ... ok
+
+failures:
+
+---- test_cannot_set_bigger_elements stdout ----
+
+thread 'test_cannot_set_bigger_elements' (585244) panicked at Simple_Sparsehash/src/bin/test.rs:54:5:
+assertion `left == right` failed: Expected setting element with bigger size to return 0
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_cannot_set_outside_bounds stdout ----
+
+thread 'test_cannot_set_outside_bounds' (585245) panicked at Simple_Sparsehash/src/bin/test.rs:28:5:
+assertion `left == right` failed: Expected setting outside bounds to return 0
+  left: 1
+ right: 0
+
+
+failures:
+    test_cannot_set_bigger_elements
+    test_cannot_set_outside_bounds
+
+test result: FAILED. 10 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.41s
+

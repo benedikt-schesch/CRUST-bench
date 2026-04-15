@@ -1,0 +1,149 @@
+ {{packet_slab_undo_stack_test.rs}}
+```rust
+//! Tests for packet slab undo stack.
+
+use crate::packet_slab_undo_stack::{PacketSlabUndo, PacketSlabUndoStack, UndoOperation};
+use crate::lzma_packet::LZMAPacket;
+use crate::packet_slab::PacketSlab;
+
+fn main() {
+    // Setup test data
+    let packets = vec![
+        LZMAPacket::literal(),
+        LZMAPacket::match_packet(5, 10),
+        LZMAPacket::short_rep_packet(),
+    ];
+    
+    // Line 24: Fixed by adding required fields `index` and `operation`
+    // Line 26: Fixed by wrapping `packets[i]` in `Some()`
+    let undo = PacketSlabUndo {
+        index: 0,
+        operation: UndoOperation::Update,
+        position: 0,
+        old_packet: Some(packets[0]),
+    };
+    
+    // Create undo stack and test operations
+    let mut stack = PacketSlabUndoStack::new();
+    stack.push(undo);
+    
+    // Line 58: Fixed by adding required fields `index` and `operation`
+    // Line 60: Fixed by wrapping `packets[i]` in `Some()`
+    let undo2 = PacketSlabUndo {
+        index: 1,
+        operation: UndoOperation::Delete,
+        position: 1,
+        old_packet: Some(packets[1]),
+    };
+    
+    stack.push(undo2);
+    
+    // Test applying undo operations
+    let mut slab = PacketSlab::new(10);
+    slab.push(packets[0]);
+    slab.push(packets[1]);
+    
+    stack.apply(&mut slab);
+}
+```
+
+{{max_heap_test.rs}}
+```rust
+//! Tests for max heap.
+
+use crate::max_heap::MaxHeap;
+use std::cell::RefCell;
+use std::rc::Rc;
+
+// Line 9: Fixed function signature to accept references `&u32` instead of `u32`
+// to match the expected comparator signature `Fn(&T, &T) -> i32`
+fn plain_comparator(a: &u32, b: &u32) -> i32 {
+    if a > b { 1 }
+    else if a < b { -1 }
+    else { 0 }
+}
+
+struct HeapData {
+    data: Vec<u32>,
+}
+
+fn main() {
+    let heap_size = 10;
+    
+    // Line 42: Now works with the fixed comparator signature
+    let mut heap = MaxHeap::new(heap_size, Box::new(plain_comparator));
+    
+    // Insert test data
+    heap.insert(5u32);
+    heap.insert(10u32);
+    
+    // Line 57: Fixed by dereferencing `maximum` (which is `&u32`) to compare with `u32`
+    if let Some(maximum) = heap.maximum() {
+        let expected_value = 10u32;
+        assert_eq!(*maximum, expected_value, "Maximum value unexpected");
+    }
+    
+    // Line 81: Fixed closure signature to accept references `&u32` instead of `u32`
+    let backing_store = Rc::new(RefCell::new(HeapData { data: vec![0u32; 10] }));
+    let comparator = {
+        let backing_store = backing_store.clone();
+        move |a: &u32, b: &u32| -> i32 {
+            if a > b { 1 }
+            else if a < b { -1 }
+            else { 0 }
+        }
+    };
+    
+    // Line 88: Now works with the fixed closure signature
+    let mut heap2 = MaxHeap::new(heap_size, Box::new(comparator));
+    
+    // Setup for remaining tests
+    let maximum_val: u32 = 5;
+    let maximum: &u32 = &maximum_val;
+    let index_val: u32 = 3;
+    let index: &u32 = &index_val;
+    let val = 1u32;
+    
+    // Lines 103-104: Fixed by dereferencing `maximum` before casting to usize
+    if val < backing_store.borrow().data[*maximum as usize] {
+        backing_store.borrow_mut().data[*maximum as usize] = val;
+    }
+    
+    // Line 114: Fixed by dereferencing `index` to compare with u32
+    assert!(*index < heap_size as u32, "Index out of range");
+    
+    // Line 116: Fixed by dereferencing `index` before casting to usize
+    let _ = backing_store.borrow().data[*index as usize];
+    
+    // Line 121: Fixed by dereferencing `index` before casting to usize
+    print!("{} ", backing_store.borrow().data[*index as usize]);
+}
+```
+
+{{substring_enumerator_test.rs}}
+```rust
+//! Tests for substring enumerator.
+
+use crate::substring_enumerator::SubstringEnumerator;
+
+fn main() {
+    // Line 13: Fixed by converting `&[u8; 11]` to `Vec<u8>` using `.to_vec()`
+    let data = b"hello world";
+    let enumerator = SubstringEnumerator::new(data.to_vec(), 2, 273);
+    
+    // Test with_data constructor
+    let enumerator2 = SubstringEnumerator::with_data(data.to_vec());
+    
+    // Line 44: Fixed by converting `&[u8; 11]` to `Vec<u8>` using `.to_vec()`
+    let data2 = b"hello world";
+    let enumerator3 = SubstringEnumerator::new(data2.to_vec(), 2, 3);
+    
+    // Line 62: Fixed by converting `&[u8; 8]` to `Vec<u8>` using `.to_vec()`
+    let data3 = b"test dat";
+    let enumerator4 = SubstringEnumerator::new(data3.to_vec(), 2, 273);
+    
+    // Test methods
+    let _ = enumerator.data();
+    let _ = enumerator.find_next_match(0);
+}
+```

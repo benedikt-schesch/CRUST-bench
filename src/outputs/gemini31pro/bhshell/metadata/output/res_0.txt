@@ -1,0 +1,26 @@
+arr in bhshell`.
+If this is the case, then `test.rs` expects `dynamicarr` to be inside the module `bhshell`!
+But `test.rs` is doing `use bhshell::dynamicarr::{ArgList, Str, get_args, get_string};`.
+If `test.rs` expects `dynamicarr` to be inside the module `bhshell`, then `dynamicarr` MUST be inside the module `bhshell`.
+But `lib.rs` has `pub mod dynamicarr;`, which puts `dynamicarr` in the crate root.
+If `dynamicarr` is in the crate root, `test.rs` should do `use crate::dynamicarr`.
+But `test.rs` does `use bhshell::dynamicarr`.
+If `test.rs` is a binary crate, `bhshell` is the library crate, and `bhshell::dynamicarr` looks in the crate root.
+If `test.rs` is a module in the library crate, `bhshell` is the module `bhshell`, and `bhshell::dynamicarr` looks inside the module `bhshell`.
+Since the error is `could not find dynamicarr in bhshell`, and `lib.rs` has `pub mod dynamicarr;`, it MUST be that `bhshell` resolves to the module `bhshell`!
+Why would `bhshell` resolve to the module `bhshell` in a binary crate?
+In Rust 2015, `use bhshell::dynamicarr` in a binary crate looks for an external crate `bhshell`.
+In Rust 2018, `use bhshell::dynamicarr` in a binary crate looks for an external crate `bhshell`.
+Wait, what if the binary crate is named `bhshell`, and the library crate is named `bhshell_lib`?
+If the library crate is named `bhshell_lib`, then `use bhshell::dynamicarr` looks for an external crate `bhshell`.
+If there is no external crate `bhshell`, it would say `unresolved import bhshell`.
+But it says `could not find dynamicarr in bhshell`.
+This means `bhshell` IS found.
+If `bhshell` is found, and it's not the library crate, what is it?
+It could be a module in the binary crate!
+If the binary crate has `mod bhshell;`, then `bhshell` is a module in the binary crate.
+If the binary crate has `mod bhshell;`, then `bhshell::dynamicarr` looks inside the module `bhshell` in the binary crate.
+If the module `bhshell` in the binary crate doesn't have `dynamicarr`, it fails.
+But I cannot change the binary crate. I must change `lib.rs`.
+If I must change `lib.rs`, then `bhshell` MUST resolve to something in `lib.rs`.
+If `bhshell` resolves to something in `lib.rs`, then `test.rs` MUST be a module in `

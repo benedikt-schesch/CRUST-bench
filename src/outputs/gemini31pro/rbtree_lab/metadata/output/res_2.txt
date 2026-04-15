@@ -1,0 +1,9 @@
+```rust
+#[path = "rbtree.rs"]
+pub mod rbtree_inner;
+
+pub mod rbtree {
+    pub use crate::rbtree_inner as rbtree;
+    pub use crate::rbtree_inner::*;
+}
+```

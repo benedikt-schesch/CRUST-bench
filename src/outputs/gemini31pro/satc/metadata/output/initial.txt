@@ -1,0 +1,71 @@
+```rust
+use std::f64::MAX;
+use std::f64::consts::PI;
+
+#[derive(Debug, Clone)]
+pub struct SatcCircle {
+    pub pos: [f64; 2],
+    pub r: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct SatcPolygon {
+    pub pos: [f64; 2],
+    pub num_points: usize,
+    pub points: Vec<[f64; 2]>,
+    pub angle: f64,
+    pub offset: [f64; 2],
+    pub calc_points: Vec<[f64; 2]>,
+    pub edges: Vec<[f64; 2]>,
+    pub normals: Vec<[f64; 2]>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SatcBox {
+    pub pos: [f64; 2],
+    pub w: f64,
+    pub h: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct SatcResponse {
+    pub overlap: f64,
+    pub overlap_n: [f64; 2],
+    pub overlap_v: [f64; 2],
+    pub a_in_b: bool,
+    pub b_in_a: bool,
+}
+
+pub const SATC_TYPE_NONE: i32 = 0;
+pub const SATC_TYPE_CIRCLE: i32 = 1;
+pub const SATC_TYPE_POLYGON: i32 = 2;
+pub const SATC_TYPE_BOX: i32 = 3;
+pub const SATC_LEFT_VORONOI_REGION: i32 = -1;
+pub const SATC_MIDDLE_VORONOI_REGION: i32 = 0;
+pub const SATC_RIGHT_VORONOI_REGION: i32 = 1;
+
+impl SatcCircle {
+    pub fn new(pos: [f64; 2], r: f64) -> Self {
+        SatcCircle { pos, r }
+    }
+}
+
+impl SatcPolygon {
+    pub fn new(pos: [f64; 2], points: Vec<[f64; 2]>) -> Self {
+        let mut polygon = SatcPolygon {
+            pos,
+            num_points: 0,
+            points: Vec::new(),
+            angle: 0.0,
+            offset: [0.0, 0.0],
+            calc_points: Vec::new(),
+            edges: Vec::new(),
+            normals: Vec::new(),
+        };
+        satc_polygon_set_points(&mut polygon, points);
+        polygon
+    }
+}
+
+impl SatcBox {
+    pub fn new(

@@ -1,0 +1,104 @@
+```rust
+// Generated Rust Code
+
+/// Protocol version.
+pub const AMP_VERSION: i16 = 1;
+
+/// Message struct.
+#[derive(Clone)]
+pub struct Amp {
+    /// Protocol version.
+    pub version: i16,
+    /// Number of arguments.
+    pub argc: i16,
+    /// Encoded buffer.
+    pub buf: String,
+}
+
+impl Amp {
+    /// Decodes the given buffer into this message.
+    ///
+    /// # Arguments
+    ///
+    /// * `buf` - A string slice containing the encoded message.
+    pub fn decode(&mut self, buf: &str) {
+        let bytes = buf.as_bytes();
+        if bytes.is_empty() {
+            return;
+        }
+        self.version = (bytes[0] >> 4) as i16;
+        self.argc = (bytes[0] & 0xf) as i16;
+        self.buf = String::from_utf8(bytes[1..].to_vec()).unwrap();
+    }
+
+    /// Decodes and returns the next argument from the message.
+    ///
+    /// # Returns
+    ///
+    /// A string slice representing the next decoded argument.
+    pub fn decode_arg(&mut self) -> &str {
+        let bytes = self.buf.as_bytes();
+        if bytes.len() < 4 {
+            return "";
+        }
+        
+        let mut len: u32 = 0;
+        len |= (bytes[0] as u32) << 24;
+        len |= (bytes[1] as u32) << 16;
+        len |= (bytes[2] as u32) << 8;
+        len |= bytes[3] as u32;
+        let len = len as usize;
+        
+        if bytes.len() < 4 + len {
+            return "";
+        }
+        
+        // To return a reference to the decoded argument while advancing the buffer,
+        // we move the remaining buffer to the front and place the decoded argument at the end.
+        // This allows us to return a valid reference tied to `self` without violating borrow rules.
+        let mut new_bytes = Vec::with_capacity(bytes.len() - 4);
+        new_bytes.extend_from_slice(&bytes[4 + len ..]);
+        new_bytes.extend_from_slice(&bytes[4 .. 4 + len]);
+        
+        self.buf = String::from_utf8(new_bytes).unwrap();
+        
+        let start = self.buf.len() - len;
+        &self.buf[start..]
+    }
+}
+
+/// Encodes the given arguments into a message buffer.
+///
+/// # Arguments
+///
+/// * `argv` - A slice of string slices representing the arguments.
+///
+/// # Returns
+///
+/// A `String` containing the encoded message.
+pub fn amp_encode(argv: &[&str]) -> String {
+    let mut total_len = 1;
+    for arg in argv {
+        total_len += 4 + arg.len();
+    }
+    
+    let mut bytes = Vec::with_capacity(total_len);
+    let argc = argv.len() as u8;
+    
+    // In the C implementation, argc is not masked when encoding, 
+    // which means values > 15 will overflow into the version bits.
+    let header = ((AMP_VERSION as u8) << 4) | argc;
+    bytes.push(header);
+    
+    for arg in argv {
+        let len = arg.len() as u32;
+        bytes.push((len >> 24 & 0xff) as u8);
+        bytes.push((len >> 16 & 0xff) as u8);
+        bytes.push((len >> 8 & 0xff) as u8);
+        bytes.push((len & 0xff) as u8);
+        bytes.extend_from_slice(arg.as_bytes());
+    }
+    
+    String::from_utf8(bytes).unwrap()
+}
+```

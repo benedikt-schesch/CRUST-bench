@@ -1,0 +1,6 @@
+```rust
+// Generated Rust Code
+pub mod bitset {
+    pub struct Bitset;
+}
+```

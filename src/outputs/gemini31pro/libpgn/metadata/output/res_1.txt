@@ -1,0 +1,24 @@
+```rust
+// Generated Rust Code
+pub mod annotation;
+pub mod check;
+pub mod comments;
+pub mod coordinate;
+pub mod metadata;
+pub mod moves;
+pub mod pgn;
+pub mod piece;
+pub mod score;
+pub mod utils;
+
+pub use crate::annotation::*;
+pub use crate::check::*;
+pub use crate::comments::*;
+pub use crate::coordinate::*;
+pub use crate::metadata::*;
+pub use crate::moves::*;
+pub use crate::pgn::*;
+pub use crate::piece::*;
+pub use crate::score::*;
+pub use crate::utils::*;
+```

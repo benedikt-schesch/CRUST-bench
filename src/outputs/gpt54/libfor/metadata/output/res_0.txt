@@ -1,0 +1,9 @@
+{{lib.rs}}
+```rust
+// Generated Rust Code
+
+pub mod for_lib;
+pub mod for_gen;
+
+pub use crate::for_lib as forLib;
+```

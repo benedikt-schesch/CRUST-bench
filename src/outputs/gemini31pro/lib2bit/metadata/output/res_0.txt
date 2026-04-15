@@ -1,0 +1,6 @@
+```rust
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod twobit;
+```

@@ -1,0 +1,1 @@
+[{"error_code": "E0432", "error_message": "unresolved import `leftpad::leftpad`", "file_path": "leftpad/src/bin/tests.rs", "row": "2", "col": "14", "error_snippet": "|\n2 | use leftpad::leftpad::leftpad;\n  |              ^^^^^^^ could not find `leftpad` in `leftpad`\n\nFor more information about this error, try `rustc --explain E0432`."}]

@@ -1,0 +1,6 @@
+// Generated Rust Code
+{{lib.rs}}
+```rust
+pub mod mvptree;
+pub use crate::mvptree::*;
+```

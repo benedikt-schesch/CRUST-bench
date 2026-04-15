@@ -1,0 +1,39 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test run_get_color_test ... ok
+test run_get_float_test ... ok
+test run_get_int_test ... ok
+test run_get_str_test ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test run_print_test ... ok
+test test ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test ... FAILED
+
+failures:
+
+---- test stdout ----
+
+thread 'test' (250775) panicked at Simple_Config/src/bin/test_parse.rs:239:17:
+assertion failed: cfg.is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

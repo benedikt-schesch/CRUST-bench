@@ -1,0 +1,8 @@
+```rust
+pub mod xopt;
+pub mod snprintf;
+
+pub mod XOpt {
+    pub use crate::xopt;
+}
+```

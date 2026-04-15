@@ -1,0 +1,45 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test empty_input_test ... 70FAILED7362
+test encode_decode_test ... 74FAILEDff01007c0200
+0000022e8c7d8d37c427e060ec002ec1c2bc30196fc2f75d6a8844cbc03651c081430a0100000000ffffffff96a04e0cc636f377933e3d93accc627faacdbcdb5a9624df1b490bd045f24d2c0000000000ffffffff01e02be50e0000000017a914b53bb0dc1db8c8d803e3e39f784d42e4737ffa0d870000000000010447522103c8727ce35f1c93eb0be21406ee9a923c89219fe9c9e8504c8314a6a22d1295c02103c74dc710c407d7db6e041ee212d985cd2826d93f806ed44912b9a1da691c977352ae0104220020a8f44467bf171d51499153e01c0bd6291109fc38bd21b3c3224c9dc6b57590df0000
+test read_test_vector ... FAILED
+test test_vector ... ok
+
+failures:
+
+---- empty_input_test stdout ----
+
+thread 'empty_input_test' (219377) panicked at libpsbt/src/bin/test.rs:194:5:
+assertion `left == right` failed
+  left: OobWrite
+ right: Ok
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- encode_decode_test stdout ----
+
+thread 'encode_decode_test' (219378) panicked at libpsbt/src/bin/test.rs:157:5:
+assertion `left == right` failed
+  left: OobWrite
+ right: Ok
+
+---- read_test_vector stdout ----
+
+thread 'read_test_vector' (219379) panicked at libpsbt/src/bin/test.rs:126:26:
+assertion `left == right` failed
+  left: 4
+ right: 0
+
+
+failures:
+    empty_input_test
+    encode_decode_test
+    read_test_vector
+
+test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
