@@ -1,0 +1,11 @@
+{
+  "loc": {
+    "code": 1002
+  },
+  "unsafe": {
+    "blocks": 5,
+    "fns": 0,
+    "impls": 0,
+    "lines": 5
+  }
+}
