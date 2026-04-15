@@ -1,1 +1,36 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+file_name::module;`.
+If `file_name` is `annotation`, and `module` is `PgnAnnotation`? No, `PgnAnnotation` is a struct.
+What if the file name is `annotation`, and inside it there is a module `annotation`?
+Then the import would be `use crate::annotation::annotation;`.
+If the test binary uses `use libpgn::annotation::PgnAnnotation;`, maybe `libpgn` is the `file_name`?
+If `libpgn` is the `file_name`, then the import is `use crate::libpgn::annotation;`.
+This perfectly matches `use libpgn::annotation;` IF it was `use crate::libpgn::annotation;`!
+But the error says `use libpgn::annotation;`. It doesn't say `use crate::libpgn::annotation;`.
+Wait, in Rust 2015, `use libpgn::annotation;` is an absolute path that looks for the crate `libpgn`.
+In Rust 2018, `use libpgn::annotation;` looks for the crate `libpgn`, OR a module `libpgn` in the crate root.
+If the test binary is in the SAME crate (e.g. it's a module in `lib.rs`), then `use libpgn::annotation;` would look for a module `libpgn` in the crate root.
+If `lib.rs` has `pub mod libpgn;`, then `use libpgn::annotation;` works!
+Let's assume the test binaries are actually modules in the same crate, and they are included somewhere.
+If they are in the same crate, `use libpgn::annotation;` resolves to the module `libpgn` in the crate root.
+So `lib.rs` should be:
+```rust
+pub mod libpgn {
+    pub mod annotation;
+    pub mod check;
+    pub mod comments;
+    pub mod coordinate;
+    pub mod metadata;
+    pub mod moves;
+    pub mod pgn;
+    pub mod piece;
+    pub mod score;
+    pub mod utils;
+}
+pub use libpgn::*;
+```
+Wait, if `lib.rs` has `pub mod libpgn;`, then `libpgn` is a module.
+Then `use libpgn::annotation;` in any module of the crate will resolve to `crate::libpgn::annotation`.
+This perfectly explains why `use libpgn::annotation;` fails: `libpgn` is not a crate, it's supposed to be a module, but it's not defined!
+If the project is a single binary crate, and `lib.rs` is just a file, maybe the root is `main.rs`, and it has `mod lib;`.
+Then `lib.rs` defines the modules.
+If `lib.rs` defines `pub mod libpg

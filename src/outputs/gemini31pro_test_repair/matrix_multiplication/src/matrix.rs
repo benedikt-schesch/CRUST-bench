@@ -1,3 +1,4 @@
+
 pub fn generate_matrix(x: usize, y: usize, random: bool) -> Vec<Vec<f32>> {
 let mut matrix = Vec::with_capacity(x);
 let mut seed = 12345u32;

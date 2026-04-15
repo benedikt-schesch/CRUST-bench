@@ -1,1 +1,0 @@
-[{"error_code": "E0432", "error_message": "unresolved import `rect_pack_h::rect_pack`", "file_path": "rect_pack_h/src/bin/test.rs", "row": "1", "col": "18", "error_snippet": "|\n1 | use rect_pack_h::rect_pack::{Rect, RectPacker};\n  |                  ^^^^^^^^^ could not find `rect_pack` in `rect_pack_h`\n\nFor more information about this error, try `rustc --explain E0432`."}]

@@ -10,9 +10,9 @@ test test ... FAILED
 failures:
 
 ---- test stdout ----
-Test 1: Sequence Length=1050, K=717, S=15
+Test 1: Sequence Length=1050, K=697, S=44
 
-thread 'test' (773616) panicked at csyncmers/src/closed_syncmers.rs:38:17:
+thread 'test' (1564390) panicked at csyncmers/src/closed_syncmers.rs:38:17:
 attempt to subtract with overflow
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 

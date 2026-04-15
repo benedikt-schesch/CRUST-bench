@@ -1,1 +1,9 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+```rust
+#[path = "rbtree.rs"]
+pub mod rbtree_inner;
+
+pub mod rbtree {
+    pub use crate::rbtree_inner as rbtree;
+    pub use crate::rbtree_inner::*;
+}
+```

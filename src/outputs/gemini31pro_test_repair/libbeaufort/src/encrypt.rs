@@ -1,3 +1,4 @@
+
 use crate::tableau::beaufort_tableau;
 pub const BEAUFORT_ALPHA: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 pub const BEAUFORT_VERSION: &str = "1";

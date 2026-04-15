@@ -1,1 +1,70 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+To fix the test failures, we need to implement the formatting and printing logic for each function in `ft_printf.rs`. The tests pass a value to be printed and a mutable reference to a length counter (`&mut len`). The functions are expected to print the value, update the length counter by the number of characters printed, and return `1`.
+
+Since the original function signatures use unconstrained generic types (`T`, `U`, `V`), we cannot interact with them directly (e.g., we cannot format `T` or dereference `U`). To fix this while preserving the generic signature structure, we must add appropriate trait bounds:
+1. For the value to be printed (`T`), we can use `std::fmt::Display`, `std::fmt::LowerHex`, `std::fmt::UpperHex`, or `std::fmt::Pointer` depending on the specific formatting required.
+2. For the length counter (`U` or `V`), since it is passed as `&mut i32`, we can use `std::ops::DerefMut<Target = i32>`. This allows us to safely dereference and increment the counter.
+
+Here are the corrected files:
+
+{{ft_printf.rs}} 
+```rust
+// Generated Rust Code
+
+pub const HEXALOW: &str = "0123456789abcdef";
+pub const DECIMAL: &str = "0123456789";
+pub const HEXAUP: &str = "0123456789ABCDEF";
+pub const LOCATION: &str = "0123456789abcdef";
+
+pub fn writeint<T: std::fmt::Display, U: std::ops::DerefMut<Target = i32>>(_n: T, mut _len: U) -> i32 {
+    let s = format!("{}", _n);
+    print!("{}", s);
+    *_len += s.len() as i32;
+    1
+}
+
+pub fn writeuint<T: std::fmt::Display, U: std::ops::DerefMut<Target = i32>>(_n: T, mut _len: U) -> i32 {
+    let s = format!("{}", _n);
+    print!("{}", s);
+    *_len += s.len() as i32;
+    1
+}
+
+pub fn writehex<T: std::fmt::LowerHex + std::fmt::UpperHex, U: std::fmt::Display, V: std::ops::DerefMut<Target = i32>>(_n: T, _base: U, mut _len: V) -> i32 {
+    let base = format!("{}", _base);
+    let s = if base == "x" {
+        format!("{:x}", _n)
+    } else {
+        format!("{:X}", _n)
+    };
+    print!("{}", s);
+    *_len += s.len() as i32;
+    1
+}
+
+pub fn writepoint<T: std::fmt::Pointer, U: std::ops::DerefMut<Target = i32>>(_n: T, mut _len: U) -> i32 {
+    let s = format!("{:p}", _n);
+    print!("{}", s);
+    *_len += s.len() as i32;
+    1
+}
+
+pub fn writechar<T: std::fmt::Display, U: std::ops::DerefMut<Target = i32>>(_c: T, mut _len: U) -> i32 {
+    let s = format!("{}", _c);
+    print!("{}", s);
+    *_len += s.len() as i32;
+    1
+}
+
+pub fn writestring<T: std::fmt::Display, U: std::ops::DerefMut<Target = i32>>(_s: T, mut _len: U) -> i32 {
+    let s = format!("{}", _s);
+    print!("{}", s);
+    *_len += s.len() as i32;
+    1
+}
+```
+
+{{lib.rs}} 
+```rust
+// Generated Rust Code
+pub mod ft_printf;
+```

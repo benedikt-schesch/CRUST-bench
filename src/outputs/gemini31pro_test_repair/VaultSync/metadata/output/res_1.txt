@@ -1,1 +1,7 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+```rust
+// Generated Rust Code
+pub mod logger;
+pub mod vcs;
+
+pub use crate::vcs as vm;
+```

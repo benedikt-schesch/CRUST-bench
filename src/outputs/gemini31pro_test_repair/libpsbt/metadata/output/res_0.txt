@@ -1,1 +1,16 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+The error `E0432: unresolved import libpsbt::psbt` in `libpsbt/src/bin/test.rs` indicates that the compiler cannot find the `psbt` module in the `libpsbt` crate. This is likely because the `psbt` module is not properly exported or the crate name is different. However, looking at the provided `lib.rs` file, we can see that `psbt` is declared as a public module (`pub mod psbt;`).
+
+The issue might be that the `psbt` module is not accessible from the root of the crate, or there is a naming conflict. To ensure that the `psbt` module is correctly exported and accessible, we can explicitly re-export it using `pub use`.
+
+Here is the repaired `lib.rs` file:
+
+{{lib.rs}} 
+```rust
+pub mod base64;
+pub mod cli;
+pub mod compactsize;
+pub mod psbt;
+pub mod tx;
+
+pub use crate::psbt::*;
+```

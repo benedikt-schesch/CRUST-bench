@@ -1,1 +1,22 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+// Generated Rust Code
+```rust
+pub mod dht;
+
+pub mod Phills_DHT {
+    pub mod dht {
+        pub mod dht {
+            pub struct HASHTABLE<T> {
+                _marker: std::marker::PhantomData<T>,
+            }
+
+            impl<T> HASHTABLE<T> {
+                pub fn dht_init() -> Self {
+                    HASHTABLE {
+                        _marker: std::marker::PhantomData,
+                    }
+                }
+            }
+        }
+    }
+}
+```

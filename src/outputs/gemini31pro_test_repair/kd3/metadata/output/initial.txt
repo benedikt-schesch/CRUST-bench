@@ -1,0 +1,87 @@
+// Generated Rust Code
+```rust
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::cmp::Ordering;
+
+#[derive(Clone)]
+pub struct DataPoint{
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub idx: usize,
+}
+
+#[derive(Clone)]
+pub struct TreeNode{
+    pub left: Option<Rc<RefCell<TreeNode>>>,
+    pub right: Option<Rc<RefCell<TreeNode>>>,
+    pub split: f64,
+    pub idx: usize,
+}
+
+#[derive(Clone)]
+pub struct Boundaries{
+    pub min: f64,
+    pub max: f64,
+}
+
+#[derive(Clone)]
+pub struct space{
+    pub dim: [Boundaries; 3]
+}
+
+pub struct KDTree{
+    pub count: usize,
+    pub max_nodes: usize,
+    pub next_node: usize,
+    pub points: Vec<DataPoint>,
+    pub node_data: Vec<Rc<RefCell<TreeNode>>>,
+    pub root: Option<Rc<RefCell<TreeNode>>>,
+}
+
+impl KDTree{
+    pub fn new() -> Self {
+        KDTree {
+            count: 0,
+            max_nodes: 0,
+            next_node: 0,
+            points: Vec::new(),
+            node_data: Vec::new(),
+            root: None,
+        }
+    }
+
+    pub fn build(&mut self, x: &mut [f64], y: &mut [f64], z: &mut [f64], count: usize) {
+        assert!(count > 1);
+        
+        self.count = count;
+        self.max_nodes = ((count - 1) * 2) + 1;
+        self.next_node = 0;
+        
+        self.points = Vec::with_capacity(count);
+        for i in 0..count {
+            self.points.push(DataPoint {
+                x: x[i],
+                y: y[i],
+                z: z[i],
+                idx: i,
+            });
+        }
+        
+        self.node_data = Vec::with_capacity(self.max_nodes);
+        for _ in 0..self.max_nodes {
+            self.node_data.push(Rc::new(RefCell::new(TreeNode {
+                left: None,
+                right: None,
+                split: 0.0,
+                idx: 0,
+            })));
+        }
+        
+        let mut points = std::mem::take(&mut self.points);
+        self.build_kdtree(&mut points, 0);
+        self.points = points;
+    }
+
+    pub fn search(&

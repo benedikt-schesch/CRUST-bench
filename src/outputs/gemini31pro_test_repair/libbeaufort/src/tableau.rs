@@ -1,3 +1,6 @@
+
+pub const BEAUFORT_ALPHA: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+pub const BEAUFORT_VERSION: &str = "1";
 pub fn beaufort_tableau(alpha: &str) -> Vec<Vec<u8>> {
 let alpha_bytes = alpha.as_bytes();
 let size = alpha_bytes.len();

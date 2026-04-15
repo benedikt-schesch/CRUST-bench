@@ -1,1 +1,8 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+// Generated Rust Code
+```rust
+pub mod card;
+pub mod razz_simulation;
+
+pub use crate::card::*;
+pub use crate::razz_simulation::*;
+```

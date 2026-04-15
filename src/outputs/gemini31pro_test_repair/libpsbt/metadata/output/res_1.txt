@@ -1,1 +1,24 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+The error `E0432: unresolved import libpsbt::psbt` indicates that the compiler cannot find the `psbt` module when it is imported from the `libpsbt` crate in `test.rs`. 
+
+Looking at the `lib.rs` file, we have:
+```rust
+pub mod psbt;
+pub use crate::psbt::*;
+```
+The `pub use crate::psbt::*;` statement re-exports all items from the `psbt` module directly into the root of the crate. This means that items inside `psbt` are available as `libpsbt::ItemName` rather than `libpsbt::psbt::ItemName`. However, because `pub mod psbt;` is also present, the module itself should be accessible as `libpsbt::psbt`.
+
+Wait, if `test.rs` is trying to do `use libpsbt::psbt::*;`, and it fails with `could not find psbt in libpsbt`, it's highly likely that the `psbt` module is not being resolved correctly. This can happen if the `psbt` module is shadowed or if there's an issue with how it's exported. But more commonly, if `pub use crate::psbt::*;` is used, it brings all items from `psbt` into the root namespace. If there is a struct or another item named `psbt` inside the `psbt` module, `pub use crate::psbt::*;` will bring that item into the root, shadowing the `psbt` module itself!
+
+To fix this and ensure that the `psbt` module is always accessible as a module without being shadowed by its own contents, we can remove the `pub use crate::psbt::*;` wildcard re-export. This will force users (like `test.rs`) to import items via `libpsbt::psbt::*`, which matches the exact path they are trying to use in the failing test.
+
+Let's remove `pub use crate::psbt::*;` to prevent any potential shadowing and keep the module structure clean and explicit.
+
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod base64;
+pub mod cli;
+pub mod compactsize;
+pub mod psbt;
+pub mod tx;
+```

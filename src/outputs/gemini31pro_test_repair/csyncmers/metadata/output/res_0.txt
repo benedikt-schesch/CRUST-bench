@@ -1,16 +1,6 @@
-To fix the test failures, we need to address the integer overflow panics that occur during subtraction. In Rust, subtracting a larger `usize` from a smaller one will cause a panic in debug mode (and wrap around in release mode, which is usually unintended). 
-
-### Reasoning:
-1. **Overflow in `i - window_size + 1`**:
-   In `closed_syncmers.rs`, the line `let kmer_pos = i - window_size + 1;` is evaluated left-to-right as `(i - window_size) + 1`. When `i` is exactly `window_size - 1`, `i - window_size` evaluates to `(window_size - 1) - window_size`, which results in `-1`. Since both variables are of type `usize`, this causes an `attempt to subtract with overflow` panic. We can fix this by rearranging the expression to `i + 1 - window_size`.
-   
-2. **Overflow in `i - s + 1`**:
-   Similarly, the line `let s_mer_pos = i - s + 1;` will panic when `i` is exactly `s - 1`. We can fix this by rearranging the expression to `i + 1 - s`.
-
-3. **Safety Checks**:
-   To ensure that no other subtractions overflow (such as `k - s` or `len - s`), we should add a guard at the beginning of the functions to verify that `len >= k`, `k >= s`, and `s > 0`.
-
-Here are the corrected Rust files:
+```rust
+// Generated Rust Code
+```
 
 {{closed_syncmers.rs}}
 ```rust
@@ -32,14 +22,45 @@ pub fn compute_closed_syncmers(
     num_results: &mut i32,
 ) {
     *num_results = 0;
-    if len < k || k < s || s <= 0 {
-        eprintln!("Invalid lengths: ensure len >= k >= s > 0");
+    if len < k {
+        eprintln!("Sequence length is less than K");
+        return;
+    }
+    if k < s {
+        eprintln!("K is less than S");
+        return;
+    }
+    if s <= 0 {
+        eprintln!("S must be positive");
         return;
     }
     
     let len = len as usize;
     let k = k as usize;
     let s = s as usize;
-    let num_s_mers = len - s + 1;
+    
+    // Avoid subtraction overflow by adding 1 first
+    let num_s_mers = len + 1 - s;
     let mut s_mer_hashes = vec![0u128; num_s_mers];
     let mask: u128 = 1u128.checked_shl((2 * s) as u32).map(|v| v - 1).unwrap_or(!0);
+    let mut hash_fwd: u128 = 0;
+    let mut hash_rev: u128 = 0;
+    let rc_shift = 2 * (s - 1);
+    let seq_bytes = sequence_input.as_bytes();
+    
+    for i in 0..len {
+        let base = base_to_bits(seq_bytes[i] as char);
+        hash_fwd = ((hash_fwd << 2) | (base as u128)) & mask;
+        let comp_base = complement_base(base);
+        hash_rev = ((hash_rev >> 2) | ((comp_base as u128) << rc_shift)) & mask;
+        
+        // Avoid subtraction overflow by using addition
+        if i + 1 >= s {
+            let s_mer_pos = i + 1 - s;
+            let canonical_hash = if hash_fwd < hash_rev { hash_fwd } else { hash_rev };
+            s_mer_hashes[s_mer_pos] = canonical_hash;
+        }
+    }
+    
+    let window_size = k + 1 - s;
+    let mut deque = vec![0usize; num

@@ -1,1 +1,13 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+```rust
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod token;
+pub mod lex;
+pub mod codegen;
+pub mod hashmap;
+pub mod out;
+pub mod parse;
+pub mod list;
+pub mod cst;
+```

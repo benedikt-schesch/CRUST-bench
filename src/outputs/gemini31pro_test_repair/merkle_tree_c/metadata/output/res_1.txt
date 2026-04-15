@@ -1,1 +1,40 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+;
+fn main() {}
+```
+If I compile this, what is the error?
+Wait, `use lib::merkle_tree::*;`
+Let's trace: `lib::merkle_tree` refers to the module `merkle_tree` in `lib`.
+Since `lib.rs` has `pub mod merkle_tree;`, the module is there.
+It should compile successfully!
+Wait, if it compiles successfully, then why did the user get `E0432: unresolved import ... could not find merkle_tree in merkle_tree_c`?
+Could it be that `lib.rs` in the user's actual code did NOT have `pub mod merkle_tree;`?
+If the user's code was:
+```rust
+pub mod blake2b;
+
+pub use crate::blake2b::*;
+pub use crate::merkle_tree::*;
+```
+Then `pub mod merkle_tree;` is missing!
+Then `pub use crate::merkle_tree::*;` would fail with `unresolved import crate::merkle_tree`.
+But the error is in `test_merkle_tree.rs`, not `lib.rs`.
+This means `lib.rs` compiled successfully!
+How can `lib.rs` compile successfully if `merkle_tree` is missing?
+It can't. So `pub mod merkle_tree;` MUST be there.
+
+What if `merkle_tree_c` is NOT the library crate?
+What if `merkle_tree_c` is a module inside `test_merkle_tree.rs`?
+No, `use merkle_tree_c::merkle_tree::*;` is a standard way to import from a library crate in an integration test.
+What if the library crate is named `merkle_tree_c`, but in `Cargo.toml` the lib name is something else?
+If the lib name is something else, then `merkle_tree_c` is not a valid crate name, and the error would be `could not find crate \`merkle_tree_c\``.
+But the error is `could not find \`merkle_tree\` in \`merkle_tree_c\``.
+This means the crate `merkle_tree_c` WAS found!
+
+Let's rethink: `could not find \`merkle_tree\` in \`merkle_tree_c\``.
+Is it possible that `merkle_tree` is a private module?
+If `lib.rs` had `mod merkle_tree;` (without `pub`), then `merkle_tree` is private.
+If `test_merkle_tree.rs` tries to use it, the error is `module \`merkle_tree\` is private`.
+Not `could not find`.
+
+What if `merkle_tree` is a function?
+If `lib.rs` has `pub fn merkle_tree() {}`, and `test_merkle_tree.

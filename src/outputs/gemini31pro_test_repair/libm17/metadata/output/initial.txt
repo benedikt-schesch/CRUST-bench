@@ -1,0 +1,49 @@
+```rust
+// Generated Rust Code
+```
+
+{{decode.rs}}
+```rust
+use std::sync::Mutex;
+use crate::math::q_abs_diff;
+
+// Synchronization symbols for LSF (Link Setup Frame)
+pub const LSF_SYNC_SYMBOLS: [i8; 8] = [3, 3, 3, 3, -3, -3, 3, -3];
+// Synchronization symbols for Stream
+pub const STR_SYNC_SYMBOLS: [i8; 8] = [-3, -3, -3, -3, 3, 3, -3, 3];
+// Synchronization symbols for Packet
+pub const PKT_SYNC_SYMBOLS: [i8; 8] = [3, -3, 3, 3, -3, -3, -3, -3];
+// Symbol levels for modulation
+pub const SYMBOL_LEVELS: [f32; 4] = [-3.0, -1.0, 1.0, 3.0];
+pub const NUM_STATES: usize = 1 << (5 - 1);
+
+static PREV_METRICS: Mutex<[u32; NUM_STATES]> = Mutex::new([0; NUM_STATES]);
+static CURR_METRICS: Mutex<[u32; NUM_STATES]> = Mutex::new([0; NUM_STATES]);
+static PREV_METRICS_DATA: Mutex<[u32; NUM_STATES]> = Mutex::new([0; NUM_STATES]);
+static CURR_METRICS_DATA: Mutex<[u32; NUM_STATES]> = Mutex::new([0; NUM_STATES]);
+static VITERBI_HISTORY: Mutex<[u16; 244]> = Mutex::new([0; 244]);
+
+pub fn viterbi_decode(out: &mut [u8], input: &[u16], len: u16) -> u32 {
+    if len > 244 * 2 {
+        eprintln!("Input size exceeds max history");
+    }
+    viterbi_reset();
+    let mut pos = 0;
+    let mut i = 0;
+    while i < len as usize {
+        let s0 = input[i];
+        let s1 = input[i + 1];
+        viterbi_decode_bit(s0, s1, pos);
+        pos += 1;
+        i += 2;
+    }
+    viterbi_chainback(out, pos, len / 2)
+}
+
+pub fn viterbi_decode_punctured(
+    out: &mut [u8],
+    input: &[u16],
+    punct: &[u8],
+    in_len: u16,
+    p_len: u16,
+)

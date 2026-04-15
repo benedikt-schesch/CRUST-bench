@@ -1,1 +1,15 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+```rust
+pub mod core;
+pub mod io;
+pub mod math;
+pub mod os;
+pub mod string;
+pub mod tisp;
+
+pub use crate::core::*;
+pub use crate::io::*;
+pub use crate::math::*;
+pub use crate::os::*;
+pub use crate::string::*;
+pub use crate::tisp::*;
+```

@@ -1,1 +1,16 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+To resolve the compiler errors, we need to ensure that the `cuckoohash` and `openhash` modules are publicly exported from the library crate root (`lib.rs`). The errors indicate that the test binaries are trying to import `CuckooHashTable` and `OpenHashTable` from `Graph_recogniser::cuckoohash` and `Graph_recogniser::openhash`, but the modules are not found in the crate root. 
+
+By declaring `pub mod cuckoohash;` and `pub mod openhash;` in `lib.rs`, we expose these modules to the external binaries (like the test binaries) that depend on this library crate.
+
+Here is the repaired `lib.rs` file:
+
+{{lib.rs}} 
+```rust
+// Generated Rust Code
+pub mod check;
+pub mod cuckoohash;
+pub mod defs;
+pub mod hash;
+pub mod openhash;
+pub mod log;
+```

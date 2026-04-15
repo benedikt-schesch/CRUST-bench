@@ -1,0 +1,88 @@
+```rust
+  // Generated Rust Code
+  ```
+
+  {{error.rs}}
+  ```rust
+#[derive(Debug)]
+pub enum AcesError {
+    GenericError(String),
+}
+
+pub type Result<T> = std::result::Result<T, AcesError>;
+  ```
+
+  {{common.rs}}
+  ```rust
+use rand::Rng;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Xgcd {
+    pub gcd: u64,
+    pub a: i64,
+    pub b: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Pair {
+    pub first: u64,
+    pub second: u64,
+}
+
+pub fn gcd(mut x: u64, mut y: u64) -> u64 {
+    while x != y {
+        if x > y {
+            x -= y;
+        } else {
+            y -= x;
+        }
+    }
+    x
+}
+
+pub fn xgcd(mut x: u64, mut y: u64) -> Xgcd {
+    let mut prev_a: i64 = 1;
+    let mut a: i64 = 0;
+    let mut prev_b: i64 = 0;
+    let mut b: i64 = 1;
+    while y != 0 {
+        let q = (x / y) as i64;
+        let temp = x % y;
+        x = y;
+        y = temp;
+
+        let temp_a = a;
+        a = prev_a - (q * a);
+        prev_a = temp_a;
+
+        let temp_b = b;
+        b = prev_b - (q * b);
+        prev_b = temp_b;
+    }
+    Xgcd {
+        gcd: x,
+        a: prev_a,
+        b: prev_b,
+    }
+}
+
+pub fn are_coprime(x: u64, y: u64) -> bool {
+    !(gcd(x, y) > 1)
+}
+
+pub fn randinverse(value: u64) -> Pair {
+    let mut a = randrange(2, value - 1);
+    while !are_coprime(a, value) {
+        a = randrange(2, value - 1);
+    }
+    let result = xgcd(a, value);
+    let second = if result.a > 0 {
+        result.a as u64
+    } else {
+        (result.a + value as i64) as u64
+    };
+    Pair { first: a, second }
+}
+
+pub fn randrange(lower: u64, upper: u64) -> u64 {
+    

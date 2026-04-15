@@ -1,1 +1,5 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+```rust
+pub mod worsp {
+    pub use super::*;
+}
+```

@@ -1,3 +1,6 @@
+
+mod matrix;
+mod utils;
 use std::time::Instant;
 use crate::matrix::{generate_matrix, free_matrix, multiply};
 pub fn test_one(x1: usize, y1: usize, x2: usize, y2: usize, method: i32, _test_name: &str, time_taken: &mut u128) -> i32 {

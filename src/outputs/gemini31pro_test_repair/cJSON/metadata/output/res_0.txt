@@ -1,1 +1,41 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+module `cJSON` in the crate root!
+Wait, if `test_main.rs` is a binary, its crate root is `test_main.rs`.
+So `use cJSON::cjson;` looks for a module `cJSON` in `test_main.rs`!
+If `test_main.rs` has `extern crate cJSON;`, then `cJSON` is a crate, and it looks in the crate `cJSON`.
+If `test_main.rs` does NOT have `extern crate cJSON;`, but has `mod cJSON;`, it looks in the module `cJSON`.
+If `test_main.rs` is Rust 2018, `use cJSON::cjson;` looks for a crate `cJSON` or a module `cJSON` in scope.
+
+Assume the binary is Rust 2018, and `cJSON` is the library crate.
+Then `cJSON::cjson` looks for `cjson` in the library crate `cJSON`.
+If `lib.rs` has `pub mod cjson;`, it should be found.
+Why is it not found?
+Maybe the library crate is NOT named `cJSON`?
+What if the library crate is named `cjson_lib` or something, and `cJSON` is just a module inside `lib.rs`?
+If `lib.rs` is:
+```rust
+pub mod cjson;
+```
+And the binary does `use cJSON::cjson;`.
+If `cJSON` is a module in `lib.rs`, we need to define it!
+```rust
+pub mod cJSON {
+    pub mod cjson;
+}
+```
+Wait, if `cJSON` is a module in `lib.rs`, and the binary does `use cJSON::cjson;`.
+In Rust 2018, `use cJSON::cjson;` in a binary will NOT look in the library crate unless the library crate is named `cJSON`.
+If the library crate is named `cJSON`, it looks in the library crate.
+If the library crate is named `cJSON`, and `lib.rs` has `pub mod cJSON;`, then `cJSON::cJSON` would be the module.
+
+Let's reconsider the c2rust output.
+When c2rust translates `cJSON.c`, it creates `cJSON.rs`.
+It generates `lib.rs` with:
+```rust
+pub mod cJSON;
+```
+If `lib.rs` has `pub mod cJSON;`, then the module is `cJSON`.
+But the binary `test_main.rs` has `use cJSON::cjson::{parse, CJson};`.
+Notice the case: `cJSON::cjson`.
+If the crate is `cJSON`, and the module is `cJSON`, the path should be `cJSON::cJSON`.
+But the binary uses `cJSON::cjson`.
+So the binary

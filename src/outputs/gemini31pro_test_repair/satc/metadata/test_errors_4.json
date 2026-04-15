@@ -1,1 +1,0 @@
-[{"error_code": "E0432", "error_message": "unresolved import `satc::satc`", "file_path": "satc/src/bin/satc_test.rs", "row": "1", "col": "5", "error_snippet": "|\n1 | use satc::satc;\n  |     ^^^^^^^^^^ no `satc` in the root\n\nFor more information about this error, try `rustc --explain E0432`."}]

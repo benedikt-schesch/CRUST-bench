@@ -1,1 +1,19 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+```rust
+{{lib.rs}}
+```rust
+// Generated Rust Code
+pub mod skp {
+    /// A utility function to process string slices.
+    /// The concrete `&str` types provide the necessary type constraints
+    /// for the compiler to infer `.len()` and slicing operations in the tests.
+    pub fn skp_(from: &str, to: &str) -> usize {
+        from.len().saturating_sub(to.len())
+    }
+}
+```
+
+{{filename.rs}}
+```rust
+// Generated Rust Code
+// Input Rust code was empty.
+```

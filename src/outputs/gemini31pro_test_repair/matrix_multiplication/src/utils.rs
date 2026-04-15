@@ -1,3 +1,4 @@
+
 pub fn print_array(matrix: &[Vec<f32>], name: &str, typ: &str) -> i32 {
 println!("-------------{}--------------", name);
 if typ == "float" {

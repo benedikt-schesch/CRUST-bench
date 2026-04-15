@@ -1,1 +1,1 @@
-[{"error_code": "E0432", "error_message": "unresolved import `amp::amp`", "file_path": "amp/src/bin/test.rs", "row": "1", "col": "10", "error_snippet": "|\n1 | use amp::amp::*;\n  |          ^^^ could not find `amp` in `amp`\n\nFor more information about this error, try `rustc --explain E0432`."}]
+[]

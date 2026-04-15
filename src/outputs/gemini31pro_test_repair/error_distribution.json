@@ -1,9 +1,10 @@
 {
-    "unresolved import": 86,
-    "No errors": 9,
+    "unresolved import": 83,
+    "An unknown field was specified into a structure.  ": 1,
+    "type": 10,
+    "access nonexistent field.": 1,
+    "No errors": 12,
     "missing": 6,
-    "type": 9,
-    "args": 1,
     "Unresolved name used.": 5,
     "unsafe": 0
 }

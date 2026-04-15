@@ -1,1 +1,0 @@
-[{"error_code": "E0432", "error_message": "unresolved import `LTRE::ltre`", "file_path": "LTRE/src/bin/test.rs", "row": "1", "col": "11", "error_snippet": "|\n1 | use LTRE::ltre::*;\n  |           ^^^^ could not find `ltre` in `LTRE`"}]

@@ -1,1 +1,0 @@
-[{"error_code": "E0432", "error_message": "unresolved import `chtrie::chtrie`", "file_path": "chtrie/src/bin/test.rs", "row": "2", "col": "13", "error_snippet": "|\n2 | use chtrie::chtrie::Chtrie;\n  |             ^^^^^^ could not find `chtrie` in `chtrie`\n\nFor more information about this error, try `rustc --explain E0432`."}]

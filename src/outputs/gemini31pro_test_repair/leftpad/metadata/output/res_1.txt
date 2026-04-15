@@ -1,1 +1,17 @@
-Error code: 401 - {'error': {'message': 'No cookie auth credentials found', 'code': 401}}
+```rust
+// Generated Rust Code
+pub mod leftpad {
+    pub fn leftpad(s: &str, len: usize, pad: char) -> String {
+        if s.len() >= len {
+            s.to_string()
+        } else {
+            let mut result = String::with_capacity(len);
+            for _ in 0..(len - s.len()) {
+                result.push(pad);
+            }
+            result.push_str(s);
+            result
+        }
+    }
+}
+```

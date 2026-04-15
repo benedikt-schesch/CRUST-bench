@@ -1,0 +1,70 @@
+```rust
+// Generated Rust Code
+
+use std::io::Write;
+
+/// SKP version information.
+pub const SKP_VER: u32 = 0x0003001C;
+pub const SKP_VER_STR: &str = "0.3.1rc";
+
+/// A loop state used for scanning.
+#[derive(Debug, Default, Clone)]
+pub struct SkpLoop {
+    pub start: String,
+    pub to: Option<String>,
+    pub end: Option<String>,
+    pub alt: i32,
+}
+
+/// Returns the “length” from start to to.
+pub fn skp_loop_len(start: &str, to: &str) -> i32 {
+    let ret = start.len() as isize - to.len() as isize;
+    if ret >= 0 && ret <= (1 << 16) {
+        ret as i32
+    } else {
+        0
+    }
+}
+
+/// Global variable used in the C code.
+pub static mut SKP_ZERO: i32 = 0;
+
+/// Trace function (corresponds to the C macro skptrace).
+pub fn skptrace(args: std::fmt::Arguments) {
+    eprintln!("TRCE: {}", args);
+}
+
+/// The core scanning function from the C header.
+pub fn skp_<'a>(src: &'a str, mut pat: &'a str) -> (i32, &'a str, &'a str) {
+    let mut start = src;
+    let mut s = start;
+    let mut p = pat;
+    let mut skp_to = false;
+    let mut matched = 0;
+    let mut ret = 0;
+    let mut goal: Option<&str> = None;
+    let mut goalnot: Option<&str> = None;
+    let mut flg = 0;
+
+    if pat.is_empty() || src.is_empty() {
+        return (0, src, src);
+    }
+
+    if p.starts_with('>') {
+        skp_to = true;
+        p = &p[1..];
+        pat = p;
+    }
+
+    while !p.is_empty() && is_space(p.as_bytes()[0] as u32) {
+        p = &p[1..];
+    }
+
+    while !p.is_empty() && p.as_bytes()[0] > 7 {
+        let (m, s_end, p_end) = match_pat(p, s, &mut flg);
+        matched = m;
+        if matched != MATCHED_FAIL {
+            s = s_end;
+            p = p_end;
+            if matched == MATCHED_GOAL && goalnot.is_none() {
+                goal = Some(
